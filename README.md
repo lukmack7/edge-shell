@@ -13,7 +13,7 @@ Nakładka na Windows, która zostawia środek ekranu pracy, a wszystko inne trzy
   - Bieżący blok z Horologa z pierścieniem czasu oraz przyciski Pauza / Skończone / Przeplanuj.
   - „Wrzuć myśl”, czyli zapis językiem naturalnym prosto do Horologa.
   - Plan dnia, tygodniowy cel fokusu i Spotify.
-- **Radio.** Powiadomienia wyglądają jak rozmowy z pit wall: numer startowy, nazwa, cytat i gotowa odpowiedź na jeden klik.
+- **Radio.** Wszystkie powiadomienia Windows i wiadomości z lokalnego endpointu wyglądają jak rozmowy z pit wall: numer startowy, nazwa, cytat i gotowa odpowiedź na jeden klik.
   - W trybie cichym zwykłe wiadomości czekają na paczkę o ustalonej godzinie.
   - Od razu przechodzą tylko pilne wiadomości i kontakty z numerem 1–9.
 - **Pit wall.** Komunikaty o starcie bloków, przypomnienie o spotkaniu 10 minut wcześniej i „Box, box” przed buforem. Krawędź ekranu świeci na bursztynowo przed spotkaniem.
@@ -121,7 +121,30 @@ Invoke-RestMethod -Method Post -Uri http://127.0.0.1:7311/radio -ContentType 'ap
 - Z `replyUrl` odpowiedź idzie jako `POST {"reply": "...", "id": "...", "to": "..."}`.
 - Jeśli ustawisz `radio.token`, dodawaj nagłówek `Authorization: Bearer <token>`.
 
-Edge Shell nie przechwytuje powiadomień innych aplikacji Windows, bo dostęp do nich mają tylko aplikacje pakowane jako MSIX. Wiadomości trafiają do radia przez ten endpoint.
+## Radio: wszystkie powiadomienia Windows
+
+Edge Shell przechwytuje powiadomienia **wszystkich aplikacji**: Teams, Outlook, WhatsApp, Discord, Telefon, a także powiadomienia stron z przeglądarki.
+
+- Windows zapisuje każde powiadomienie w bazie `%LOCALAPPDATA%\Microsoft\Windows\Notifications\wpndatabase.db`. Edge Shell czyta ją wyłącznie do odczytu, co sekundę.
+- Pierwsza linia powiadomienia staje się nadawcą (dopasowywanym do `contacts`), reszta treścią.
+- Przycisk **Otwórz** uruchamia aplikację, z której przyszło powiadomienie.
+
+**Ważne: włącz w Windows „Nie przeszkadzać”** (Ustawienia → System → Powiadomienia). Systemowe dymki znikną, ale powiadomienia dalej trafiają do bazy, więc zobaczysz je tylko jako radio. Bez tego każde powiadomienie pojawi się dwa razy.
+
+Reguły dla aplikacji ustawiasz w `notifications.apps`:
+
+```jsonc
+"notifications": {
+  "enabled": true,
+  "apps": [
+    { "matches": "Spotify", "ignore": true },                      // pomijaj
+    { "matches": "Teams", "color": "#a5b4fc" },                    // własny kolor
+    { "matches": "Outlook", "urgent": true, "name": "Poczta" }     // zawsze od razu
+  ]
+}
+```
+
+Pole `matches` to fragment identyfikatora aplikacji albo jej nazwa.
 
 ## Spotify
 

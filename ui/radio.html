@@ -51,7 +51,9 @@ function render(s) {
         <p class="quote reply">„${esc(m.reply)}”</p>
       </div>` : ''}
     <div class="grid2">
-      ${m.reply ? '<button class="btn light" id="send">Wyślij odpowiedź</button>' : '<button class="btn light" id="ok">Rozumiem</button>'}
+      ${m.reply ? '<button class="btn light" id="send">Wyślij odpowiedź</button>'
+        : m.openTarget ? `<button class="btn light" id="open">Otwórz ${esc(m.app || 'aplikację')}</button>`
+        : '<button class="btn light" id="ok">Rozumiem</button>'}
       <button class="btn" id="later">${total > 1 ? 'Następne radio' : 'Do paczki'}</button>
     </div>
     <div class="meta"><span>@${esc(m.source)} · ${hhmm(m.at)}</span><span class="mono">1/${total}</span></div>`;
@@ -59,6 +61,8 @@ function render(s) {
   document.getElementById('close').onclick = () => invoke('radio_next');
   const later = document.getElementById('later');
   later.onclick = () => invoke(total > 1 ? 'radio_next' : 'radio_later');
+  const open = document.getElementById('open');
+  if (open) open.onclick = () => invoke('radio_open');
   const ok = document.getElementById('ok');
   if (ok) ok.onclick = () => invoke('radio_next');
   const send = document.getElementById('send');

@@ -71,6 +71,12 @@ pub struct RadioMsg {
     pub reply_url: Option<String>,
     pub urgent: bool,
     pub at: DateTime<Local>,
+    /// Aplikacja, z której przyszło powiadomienie Windows.
+    #[serde(default)]
+    pub app: Option<String>,
+    /// Co otworzyć przyciskiem „Otwórz”, np. `shell:AppsFolder\<AUMID>`.
+    #[serde(default)]
+    pub open_target: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -166,6 +172,7 @@ pub struct Runtime {
     pub last_batch: String,
     pub friction_app: Option<String>,
     pub glow_until: Option<DateTime<Local>>,
+    pub notif_status: String,
 }
 
 pub struct Shared {
@@ -322,6 +329,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
             "showingCount": rt.showing.len(),
             "waiting": rt.store.waiting.len(),
             "nextBatch": next_batch,
+            "notifications": rt.notif_status,
         },
         "shelf": rt.store.shelf,
         "stashes": rt.store.stashes,

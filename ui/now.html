@@ -208,6 +208,8 @@ onSnapshot((s) => {
   $('status').innerHTML = h.connected
     ? `<span style="color:#bbf7d0">● połączono</span>`
     : `<span>● offline</span>${h.pendingCaptures ? ` · ${h.pendingCaptures} myśli czeka` : ''}`;
+  const n = s.radio.notifications;
+  if (n && n !== 'ok') $('status').innerHTML += ` · <span title="${esc(n)}" style="color:#fde68a">powiadomienia: brak dostępu</span>`;
   renderFocus(s);
   renderDay(s);
   renderWeek(s);

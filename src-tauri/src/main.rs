@@ -6,6 +6,7 @@ mod engine;
 mod horolog;
 mod hotkeys;
 mod layout;
+mod notifications;
 mod platform;
 mod radio;
 mod spotify;
@@ -37,6 +38,7 @@ fn main() {
             radio::start_server(handle.clone());
             spotify::start(handle.clone());
             engine::start(handle.clone());
+            notifications::start(handle.clone());
             layout::start_edges(handle.clone());
 
             // Szuflada i Teraz chowają się, gdy klikniesz gdzie indziej.
@@ -82,6 +84,7 @@ fn main() {
             commands::radio_reply,
             commands::radio_next,
             commands::radio_later,
+            commands::radio_open,
             commands::radio_show_waiting,
             commands::shelf_add,
             commands::shelf_remove,

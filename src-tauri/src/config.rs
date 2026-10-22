@@ -32,6 +32,42 @@ pub struct Config {
     pub spotify: SpotifyCfg,
     pub shell: ShellCfg,
     pub focus: FocusCfg,
+    pub notifications: NotificationsCfg,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct NotificationsCfg {
+    /// Przechwytuj powiadomienia wszystkich aplikacji Windows do radia.
+    pub enabled: bool,
+    /// Reguły dla aplikacji: wyciszenie, pilność, kolor, nazwa.
+    pub apps: Vec<NotifApp>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct NotifApp {
+    /// Fragment identyfikatora aplikacji (AUMID) albo jej nazwa, np. `Teams`.
+    pub matches: String,
+    pub name: String,
+    pub color: String,
+    /// Zawsze od razu, nawet w trybie cichym.
+    pub urgent: bool,
+    /// Pomijaj całkowicie.
+    pub ignore: bool,
+}
+
+impl Default for NotificationsCfg {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            apps: vec![
+                NotifApp { matches: "Spotify".into(), ignore: true, ..NotifApp::default() },
+                NotifApp { matches: "Teams".into(), color: "#a5b4fc".into(), ..NotifApp::default() },
+                NotifApp { matches: "WhatsApp".into(), color: "#4ade80".into(), ..NotifApp::default() },
+            ],
+        }
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -335,6 +371,7 @@ impl Default for Config {
             spotify: SpotifyCfg::default(),
             shell: ShellCfg::default(),
             focus: FocusCfg::default(),
+            notifications: NotificationsCfg::default(),
         }
     }
 }

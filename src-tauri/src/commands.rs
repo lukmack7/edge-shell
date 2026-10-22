@@ -229,6 +229,17 @@ pub fn radio_next(app: AppHandle) {
     radio::dismiss(&app, false);
 }
 
+/// Otwiera aplikację, z której przyszło powiadomienie, i zdejmuje kartę.
+#[tauri::command]
+pub fn radio_open(app: AppHandle) -> Res<()> {
+    let target = state::read(&app, |rt| rt.showing.front().and_then(|m| m.open_target.clone()));
+    radio::dismiss(&app, false);
+    match target {
+        Some(t) => app.opener().open_path(t, None::<&str>).map_err(|e| e.to_string()),
+        None => Ok(()),
+    }
+}
+
 #[tauri::command]
 pub fn radio_later(app: AppHandle) {
     radio::dismiss(&app, true);

@@ -66,6 +66,8 @@ pub fn from_incoming(app: &AppHandle, inc: Incoming) -> RadioMsg {
         reply_url: inc.reply_url.filter(|u| u.starts_with("http://") || u.starts_with("https://")),
         urgent: inc.urgent,
         at: Local::now(),
+        app: None,
+        open_target: None,
     }
 }
 
@@ -97,6 +99,8 @@ pub fn pit_wall(app: &AppHandle, message: String, reply: Option<String>) {
             reply_url: None,
             urgent: true,
             at: Local::now(),
+            app: None,
+            open_target: None,
         },
     );
 }
