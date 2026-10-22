@@ -71,10 +71,16 @@ $('logo').onclick = () => invoke('toggle_panel', { label: 'drawer' });
 $('center').onclick = () => invoke('toggle_panel', { label: 'now' });
 $('radio').onclick = () => invoke('radio_show_waiting');
 $('clockBtn').onclick = () => invoke('toggle_calendar');
+// Klik w tytuł wyciąga odtwarzacz na wierzch; klik w korektor = play/pauza.
 $('music').onclick = (e) => {
-  const playing = e.currentTarget.dataset.playing === '1';
-  invoke('spotify_control', { action: playing ? 'pause' : 'play' }).catch(() => {});
+  if (e.target.closest('.eq')) {
+    const playing = e.currentTarget.dataset.playing === '1';
+    invoke('spotify_control', { action: playing ? 'pause' : 'play' }).catch(() => {});
+  } else {
+    invoke('player_toggle');
+  }
 };
+$('music').title = 'Klik: odtwarzacz na wierzchu · korektor: play/pauza';
 
 function renderModes(s) {
   $('modes').innerHTML = s.modes.map((m) =>

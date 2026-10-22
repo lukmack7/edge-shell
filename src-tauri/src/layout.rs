@@ -257,6 +257,7 @@ pub fn arrange(app: &AppHandle) {
     }
     place_radio(app);
     sync_bubbles(app);
+    crate::player::sync(app);
     let fs = FULLSCREEN.lock().ok().and_then(|g| *g);
     if let Some(fs) = fs {
         hide_covered(app, fs);
@@ -270,7 +271,7 @@ fn inside(r: Rect, x: i32, y: i32) -> bool {
 /// Chowa nasze okna leżące na monitorze zajętym przez pełny ekran.
 fn hide_covered(app: &AppHandle, fs: Rect) {
     for (label, w) in app.webview_windows() {
-        let ours = label == "topbar" || label.starts_with("topbar-") || matches!(label.as_str(), "rail" | "dock" | "bubbles" | "preview" | "stack");
+        let ours = label == "topbar" || label.starts_with("topbar-") || matches!(label.as_str(), "rail" | "dock" | "bubbles" | "preview" | "stack" | "player");
         if !ours {
             continue;
         }

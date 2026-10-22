@@ -21,7 +21,17 @@ import { invoke, onSnapshot, onTick, ring, focusTiming, mmss, icon, esc } from '
 
 const $ = (id) => document.getElementById(id);
 $('timer').onclick = () => invoke('set_panel', { label: 'now', open: true });
+// Klik: pauza. Przytrzymanie (0,4 s): odtwarzacz na wierzchu.
+let holdTimer = null;
+let held = false;
+$('music').onpointerdown = () => {
+  held = false;
+  holdTimer = setTimeout(() => { held = true; invoke('player_toggle'); }, 400);
+};
+$('music').onpointerleave = () => clearTimeout(holdTimer);
 $('music').onclick = () => {
+  clearTimeout(holdTimer);
+  if (held) return;
   const playing = $('music').dataset.playing === '1';
   invoke('spotify_control', { action: playing ? 'pause' : 'play' }).catch(() => {});
 };

@@ -195,7 +195,7 @@ pub async fn play_playlist(app: &AppHandle, uri: &str, volume: Option<u8>) {
 async fn poll_once(app: &AppHandle) {
     let Some(tok) = token(app).await else { return };
     let resp = reqwest::Client::new()
-        .get("https://api.spotify.com/v1/me/player/currently-playing")
+        .get("https://api.spotify.com/v1/me/player")
         .bearer_auth(tok)
         .timeout(Duration::from_secs(10))
         .send()
@@ -223,6 +223,9 @@ async fn poll_once(app: &AppHandle) {
         rt.music.progress_ms = v["progress_ms"].as_i64().unwrap_or(0);
         rt.music.duration_ms = item["duration_ms"].as_i64().unwrap_or(0);
         rt.music.fetched_at_ms = Local::now().timestamp_millis();
+        rt.music.volume = v["device"]["volume_percent"].as_i64();
+        rt.music.device = v["device"]["name"].as_str().unwrap_or("").to_string();
+        rt.music.album = item["album"]["name"].as_str().unwrap_or("").to_string();
     });
 }
 

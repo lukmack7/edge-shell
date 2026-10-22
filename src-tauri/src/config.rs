@@ -389,6 +389,7 @@ pub struct Contact {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Hotkeys {
+    pub player: String,
     pub drawer: String,
     pub now: String,
     pub capture: String,
@@ -538,6 +539,7 @@ impl Default for Contact {
 impl Default for Hotkeys {
     fn default() -> Self {
         Self {
+            player: "Ctrl+Alt+M".into(),
             drawer: "Ctrl+Alt+ArrowLeft".into(),
             now: "Ctrl+Alt+ArrowRight".into(),
             capture: "Ctrl+Alt+K".into(),

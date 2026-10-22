@@ -109,6 +109,10 @@ Panele wysuwają się też same, gdy kursor dotknie lewej albo prawej krawędzi 
 
 *Ustawienia → Automatyzacje*: reguły „Gdy → to”. Warunki: czas (dni tygodnia), monitor (po nazwie z EDID albo dowolny dodatkowy), sieć Wi‑Fi, nowy plik w folderze (wzorzec, np. `*.pdf`), blok z Horologa (spotkanie, fokus…, X min wcześniej), aplikacja / pełny ekran, bateria, bezczynność. Akcje wykonują się po kolei: tryb, Spotify, cisza radia, karta radia, półka, odłożenie / zamknięcie okien aplikacji, uruchomienie, jasność, głośność, fokus, schowanie docka i pasków, dowolne polecenie `cmd`. Opcje: *najpierw zapytaj* (karta radia z „Tak / Nie”), *nie częściej niż*, *gdy warunek minie, przywróć*. Dziennik pokazuje, co się wykonało. Przykładowe reguły są dodane, ale wyłączone.
 
+## Odtwarzacz na wierzchu
+
+Pływająca karta Spotify z okładką; tło, tytuł, pasek postępu i przycisk play biorą kolory z okładki. Wyciągasz ją klikiem w tytuł w górnym pasku (klik w korektor = play/pauza), przytrzymaniem dymka muzyki, `sp` w palecie albo `Ctrl+Alt+M`. Przeciągasz za okładkę (przy krawędzi przyciąga się do rogu), podwójny klik zwija kartę do paska, kółko myszy zmienia głośność, 📌 odpina z wierzchu. Bez kursora przygasa, w grach się chowa, na początku fokusu sam zwija się do paska. Pozycja i rozmiar są zapamiętywane.
+
 ## Horolog
 
 Edge Shell korzysta z tych tras API Horologa (bez logowania, więc trzymaj Horologa w sieci domowej albo za VPN):

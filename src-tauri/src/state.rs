@@ -135,6 +135,24 @@ pub struct Store {
     /// Ostatnie wykonanie reguły automatyzacji.
     pub rule_last: HashMap<String, DateTime<Local>>,
     pub automation_log: Vec<LogEntry>,
+    pub player: PlayerState,
+}
+
+/// Pływający odtwarzacz: czy widoczny, pozycja (px fizyczne), karta/pasek, na wierzchu.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PlayerState {
+    pub visible: bool,
+    pub x: Option<i32>,
+    pub y: Option<i32>,
+    pub compact: bool,
+    pub pinned: bool,
+}
+
+impl Default for PlayerState {
+    fn default() -> Self {
+        Self { visible: false, x: None, y: None, compact: false, pinned: true }
+    }
 }
 
 impl Store {
@@ -174,6 +192,10 @@ pub struct Music {
     pub duration_ms: i64,
     pub fetched_at_ms: i64,
     pub error: String,
+    /// Głośność urządzenia Spotify (0–100).
+    pub volume: Option<i64>,
+    pub device: String,
+    pub album: String,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -419,6 +441,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "battery": rt.battery.map(|(p, c)| json!({ "percent": p, "charging": c })),
         "music": rt.music,
         "spotifyEnabled": !cfg.spotify.client_id.is_empty(),
+        "player": rt.store.player,
         "panels": { "drawer": rt.drawer_open, "now": rt.now_open },
         "friction": rt.friction_app.as_ref().and_then(|id| cfg.dock.iter().find(|a| &a.id == id))
             .map(|a| json!({ "id": a.id, "name": a.name })),

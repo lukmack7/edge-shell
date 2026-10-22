@@ -32,6 +32,7 @@ fn run(app: &AppHandle, action: &str) {
         "capture" => layout::show_window(app, "capture", true),
         "search" => crate::palette::show(app),
         "radio" => crate::radio::release_batch(app),
+        "player" => crate::player::toggle(app),
         "focus" => {
             let app = app.clone();
             tauri::async_runtime::spawn(async move {
@@ -52,7 +53,8 @@ pub fn register(app: &AppHandle) {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
     let keys = state::cfg(app).hotkeys;
-    let pairs: [(&str, &'static str); 6] = [
+    let pairs: [(&str, &'static str); 7] = [
+        (&keys.player, "player"),
         (&keys.drawer, "drawer"),
         (&keys.now, "now"),
         (&keys.capture, "capture"),

@@ -1,0 +1,300 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — odtwarzacz</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  :root { --p-bg: #17171c; --p-accent: #e4e4e7; --p-on: #111; }
+  body { padding: 12px; transition: opacity 0.4s ease; }
+  body.dim { opacity: 0.6; }
+  .card, .bar { background: var(--p-bg); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 18px 44px rgba(0,0,0,0.5); transition: background 0.5s ease; }
+  .card { height: 100%; display: flex; flex-direction: column; border-radius: 26px; overflow: hidden; }
+  .art { position: relative; height: 216px; flex: none; background: #26262c center/cover no-repeat; cursor: grab; }
+  .art::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 80px; background: linear-gradient(to bottom, transparent, var(--p-bg)); transition: background 0.5s ease; pointer-events: none; }
+  .art .ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.35); }
+  .tools { position: absolute; top: 12px; left: 12px; right: 12px; display: flex; gap: 6px; z-index: 1; opacity: 0; transition: opacity 0.2s; }
+  body:hover .tools { opacity: 1; }
+  .tb { width: 30px; height: 30px; border-radius: 9px; border: 0; background: rgba(0,0,0,0.42); color: #fff; display: flex; align-items: center; justify-content: center; }
+  .tb:hover { background: rgba(0,0,0,0.65); }
+  .tb.on { color: var(--p-accent); }
+  .meta { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 4px 24px 0; text-align: center; }
+  .title { max-width: 100%; font-size: 22px; font-weight: 650; color: var(--p-accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.5s ease; }
+  .artist { max-width: 100%; font-size: 14px; color: rgba(255,255,255,0.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .prog { display: flex; align-items: center; gap: 12px; padding: 16px 24px 4px; font-family: var(--mono); font-size: 12px; color: rgba(255,255,255,0.75); }
+  .track { flex: 1; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.15); overflow: hidden; }
+  .track i { display: block; height: 100%; width: 0; background: var(--p-accent); border-radius: 3px; transition: background 0.5s ease; }
+  .ctl { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 10px 0 18px; }
+  .ctl .sk { width: 40px; height: 40px; border-radius: 50%; border: 0; background: transparent; color: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; }
+  .ctl .sk:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .pp { width: 54px; height: 54px; border-radius: 50%; border: 0; background: var(--p-accent); color: var(--p-on); display: flex; align-items: center; justify-content: center; transition: background 0.5s ease, transform 0.1s; }
+  .pp:active { transform: scale(0.94); }
+  .bar { height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 7px; border-radius: 999px; cursor: grab; }
+  .bar .dot { width: 34px; height: 34px; flex: none; border-radius: 50%; background: #26262c center/cover no-repeat; }
+  .bar .pp { width: 30px; height: 30px; }
+  .bar .txt { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar .txt b { font-weight: 600; color: var(--p-accent); transition: color 0.5s ease; }
+  .bar .txt span { color: rgba(255,255,255,0.6); }
+  .bar .mini { width: 70px; height: 4px; flex: none; border-radius: 2px; background: rgba(255,255,255,0.15); overflow: hidden; }
+  .bar .mini i { display: block; height: 100%; width: 0; background: var(--p-accent); }
+  .bar .tb { width: 26px; height: 26px; background: transparent; color: rgba(255,255,255,0.7); display: none; }
+  .bar:hover .tb { display: flex; }
+  .bar:hover .mini { display: none; }
+  .vol { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 8px 14px; border-radius: 12px; background: rgba(0,0,0,0.6); font-size: 14px; font-weight: 600; color: #fff; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 2; }
+  .vol.on { opacity: 1; }
+  .empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 20px; text-align: center; font-size: 13px; color: rgba(255,255,255,0.7); }
+</style>
+</head>
+<body>
+<div id="root" style="height:100%;position:relative"></div>
+<span class="vol" id="vol"></span>
+<script type="module">
+import { invoke, listen, onSnapshot, onTick, esc, icon, focusTiming, mmss } from './shared.js';
+
+const win = window.__TAURI__.window.getCurrentWindow();
+const root = document.getElementById('root');
+let s = null;
+let shape = '';
+let palette = { bg: '#17171c', accent: '#e4e4e7', on: '#111111' };
+let artUrl = '';
+const colorCache = new Map();
+let autoCompact = false;
+
+// ------------------------------------------------------------------ kolory z okładki
+
+function rgbToHsl(r, g, b) {
+  r /= 255; g /= 255; b /= 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+  let h = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [h * 60, sat, l];
+}
+const hsl = (h, sa, l) => `hsl(${Math.round(h)} ${Math.round(sa * 100)}% ${Math.round(l * 100)}%)`;
+
+/** Dominujący kolor (ważony nasyceniem) → ciemne tło, jasny akcent na tytuł i pasek. */
+function extract(url) {
+  return new Promise((resolve) => {
+    if (colorCache.has(url)) return resolve(colorCache.get(url));
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = c.height = 40;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, 40, 40);
+        const px = ctx.getImageData(0, 0, 40, 40).data;
+        const buckets = new Map();
+        let grey = [0, 0];
+        for (let i = 0; i < px.length; i += 4) {
+          const [h, sa, l] = rgbToHsl(px[i], px[i + 1], px[i + 2]);
+          if (sa < 0.18 || l < 0.08 || l > 0.94) { grey[0] += l; grey[1] += 1; continue; }
+          const k = Math.round(h / 20) % 18;
+          const w = sa * (1 - Math.abs(l - 0.5));
+          const b = buckets.get(k) || { w: 0, h: 0, s: 0, l: 0 };
+          b.w += w; b.h += h * w; b.s += sa * w; b.l += l * w;
+          buckets.set(k, b);
+        }
+        let best = null;
+        for (const b of buckets.values()) if (!best || b.w > best.w) best = b;
+        let out;
+        if (!best || best.w < 4) {
+          out = { bg: '#18181c', accent: '#f4f4f5', on: '#111111' };
+        } else {
+          const h = best.h / best.w, sa = best.s / best.w;
+          out = { bg: hsl(h, Math.min(sa, 0.45), 0.13), accent: hsl(h, Math.max(0.55, Math.min(sa, 0.9)), 0.76), on: hsl(h, 0.5, 0.12) };
+        }
+        colorCache.set(url, out);
+        resolve(out);
+      } catch {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
+function applyPalette(p) {
+  palette = p;
+  const r = document.documentElement.style;
+  r.setProperty('--p-bg', p.bg);
+  r.setProperty('--p-accent', p.accent);
+  r.setProperty('--p-on', p.on);
+}
+
+// ------------------------------------------------------------------ rysowanie
+
+function elapsed(m) {
+  const e = m.playing ? m.progressMs + (Date.now() - m.fetchedAtMs) : m.progressMs;
+  return Math.max(0, Math.min(e, m.durationMs || e));
+}
+
+function tools(compact) {
+  const pinned = s?.player?.pinned !== false;
+  return `
+    <button class="tb ${pinned ? 'on' : ''}" id="pin" title="${pinned ? 'Zawsze na wierzchu — kliknij, żeby odpiąć' : 'Przypnij na wierzch'}" aria-label="Na wierzchu">${icon('pin', 14)}</button>
+    <span style="flex:1"></span>
+    <button class="tb" id="mode" title="${compact ? 'Rozwiń do karty' : 'Zwiń do paska'}" aria-label="Zmień rozmiar">${icon(compact ? 'up' : 'down', 14, 2.2)}</button>
+    <button class="tb" id="close" title="Schowaj" aria-label="Schowaj">${icon('close', 12, 2.4)}</button>`;
+}
+
+function render() {
+  if (!s) return;
+  const m = s.music;
+  const compact = !!s.player?.compact;
+  const ok = s.spotifyEnabled && m.connected && m.title;
+  const key = `${compact}|${ok}|${m.title}|${m.artist}|${m.art}|${m.playing}|${s.player?.pinned}|${m.error}|${s.spotifyEnabled}`;
+  if (key !== shape) {
+    shape = key;
+    if (!ok) {
+      root.innerHTML = compact
+        ? `<div class="bar" id="drag"><span class="dot"></span><span class="txt"><span>${esc(emptyText(m))}</span></span>${tools(true)}</div>`
+        : `<div class="card"><div class="art" id="drag"><div class="ph">${icon('music', 48, 1.4)}</div><div class="tools">${tools(false)}</div></div>
+           <div class="empty"><span>${esc(emptyText(m))}</span>${s.spotifyEnabled && !m.connected ? '<button class="btn light" id="login">Połącz ze Spotify</button>' : ''}</div></div>`;
+    } else if (compact) {
+      root.innerHTML = `
+        <div class="bar" id="drag">
+          <span class="dot" style="background-image:url('${esc(m.art)}')"></span>
+          <button class="pp" id="pp" aria-label="${m.playing ? 'Pauza' : 'Graj'}">${icon(m.playing ? 'pause' : 'play', 14)}</button>
+          <span class="txt"><b>${esc(m.title)}</b><span> · ${esc(m.artist)}</span></span>
+          <span class="mini"><i id="bar"></i></span>
+          ${tools(true)}
+        </div>`;
+    } else {
+      root.innerHTML = `
+        <div class="card">
+          <div class="art" id="drag" style="background-image:url('${esc(m.art)}')"><div class="tools">${tools(false)}</div></div>
+          <div class="meta"><span class="title" title="${esc(m.title)}">${esc(m.title)}</span><span class="artist" title="${esc(m.album || '')}">${esc(m.artist)}</span></div>
+          <div class="prog"><span id="pos">0:00</span><span class="track"><i id="bar"></i></span><span id="len">0:00</span></div>
+          <div class="ctl">
+            <button class="sk" id="prev" aria-label="Poprzedni">${icon('prev', 20)}</button>
+            <button class="pp" id="pp" aria-label="${m.playing ? 'Pauza' : 'Graj'}">${icon(m.playing ? 'pause' : 'play', 22)}</button>
+            <button class="sk" id="next" aria-label="Następny">${icon('next', 20)}</button>
+          </div>
+        </div>`;
+    }
+    wire();
+  }
+  if (ok && m.art !== artUrl) {
+    artUrl = m.art;
+    extract(m.art).then((p) => { if (p && artUrl === m.art) applyPalette(p); });
+  }
+  tick();
+}
+
+function emptyText(m) {
+  if (!s.spotifyEnabled) return 'Spotify nie jest skonfigurowane — dodaj Client ID w ustawieniach.';
+  if (!m.connected) return m.error || 'Spotify nie jest połączone.';
+  return m.error || 'Nic nie gra — włącz Spotify na komputerze albo w przeglądarce.';
+}
+
+function tick() {
+  if (!s) return;
+  const m = s.music;
+  const bar = document.getElementById('bar');
+  if (!bar || !m.durationMs) return;
+  const e = elapsed(m);
+  bar.style.width = `${(e / m.durationMs) * 100}%`;
+  const pos = document.getElementById('pos');
+  if (pos) {
+    pos.textContent = mmss(e).replace(/^0(\d:)/, '$1');
+    document.getElementById('len').textContent = mmss(m.durationMs).replace(/^0(\d:)/, '$1');
+  }
+}
+
+const ctl = (action) => invoke('spotify_control', { action }).catch((e) => flash(String(e)));
+
+function wire() {
+  const $ = (id) => document.getElementById(id);
+  if ($('pp')) $('pp').onclick = (e) => { e.stopPropagation(); ctl(s.music.playing ? 'pause' : 'play'); };
+  if ($('prev')) $('prev').onclick = () => ctl('previous');
+  if ($('next')) $('next').onclick = () => ctl('next');
+  if ($('login')) $('login').onclick = () => invoke('spotify_login').catch((e) => flash(String(e)));
+  $('pin').onclick = (e) => { e.stopPropagation(); invoke('player_pin', { pinned: s.player?.pinned === false }); };
+  $('mode').onclick = (e) => { e.stopPropagation(); autoCompact = false; invoke('player_mode', { compact: !s.player?.compact }); };
+  $('close').onclick = (e) => { e.stopPropagation(); invoke('player_hide'); };
+  // Przeciąganie za okładkę / pasek; podwójny klik zwija ↔ rozwija.
+  const drag = $('drag');
+  drag.onmousedown = (e) => {
+    if (e.button !== 0 || e.target.closest('button')) return;
+    if (e.detail === 2) {
+      autoCompact = false;
+      invoke('player_mode', { compact: !s.player?.compact });
+      return;
+    }
+    win.startDragging().catch(() => {});
+  };
+}
+
+// Po przeciągnięciu: przyciągnij do rogu i zapamiętaj pozycję.
+let moveTimer = null;
+win.onMoved(() => {
+  clearTimeout(moveTimer);
+  moveTimer = setTimeout(() => invoke('player_drag_end'), 450);
+});
+
+// ------------------------------------------------------------------ głośność kółkiem
+
+let vol = null;
+let volTimer = null;
+let volHide = null;
+function flash(text) {
+  const el = document.getElementById('vol');
+  el.textContent = text;
+  el.classList.add('on');
+  clearTimeout(volHide);
+  volHide = setTimeout(() => el.classList.remove('on'), 1200);
+}
+window.addEventListener('wheel', (e) => {
+  if (!s?.music?.connected) return;
+  if (vol == null) vol = s.music.volume ?? 50;
+  vol = Math.max(0, Math.min(100, vol + (e.deltaY < 0 ? 5 : -5)));
+  flash(`Głośność ${vol}%`);
+  clearTimeout(volTimer);
+  volTimer = setTimeout(() => { volTimer = null; invoke('player_volume', { volume: vol }).catch((err) => flash(String(err))); }, 250);
+}, { passive: true });
+
+// ------------------------------------------------------------------ przygasanie bez kursora
+
+let dimTimer = null;
+const wake = () => { document.body.classList.remove('dim'); clearTimeout(dimTimer); };
+document.addEventListener('mouseenter', wake);
+document.addEventListener('mousemove', wake);
+document.addEventListener('mouseleave', () => {
+  clearTimeout(dimTimer);
+  dimTimer = setTimeout(() => document.body.classList.add('dim'), 3000);
+});
+
+// ------------------------------------------------------------------ fokus: sam zwija się do paska
+
+// Tylko na początku i końcu sesji — ręczne rozwinięcie w trakcie fokusu zostaje.
+let wasFocusing = null;
+function focusAuto() {
+  if (!s?.player) return;
+  const focusing = !!focusTiming(s);
+  if (wasFocusing === null) { wasFocusing = focusing; return; }
+  if (focusing && !wasFocusing && !s.player.compact && s.player.visible) {
+    autoCompact = true;
+    invoke('player_mode', { compact: true });
+  } else if (!focusing && wasFocusing && autoCompact) {
+    autoCompact = false;
+    if (s.player.compact) invoke('player_mode', { compact: false });
+  }
+  wasFocusing = focusing;
+}
+
+onSnapshot((snap) => {
+  s = snap;
+  if (vol != null && snap.music.volume != null && !volTimer) vol = snap.music.volume;
+  render();
+  focusAuto();
+});
+onTick((snap) => { s = snap; tick(); });
+listen('player-open', () => { wake(); dimTimer = setTimeout(() => document.body.classList.add('dim'), 4000); });
+</script>
+</body>
+</html>

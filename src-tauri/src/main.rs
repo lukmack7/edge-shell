@@ -20,6 +20,7 @@ mod sys;
 mod tray;
 mod watchdog;
 mod palette;
+mod player;
 mod automations;
 mod backup;
 mod stacks;
@@ -86,6 +87,7 @@ fn main() {
             layout::start_edges(handle.clone());
             stacks::init(&handle);
             palette::init(&handle);
+            player::init(&handle);
             automations::start(handle.clone());
 
             // Szuflada i Teraz chowają się, gdy klikniesz gdzie indziej.
@@ -194,6 +196,12 @@ fn main() {
             backup::backup_export,
             backup::backup_import,
             palette::palette_query,
+            player::player_toggle,
+            player::player_hide,
+            player::player_mode,
+            player::player_pin,
+            player::player_drag_end,
+            player::player_volume,
             palette::palette_run,
             palette::palette_show,
             palette::palette_hide,

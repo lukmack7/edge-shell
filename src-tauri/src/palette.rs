@@ -65,6 +65,7 @@ enum Cmd {
     Stash,
     Spotify,
     SpotifyNext,
+    Player,
     Tailscale(String),
     TailscaleOff,
     Calc(String),
@@ -551,6 +552,8 @@ fn add_command(b: &mut Builder, app: &AppHandle, cfg: &Config, cmd: &str, key: &
             let (playing, title, artist) = state::read(app, |rt| (rt.music.playing, rt.music.title.clone(), rt.music.artist.clone()));
             let now = if title.is_empty() { "nic nie gra".to_string() } else { format!("{title} — {artist}") };
             if cmd == "spotify" {
+                b.add("Spotify", "S", GREEN, "Odtwarzacz na wierzchu".into(), now.clone(), key,
+                    pv("Odtwarzacz na wierzchu", "Karta z okładką i kolorami albumu, zawsze nad oknami. Przeciągasz ją gdziekolwiek, podwójny klik zwija do paska.", "• pokazuje / chowa odtwarzacz"), &[], Cmd::Player);
                 let t = if playing { "Spotify: pauza" } else { "Spotify: graj" };
                 b.add("Spotify", "S", GREEN, t.into(), now.clone(), key, pv(t, if spotify_on { now } else { "Spotify nie jest połączone — połącz w ustawieniach.".into() }, ""), &[], Cmd::Spotify);
             } else {
@@ -854,6 +857,7 @@ pub async fn palette_run(app: AppHandle, id: String, action: Option<String>) -> 
             spotify::control(&app, if playing { "pause" } else { "play" }, None).await?;
         }
         Cmd::SpotifyNext => spotify::control(&app, "next", None).await?,
+        Cmd::Player => crate::player::show(&app),
         Cmd::Tailscale(node) => {
             let r = tauri::async_runtime::spawn_blocking(move || tailscale(&node)).await.map_err(|e| e.to_string())?;
             if let Err(e) = r {

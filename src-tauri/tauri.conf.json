@@ -246,6 +246,20 @@
         "resizable": false,
         "shadow": false,
         "visible": false
+      },
+      {
+        "label": "player",
+        "url": "player.html",
+        "title": "Edge Shell — odtwarzacz",
+        "width": 424,
+        "height": 468,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "visible": false
       }
     ]
   },
