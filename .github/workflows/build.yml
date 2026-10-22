@@ -26,7 +26,42 @@ jobs:
         run: npm install
 
       - name: Build installer
-        run: npx tauri build
+        shell: bash
+        run: |
+          set -o pipefail
+          npx tauri build 2>&1 | tee build.log
+
+      # Błędy kompilacji jako adnotacje — widać je w podsumowaniu runu
+      # i przez API, bez pobierania pełnego logu.
+      - name: Report build errors
+        if: failure()
+        shell: bash
+        run: |
+          python - <<'EOF'
+          import re
+          raw = open('build.log', encoding='utf-8', errors='replace').read()
+          lines = [re.sub(r'\x1b\[[0-9;]*m', '', l) for l in raw.splitlines()]
+          blocks, cur = [], None
+          for l in lines:
+              if l.startswith('error'):
+                  if cur:
+                      blocks.append(cur)
+                  cur = [l]
+              elif cur is not None:
+                  if not l.strip() and len(cur) > 1:
+                      blocks.append(cur)
+                      cur = None
+                  else:
+                      cur.append(l)
+          if cur:
+              blocks.append(cur)
+          if not blocks:
+              blocks = [lines[-80:]]
+          text = '\n\n'.join('\n'.join(b[:30]) for b in blocks)
+          chunks = [text[i:i + 3500] for i in range(0, len(text), 3500)][:10]
+          for c in chunks:
+              print('::error title=build::' + c.replace('%', '%25').replace('\r', '').replace('\n', '%0A'))
+          EOF
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
