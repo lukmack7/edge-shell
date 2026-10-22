@@ -3,7 +3,7 @@
 //! Każde okno renderuje się wyłącznie z migawki (zdarzenie `snapshot`), więc
 //! pasek, dock, szuflada i panel Teraz zawsze pokazują to samo.
 
-use crate::config::{category_colors, Config};
+use crate::config::{section_colors, Config};
 use chrono::{DateTime, Local, Timelike};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -101,6 +101,9 @@ pub struct Store {
     pub waiting: Vec<RadioMsg>,
     pub spotify: Option<SpotifyTokens>,
     pub week_focus_min: i64,
+    /// Stan paska zadań Windows sprzed pierwszego uruchomienia (do przywrócenia).
+    pub taskbar_state: usize,
+    pub taskbar_saved: bool,
 }
 
 impl Store {
@@ -252,17 +255,22 @@ pub fn snapshot(app: &AppHandle) -> Value {
     let mode = cfg.mode(&rt.store.mode);
     let today = today_key();
 
-    let dock: Vec<Value> = cfg
-        .dock
+    // Dock pogrupowany według kolejności sekcji; separator między sekcjami.
+    let section_index = |id: &str| cfg.sections.iter().position(|s| s.id == id).unwrap_or(usize::MAX);
+    let mut ordered: Vec<&crate::config::DockApp> = cfg.dock.iter().collect();
+    ordered.sort_by_key(|a| section_index(&a.category));
+    let dock: Vec<Value> = ordered
         .iter()
-        .map(|a| {
-            let (bg, fg, stripe) = category_colors(&a.category);
+        .enumerate()
+        .map(|(n, a)| {
+            let (bg, fg, stripe) = section_colors(&cfg.sections, &a.category);
             let running = !a.process.is_empty() && rt.running.contains(&a.process.to_lowercase());
+            let separator = ordered.get(n + 1).is_some_and(|next| next.category != a.category);
             json!({
                 "id": a.id, "name": a.name, "icon": a.icon, "category": a.category,
                 "bg": bg, "fg": fg, "stripe": stripe,
                 "dim": mode.dim.iter().any(|d| d == &a.id),
-                "running": running, "separatorAfter": a.separator_after,
+                "running": running, "separatorAfter": separator,
             })
         })
         .collect();
@@ -334,7 +342,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "shelf": rt.store.shelf,
         "stashes": rt.store.stashes,
         "pinned": cfg.pinned.iter().map(|p| {
-            let (_, _, stripe) = category_colors(&p.category);
+            let (_, _, stripe) = section_colors(&cfg.sections, &p.category);
             json!({ "name": p.name, "path": p.path, "stripe": stripe })
         }).collect::<Vec<_>>(),
         "recent": rt.recent,
@@ -348,6 +356,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
             .map(|a| json!({ "id": a.id, "name": a.name })),
         "hotkeys": cfg.hotkeys,
         "showBubbles": cfg.shell.show_bubbles,
+        "barStats": cfg.bar.stats,
         "clock": format!("{:02}:{:02}", now.hour(), now.minute()),
     })
 }

@@ -145,12 +145,28 @@
         "resizable": false,
         "shadow": false,
         "focus": false
+      },
+      {
+        "label": "settings",
+        "url": "settings.html",
+        "title": "Edge Shell — ustawienia",
+        "width": 1180,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 600,
+        "center": true,
+        "visible": false,
+        "decorations": true,
+        "resizable": true,
+        "skipTaskbar": false
       }
     ]
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis"],
+    "targets": [
+      "nsis"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

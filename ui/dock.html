@@ -10,6 +10,8 @@
   .app { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0; border: 0; background: transparent; transition: transform 0.12s ease; }
   .app:hover { transform: translateY(-3px); }
   .tile { width: 52px; height: 52px; border-radius: 15px; display: flex; align-items: center; justify-content: center; }
+  .tile.real { background: transparent !important; }
+  .tile img { width: 44px; height: 44px; object-fit: contain; image-rendering: auto; }
   .stripe { width: 28px; height: 3px; border-radius: 2px; }
   .app.dim { opacity: 0.35; filter: grayscale(1); }
   .app.dim .stripe { background: transparent !important; }
@@ -22,18 +24,38 @@
 <body>
 <nav id="dock" aria-label="Dock"></nav>
 <script type="module">
-import { invoke, onSnapshot, esc, icon } from './shared.js';
+import { invoke, listen, onSnapshot, esc, icon } from './shared.js';
 
 const dock = document.getElementById('dock');
 let lastKey = '';
+let icons = {};
+let snap = null;
 
-onSnapshot((s) => {
-  const key = JSON.stringify(s.dock);
+async function loadIcons() {
+  icons = await invoke('dock_icons').catch(() => ({}));
+  lastKey = '';
+  if (snap) render(snap);
+}
+listen('config-changed', loadIcons);
+loadIcons();
+
+function tile(a) {
+  if (a.icon === 'auto' && icons[a.id]) {
+    return `<span class="tile real"><img src="${icons[a.id]}" alt=""></span>`;
+  }
+  const builtin = a.icon === 'auto' ? a.name : a.icon || a.name;
+  return `<span class="tile" style="background:${a.bg};color:${a.fg}">${icon(builtin, 24)}</span>`;
+}
+
+onSnapshot((s) => { snap = s; render(s); });
+
+function render(s) {
+  const key = JSON.stringify(s.dock) + Object.keys(icons).length;
   if (key === lastKey) return;
   lastKey = key;
   dock.innerHTML = s.dock.map((a) => `
     <button class="app ${a.dim ? 'dim' : ''}" data-id="${esc(a.id)}" aria-label="${esc(a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}">
-      <span class="tile" style="background:${a.bg};color:${a.fg}">${icon(a.icon || a.name, 24)}</span>
+      ${tile(a)}
       <span class="stripe" style="background:${a.stripe}"></span>
       ${a.running ? '<span class="run" aria-hidden="true"></span>' : ''}
       <span class="tip">${esc(a.name)}</span>
@@ -41,12 +63,13 @@ onSnapshot((s) => {
   for (const b of dock.querySelectorAll('.app')) {
     b.onclick = () => invoke('launch', { id: b.dataset.id }).catch((e) => console.warn(e));
   }
+  dock.oncontextmenu = (e) => { e.preventDefault(); invoke('open_settings'); };
   // Okno docka dopasowuje się do szerokości ikon (+ miejsce na podpowiedź).
   requestAnimationFrame(() => {
     const width = Math.ceil(dock.getBoundingClientRect().width) + 24;
     invoke('dock_resize', { width });
   });
-});
+}
 </script>
 </body>
 </html>

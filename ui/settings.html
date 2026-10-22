@@ -1,0 +1,795 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — ustawienia</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  html, body { background: #0f0f11; user-select: none; }
+  .app { position: absolute; inset: 0; display: grid; grid-template-columns: 232px minmax(0, 1fr); }
+  nav { display: flex; flex-direction: column; gap: 2px; padding: 20px 12px; border-right: 1px solid var(--line); background: #121214; }
+  nav h1 { margin: 0 10px 18px; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+  nav h1 .logo { width: 16px; height: 16px; border-radius: 50%; border: 2.5px solid var(--text); }
+  nav button { display: flex; align-items: center; gap: 12px; height: 42px; padding: 0 12px; border-radius: 10px; border: 0; background: transparent; color: var(--text-2); font-size: 14px; text-align: left; }
+  nav button:hover { background: var(--fill); color: var(--text); }
+  nav button.on { background: var(--fill-strong); color: var(--text); font-weight: 600; }
+  main { display: flex; flex-direction: column; min-height: 0; }
+  .content { flex: 1; min-height: 0; padding: 28px 36px 40px; }
+  .page { display: none; flex-direction: column; gap: 22px; max-width: 980px; }
+  .page.on { display: flex; }
+  h2 { margin: 0; font-size: 24px; font-weight: 700; }
+  .lead { margin: -14px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .card { display: flex; flex-direction: column; gap: 14px; padding: 18px; border-radius: 16px; background: #161619; border: 1px solid var(--line); }
+  .card h3 { margin: 0; font-size: 15px; font-weight: 600; }
+  .row { display: flex; align-items: center; gap: 14px; min-height: 44px; }
+  .row .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+  .row .txt b { font-weight: 500; font-size: 14px; }
+  .row .txt span { color: var(--muted); font-size: 12px; }
+  .in { height: 40px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: #0f0f11; color: var(--text); font-size: 13px; outline: none; user-select: text; min-width: 0; }
+  .in:focus { border-color: var(--accent); }
+  select.in { padding-right: 6px; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+  .field-l { display: flex; flex-direction: column; gap: 6px; font-size: 12px; color: var(--muted); }
+  .switch { position: relative; width: 46px; height: 26px; flex: none; border-radius: 999px; border: 0; background: rgba(255,255,255,0.18); padding: 0; }
+  .switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: transform 0.15s; }
+  .switch[aria-checked="true"] { background: var(--accent); }
+  .switch[aria-checked="true"]::after { transform: translateX(20px); }
+  input[type="color"] { width: 40px; height: 40px; padding: 0; border: 1px solid var(--line-strong); border-radius: 10px; background: transparent; cursor: pointer; flex: none; }
+  input[type="color"]::-webkit-color-swatch-wrapper { padding: 4px; }
+  input[type="color"]::-webkit-color-swatch { border: 0; border-radius: 6px; }
+  input[type="range"] { accent-color: var(--accent); }
+  .footer { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 14px 36px; border-top: 1px solid var(--line); background: #121214; }
+  .footer .status { margin-right: auto; color: var(--muted); font-size: 13px; }
+  .footer .status.dirty { color: #fde68a; }
+  .list { display: flex; flex-direction: column; gap: 8px; }
+  .item { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 12px; background: #0f0f11; border: 1px solid var(--line); }
+  .mini { width: 36px; height: 36px; flex: none; border-radius: 10px; border: 0; background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+  .mini:hover { background: var(--fill-strong); color: var(--text); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--line-strong); background: transparent; font-size: 12px; color: var(--text-2); }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .hint { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  /* Dock */
+  .preview { display: flex; justify-content: center; padding: 18px; border-radius: 16px; background: radial-gradient(600px 200px at 50% 120%, #4a1210, #121214); border: 1px solid var(--line); overflow-x: auto; }
+  .pdock { display: inline-flex; align-items: flex-end; gap: 8px; padding: 10px 10px 7px; border-radius: 20px; background: rgba(16,16,19,0.9); border: 1px solid var(--line); }
+  .pdock .a { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .pdock .t { width: 44px; height: 44px; border-radius: 13px; display: flex; align-items: center; justify-content: center; }
+  .pdock .t img { width: 38px; height: 38px; }
+  .pdock .s { width: 24px; height: 3px; border-radius: 2px; }
+  .pdock .sep { width: 1px; height: 30px; margin-bottom: 12px; background: rgba(255,255,255,0.14); }
+  .dockgrid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+  .lane { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 14px; background: #161619; border: 1px solid var(--line); }
+  .lane.over { border-color: var(--accent); background: #1b1b1f; }
+  .lane-head { display: flex; align-items: center; gap: 10px; }
+  .lane-head .in { flex: 1; height: 36px; font-weight: 600; }
+  .lane-apps { display: flex; flex-wrap: wrap; gap: 8px; min-height: 64px; padding: 8px; border-radius: 10px; border: 1.5px dashed rgba(255,255,255,0.12); }
+  .lane-apps .empty { align-self: center; margin: 0 auto; }
+  .app-chip { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 76px; padding: 8px 4px 6px; border-radius: 12px; border: 1px solid transparent; background: #0f0f11; cursor: grab; }
+  .app-chip:hover { border-color: var(--line-strong); }
+  .app-chip.sel { border-color: var(--accent); background: #1d1214; }
+  .app-chip.dragging { opacity: 0.4; }
+  .app-chip .t { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; }
+  .app-chip .t img { width: 34px; height: 34px; }
+  .app-chip .n { width: 100%; font-size: 11px; text-align: center; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .editor { position: sticky; top: 0; }
+  .iconpick { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 6px; }
+  .iconpick button { height: 36px; border-radius: 8px; border: 1px solid var(--line); background: #0f0f11; color: var(--text-2); display: flex; align-items: center; justify-content: center; }
+  .iconpick button.on { border-color: var(--accent); color: var(--text); background: #1d1214; }
+
+  /* Okno wyboru aplikacji */
+  .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); z-index: 10; }
+  .modal.on { display: flex; }
+  .modal .box { width: min(640px, 92vw); max-height: 80vh; display: flex; flex-direction: column; gap: 12px; padding: 20px; border-radius: 18px; background: #18181b; border: 1px solid var(--line-strong); }
+  .picklist { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 2px; }
+  .pick { display: flex; align-items: center; gap: 12px; height: 46px; padding: 0 10px; border-radius: 10px; border: 0; background: transparent; text-align: left; font-size: 13px; }
+  .pick:hover { background: var(--fill-strong); }
+  .pick img, .pick .ph { width: 28px; height: 28px; border-radius: 6px; flex: none; }
+  .pick .ph { background: #27272a; }
+  .kbdrec { min-width: 220px; height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid var(--line-strong); background: #0f0f11; font-family: var(--mono); font-size: 13px; color: var(--text); text-align: left; }
+  .kbdrec.rec { border-color: var(--accent); color: #fca5a5; }
+</style>
+</head>
+<body>
+<div class="app">
+  <nav id="nav" aria-label="Sekcje ustawień">
+    <h1><span class="logo" aria-hidden="true"></span>Edge Shell</h1>
+  </nav>
+  <main>
+    <div class="content scroll" id="content"></div>
+    <div class="footer">
+      <span class="status" id="status">Wszystko zapisane</span>
+      <button class="btn" id="revert">Cofnij zmiany</button>
+      <button class="btn primary" id="save">Zapisz i zastosuj</button>
+    </div>
+  </main>
+</div>
+
+<div class="modal" id="picker" role="dialog" aria-label="Dodaj aplikację">
+  <div class="box">
+    <div style="display:flex;align-items:center;justify-content:space-between">
+      <h3 style="margin:0;font-size:17px">Dodaj aplikację do docka</h3>
+      <button class="mini" id="pickClose" aria-label="Zamknij"></button>
+    </div>
+    <input class="in" id="pickSearch" placeholder="Szukaj w zainstalowanych aplikacjach…" autocomplete="off">
+    <div class="picklist scroll" id="pickList"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="pickFile">Wybierz plik .exe…</button>
+      <button class="btn" id="pickUrl">Adres WWW lub URI…</button>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { invoke, listen, onSnapshot, esc, icon, toast, BUILTIN_ICONS } from './shared.js';
+
+const $ = (id) => document.getElementById(id);
+let cfg = null;
+let saved = '';
+let snap = null;
+let selectedApp = null;
+let startApps = null;
+const iconCache = new Map();
+
+const PAGES = [
+  ['general', 'Ogólne', 'sliders'],
+  ['bar', 'Górny pasek', 'layers'],
+  ['dock', 'Dock', 'apps'],
+  ['modes', 'Tryby', 'clock'],
+  ['radio', 'Radio i kontakty', 'radio'],
+  ['notifications', 'Powiadomienia', 'bell'],
+  ['spotify', 'Spotify', 'music'],
+  ['hotkeys', 'Skróty', 'keyboard'],
+];
+let page = 'general';
+
+// ------------------------------------------------------------ narzędzia
+
+const uid = (name) => `${(name || 'app').toLowerCase().normalize('NFD').replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').slice(0, 20) || 'app'}-${Math.random().toString(36).slice(2, 6)}`;
+const sw = (on, key) => `<button class="switch" role="switch" aria-checked="${on ? 'true' : 'false'}" data-sw="${key}"></button>`;
+
+function get(path) { return path.split('.').reduce((o, k) => (o == null ? o : o[k]), cfg); }
+function set(path, value) {
+  const keys = path.split('.');
+  const last = keys.pop();
+  const obj = keys.reduce((o, k) => o[k], cfg);
+  obj[last] = value;
+  markDirty();
+}
+function markDirty() {
+  const dirty = JSON.stringify(cfg) !== saved;
+  $('status').textContent = dirty ? 'Masz niezapisane zmiany' : 'Wszystko zapisane';
+  $('status').classList.toggle('dirty', dirty);
+}
+
+/** Podpina pola z atrybutami data-bind / data-num / data-sw do konfiguracji. */
+function bind(root) {
+  for (const el of root.querySelectorAll('[data-bind]')) {
+    el.value = get(el.dataset.bind) ?? '';
+    el.oninput = () => set(el.dataset.bind, el.value);
+  }
+  for (const el of root.querySelectorAll('[data-num]')) {
+    el.value = get(el.dataset.num) ?? 0;
+    el.oninput = () => {
+      set(el.dataset.num, Number(el.value));
+      const out = root.querySelector(`[data-out="${el.dataset.num}"]`);
+      if (out) out.textContent = el.value;
+    };
+  }
+  for (const el of root.querySelectorAll('[data-sw]')) {
+    el.onclick = () => {
+      const v = !get(el.dataset.sw);
+      set(el.dataset.sw, v);
+      el.setAttribute('aria-checked', v ? 'true' : 'false');
+    };
+  }
+}
+
+async function appIcon(path) {
+  if (!path) return null;
+  if (!iconCache.has(path)) iconCache.set(path, invoke('app_icon', { path }).catch(() => null));
+  return iconCache.get(path);
+}
+
+function sectionColor(id) {
+  return cfg.sections.find((s) => s.id === id)?.color || '#a1a1aa';
+}
+function tint(hex, t, base) {
+  const h = (hex || '#a1a1aa').replace('#', '');
+  const c = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) || 160);
+  return `rgb(${c.map((v, i) => Math.round(v * t + base[i] * (1 - t))).join(',')})`;
+}
+const tileBg = (id) => tint(sectionColor(id), 0.28, [20, 20, 23]);
+const tileFg = (id) => tint(sectionColor(id), 0.35, [255, 255, 255]);
+
+/** Kafelek aplikacji: prawdziwa ikona albo wbudowana/monogram. */
+function appTile(a, cls = 't') {
+  const id = `ic-${a.id}-${cls}`;
+  if (a.icon === 'auto') {
+    appIcon(a.iconPath || a.path).then((url) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (url) { el.style.background = 'transparent'; el.innerHTML = `<img src="${url}" alt="">`; }
+    });
+  }
+  const inner = a.icon === 'auto' ? icon(a.name, 20) : icon(a.icon || a.name, 20);
+  return `<span class="${cls}" id="${id}" style="background:${tileBg(a.category)};color:${tileFg(a.category)}">${inner}</span>`;
+}
+
+// ------------------------------------------------------------ strony
+
+const render = {
+  general() {
+    return `
+      <h2>Ogólne</h2>
+      <p class="lead">Połączenie z Horologiem, start razem z Windows i zachowanie krawędzi ekranu.</p>
+      <div class="card">
+        <h3>Horolog</h3>
+        <div class="grid2">
+          <label class="field-l">Adres API<input class="in" data-bind="horolog.url" placeholder="http://homeserver.local:8000"></label>
+          <label class="field-l">Adres interfejsu WWW<input class="in" data-bind="horolog.webUrl" placeholder="http://homeserver.local:3000"></label>
+        </div>
+        <div class="row"><button class="btn" id="testHorolog">Sprawdź połączenie</button><span class="hint" id="testResult"></span></div>
+      </div>
+      <div class="card">
+        <h3>Windows</h3>
+        <div class="row"><div class="txt"><b>Uruchamiaj z Windows</b><span>Edge Shell startuje po zalogowaniu.</span></div>${sw(cfg.shell.autostart, 'shell.autostart')}</div>
+        <div class="row"><div class="txt"><b>Chowaj pasek zadań Windows</b><span>Pasek znika po starcie i wraca, gdy zamkniesz Edge Shell.</span></div>${sw(cfg.shell.hideTaskbar, 'shell.hideTaskbar')}</div>
+        <div class="row"><div class="txt"><b>Rezerwuj miejsce na górny pasek</b><span>Zmaksymalizowane okna nie wchodzą pod pasek.</span></div>${sw(cfg.shell.reserveTopBar, 'shell.reserveTopBar')}</div>
+        <div class="row"><div class="txt"><b>Pokazuj dock</b><span>Wyłącz, jeśli wolisz inny dock.</span></div>${sw(cfg.shell.showDock, 'shell.showDock')}</div>
+        <div class="row"><div class="txt"><b>Dymki przy prawej krawędzi</b><span>Timer i muzyka, gdy panel Teraz jest schowany.</span></div>${sw(cfg.shell.showBubbles, 'shell.showBubbles')}</div>
+      </div>
+      <div class="card">
+        <h3>Krawędzie i fokus</h3>
+        <div class="row"><div class="txt"><b>Wysuwanie paneli po dotknięciu krawędzi</b><span>Ile kursor musi stać przy krawędzi: <span data-out="shell.edgeDelayMs">${cfg.shell.edgeDelayMs}</span> ms</span></div><input type="range" min="50" max="800" step="10" data-num="shell.edgeDelayMs" style="width:240px"></div>
+        <div class="row"><div class="txt"><b>Świecąca krawędź przed spotkaniem</b><span><span data-out="shell.edgeGlowMinutes">${cfg.shell.edgeGlowMinutes}</span> minut wcześniej</span></div><input type="range" min="0" max="60" step="5" data-num="shell.edgeGlowMinutes" style="width:240px"></div>
+        <div class="row"><div class="txt"><b>Długość własnej sesji fokusu</b><span><span data-out="focus.adhocMinutes">${cfg.focus.adhocMinutes}</span> minut</span></div><input type="range" min="10" max="120" step="5" data-num="focus.adhocMinutes" style="width:240px"></div>
+        <div class="row"><div class="txt"><b>Tygodniowy cel fokusu</b><span><span data-out="focus.weeklyGoalHours">${cfg.focus.weeklyGoalHours}</span> godzin</span></div><input type="range" min="1" max="40" step="1" data-num="focus.weeklyGoalHours" style="width:240px"></div>
+      </div>`;
+  },
+
+  bar() {
+    const STATS = [
+      ['network', 'Prędkość internetu', 'Pobieranie i wysyłanie na żywo'],
+      ['cpu', 'Procesor', 'Obciążenie w procentach'],
+      ['memory', 'Pamięć RAM', 'Zajęta pamięć'],
+      ['volume', 'Dźwięk', 'Kliknięcie wycisza, kółko myszy zmienia głośność'],
+      ['bluetooth', 'Bluetooth', 'Liczba połączonych urządzeń'],
+      ['wifi', 'Wi‑Fi', 'Siła sygnału, nazwa sieci po najechaniu'],
+      ['battery', 'Bateria', 'Tylko w laptopie'],
+    ];
+    const rows = STATS.map(([k, name, desc]) => `
+      <div class="row"><div class="txt"><b>${name}</b><span>${desc}</span></div>${sw(cfg.bar.stats.includes(k), 'stat:' + k)}</div>`).join('');
+    const pinned = cfg.pinned.map((p, n) => `
+      <div class="item">
+        <span class="mini" style="color:${sectionColor(p.category)}">${icon('folder', 18)}</span>
+        <input class="in" style="width:160px" data-pin="${n}.name" value="${esc(p.name)}" aria-label="Nazwa">
+        <input class="in" style="flex:1" data-pin="${n}.path" value="${esc(p.path)}" aria-label="Ścieżka">
+        <button class="mini" data-pinpick="${n}" aria-label="Wybierz folder">${icon('folder', 16)}</button>
+        <select class="in" data-pin="${n}.category" aria-label="Sekcja">${cfg.sections.map((s) => `<option value="${esc(s.id)}" ${s.id === p.category ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>
+        <button class="mini" data-pindel="${n}" aria-label="Usuń">${icon('trash', 16)}</button>
+      </div>`).join('');
+    return `
+      <h2>Górny pasek</h2>
+      <p class="lead">Wybierz, co ma być widać po prawej stronie paska. Kolejność jest stała: od sieci do baterii.</p>
+      <div class="card"><h3>Statystyki</h3>${rows}</div>
+      <div class="card">
+        <h3>Przypięte foldery w szufladzie</h3>
+        <div class="list">${pinned || '<span class="hint">Brak przypiętych folderów.</span>'}</div>
+        <div><button class="btn" id="pinAdd">${icon('plus', 16, 2)}Dodaj folder</button></div>
+      </div>`;
+  },
+
+  dock() {
+    const lanes = cfg.sections.map((s, n) => {
+      const apps = cfg.dock.filter((a) => a.category === s.id);
+      return `
+      <div class="lane" data-lane="${esc(s.id)}">
+        <div class="lane-head">
+          <input type="color" value="${esc(s.color)}" data-seccolor="${n}" aria-label="Kolor sekcji">
+          <input class="in" value="${esc(s.name)}" data-secname="${n}" aria-label="Nazwa sekcji">
+          <button class="mini" data-secup="${n}" aria-label="Sekcja wyżej" ${n === 0 ? 'disabled' : ''}>${icon('up', 16, 2)}</button>
+          <button class="mini" data-secdown="${n}" aria-label="Sekcja niżej" ${n === cfg.sections.length - 1 ? 'disabled' : ''}>${icon('down', 16, 2)}</button>
+          <button class="mini" data-secdel="${n}" aria-label="Usuń sekcję" ${apps.length ? 'disabled title="Najpierw przenieś aplikacje"' : ''}>${icon('trash', 16)}</button>
+        </div>
+        <div class="lane-apps" data-drop="${esc(s.id)}">
+          ${apps.map((a) => `
+            <div class="app-chip ${selectedApp === a.id ? 'sel' : ''}" draggable="true" data-app="${esc(a.id)}">
+              ${appTile(a)}
+              <span class="n">${esc(a.name)}</span>
+            </div>`).join('') || '<span class="hint empty">Przeciągnij tu aplikację</span>'}
+        </div>
+      </div>`;
+    }).join('');
+    return `
+      <h2>Dock</h2>
+      <p class="lead">Przeciągaj aplikacje między sekcjami i zmieniaj ich kolejność. Między sekcjami dock sam wstawia separator, a pasek pod ikoną ma kolor sekcji.</p>
+      <div class="preview"><div class="pdock" id="pdock"></div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn primary" id="appAdd">${icon('plus', 16, 2)}Dodaj aplikację</button>
+        <button class="btn" id="secAdd">${icon('plus', 16, 2)}Nowa sekcja</button>
+      </div>
+      <div class="dockgrid">
+        <div style="display:flex;flex-direction:column;gap:12px">${lanes}</div>
+        <div class="card editor" id="editor"></div>
+      </div>`;
+  },
+
+  modes() {
+    const cards = cfg.modes.map((m, n) => `
+      <div class="card">
+        <div class="row">
+          <input type="color" value="${esc(m.accent)}" data-mode="${n}.accent" aria-label="Kolor trybu">
+          <input class="in" style="flex:1;font-weight:600" value="${esc(m.label)}" data-mode="${n}.label" aria-label="Nazwa trybu">
+          <button class="mini" data-modedel="${n}" aria-label="Usuń tryb" ${cfg.modes.length < 2 ? 'disabled' : ''}>${icon('trash', 16)}</button>
+        </div>
+        <div class="row"><div class="txt"><b>Cisza</b><span>Zwykłe powiadomienia czekają na paczkę.</span></div>${sw(m.quiet, `modes.${n}.quiet`)}</div>
+        <label class="field-l">Playlista Spotify (spotify:playlist:…)<input class="in" value="${esc(m.playlist)}" data-mode="${n}.playlist" placeholder="spotify:playlist:…"></label>
+        <div class="field-l">Wyciszone aplikacje w tym trybie — kliknięcie pokaże żółtą flagę
+          <div class="chips">${cfg.dock.map((a) => `<button class="chip ${m.dim.includes(a.id) ? 'on' : ''}" data-dim="${n}:${esc(a.id)}">${esc(a.name)}</button>`).join('')}</div>
+        </div>
+      </div>`).join('');
+    return `
+      <h2>Tryby</h2>
+      <p class="lead">Tryb zmienia kolor akcentu, wycisza wybrane aplikacje w docku, decyduje o powiadomieniach i włącza swoją playlistę.</p>
+      <div class="card"><div class="row"><div class="txt"><b>Tryb na start</b><span>Z jakim trybem uruchamia się Edge Shell.</span></div>
+        <select class="in" data-bind="startMode">${cfg.modes.map((m) => `<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('')}</select></div></div>
+      ${cards}
+      <div><button class="btn" id="modeAdd">${icon('plus', 16, 2)}Dodaj tryb</button></div>`;
+  },
+
+  radio() {
+    const contacts = cfg.contacts.map((c, n) => `
+      <div class="item">
+        <input class="in mono" style="width:64px;text-align:center;font-weight:800;font-style:italic;color:${esc(c.color)}" value="${esc(c.number)}" data-ct="${n}.number" aria-label="Numer startowy">
+        <input class="in" style="width:150px" value="${esc(c.name)}" data-ct="${n}.name" aria-label="Nazwa na karcie">
+        <input type="color" value="${esc(c.color)}" data-ct="${n}.color" aria-label="Kolor">
+        <input class="in" style="flex:1" value="${esc(c.matches.join(', '))}" data-ctm="${n}" placeholder="Jak podpisuje się w powiadomieniach, np. Kasia, Katarzyna" aria-label="Dopasowanie nadawcy">
+        <button class="mini" data-ctdel="${n}" aria-label="Usuń">${icon('trash', 16)}</button>
+      </div>`).join('');
+    const times = cfg.radio.batchTimes.map((t, n) => `<span class="chip">${esc(t)}<button class="mini" style="width:22px;height:22px" data-btdel="${n}" aria-label="Usuń ${esc(t)}">${icon('close', 10, 2.4)}</button></span>`).join('');
+    return `
+      <h2>Radio i kontakty</h2>
+      <p class="lead">Kontakty z numerem 1–9 przechodzą przez ciszę od razu. Numer i kolor widzisz na karcie radia.</p>
+      <div class="card"><h3>Kontakty</h3><div class="list">${contacts || '<span class="hint">Brak kontaktów.</span>'}</div>
+        <div><button class="btn" id="ctAdd">${icon('plus', 16, 2)}Dodaj kontakt</button></div></div>
+      <div class="card"><h3>Paczki powiadomień</h3>
+        <span class="hint">O tych godzinach w trybie cichym przychodzi wszystko, co czekało.</span>
+        <div class="chips">${times}</div>
+        <div class="row"><input type="time" class="in" id="btNew" style="width:140px"><button class="btn" id="btAdd">Dodaj godzinę</button></div>
+      </div>
+      <div class="card"><h3>Lokalny endpoint</h3>
+        <span class="hint">POST http://127.0.0.1:${cfg.radio.port}/radio — dla n8n, Home Assistanta, skryptów i telefonu.</span>
+        <div class="grid2">
+          <label class="field-l">Port<input class="in" type="number" data-num="radio.port"></label>
+          <label class="field-l">Token (opcjonalny)<input class="in" data-bind="radio.token" placeholder="pusty = bez tokenu"></label>
+        </div>
+      </div>`;
+  },
+
+  notifications() {
+    const rules = cfg.notifications.apps.map((r, n) => `
+      <div class="item">
+        <input class="in" style="flex:1" value="${esc(r.matches)}" data-nr="${n}.matches" placeholder="Aplikacja, np. Teams" aria-label="Aplikacja">
+        <input class="in" style="width:150px" value="${esc(r.name)}" data-nr="${n}.name" placeholder="Nazwa na karcie" aria-label="Nazwa">
+        <input type="color" value="${esc(r.color || '#fbbf24')}" data-nr="${n}.color" aria-label="Kolor">
+        <button class="chip ${r.urgent ? 'on' : ''}" data-nrt="${n}.urgent">Pilne</button>
+        <button class="chip ${r.ignore ? 'on' : ''}" data-nrt="${n}.ignore">Pomijaj</button>
+        <button class="mini" data-nrdel="${n}" aria-label="Usuń">${icon('trash', 16)}</button>
+      </div>`).join('');
+    const status = snap?.radio?.notifications;
+    return `
+      <h2>Powiadomienia</h2>
+      <p class="lead">Edge Shell zbiera powiadomienia wszystkich aplikacji Windows i pokazuje je jako radio.</p>
+      <div class="card">
+        <div class="row"><div class="txt"><b>Przechwytuj powiadomienia Windows</b><span>${status === 'ok' ? 'Działa — baza powiadomień jest czytana.' : status ? 'Problem: ' + esc(status) : 'Uruchamianie…'}</span></div>${sw(cfg.notifications.enabled, 'notifications.enabled')}</div>
+        <div class="row"><div class="txt"><b>Włącz w Windows „Nie przeszkadzać”</b><span>Wtedy systemowe dymki znikają, a powiadomienia widzisz tylko jako radio.</span></div><button class="btn" id="openNotif">Otwórz ustawienia Windows</button></div>
+      </div>
+      <div class="card"><h3>Reguły dla aplikacji</h3>
+        <span class="hint">„Pilne” przechodzi od razu nawet w ciszy, „Pomijaj” ukrywa całkiem.</span>
+        <div class="list">${rules}</div>
+        <div><button class="btn" id="nrAdd">${icon('plus', 16, 2)}Dodaj regułę</button></div>
+      </div>`;
+  },
+
+  spotify() {
+    const m = snap?.music || {};
+    return `
+      <h2>Spotify</h2>
+      <p class="lead">Muzyka sama dopasowuje się do planu dnia. Sterowanie wymaga konta Premium.</p>
+      <div class="card">
+        <h3>Połączenie</h3>
+        <span class="hint">1. Na developer.spotify.com utwórz aplikację i dodaj Redirect URI: <span class="mono" style="color:var(--text)">http://127.0.0.1:${cfg.spotify.redirectPort}/callback</span><br>2. Wklej jej Client ID, zapisz i kliknij „Połącz”.</span>
+        <div class="grid2">
+          <label class="field-l">Client ID<input class="in" data-bind="spotify.clientId" placeholder="np. 3f2a…"></label>
+          <label class="field-l">Port przekierowania<input class="in" type="number" data-num="spotify.redirectPort"></label>
+        </div>
+        <div class="row"><button class="btn primary" id="spLogin">Połącz ze Spotify</button><span class="hint">${m.connected ? 'Połączone' : m.error ? esc(m.error) : 'Niepołączone'}</span></div>
+      </div>
+      <div class="card">
+        <h3>Reguły</h3>
+        <div class="row"><div class="txt"><b>Start bloku fokusu włącza playlistę trybu</b><span>Ściszoną do <span data-out="spotify.focusVolume">${cfg.spotify.focusVolume}</span>%</span></div>${sw(cfg.spotify.playOnFocus, 'spotify.playOnFocus')}</div>
+        <div class="row"><div class="txt"><b>Głośność w fokusie</b></div><input type="range" min="5" max="100" step="5" data-num="spotify.focusVolume" style="width:240px"></div>
+        <div class="row"><div class="txt"><b>Pauza w buforze</b><span>Przerwa to przerwa.</span></div>${sw(cfg.spotify.pauseOnBuffer, 'spotify.pauseOnBuffer')}</div>
+        <div class="row"><div class="txt"><b>Pauza 2 minuty przed spotkaniem</b></div>${sw(cfg.spotify.pauseBeforeMeeting, 'spotify.pauseBeforeMeeting')}</div>
+        <div class="row"><div class="txt"><b>Zmiana trybu przełącza playlistę</b></div>${sw(cfg.spotify.playOnModeChange, 'spotify.playOnModeChange')}</div>
+      </div>`;
+  },
+
+  hotkeys() {
+    const KEYS = [
+      ['drawer', 'Szuflada'], ['now', 'Panel Teraz'], ['capture', 'Wrzuć myśl'],
+      ['focus', 'Start / pauza fokusu'], ['search', 'Szukaj w szufladzie'], ['radio', 'Pokaż radio z paczki'],
+    ];
+    return `
+      <h2>Skróty klawiszowe</h2>
+      <p class="lead">Kliknij pole i naciśnij nowy skrót. Backspace czyści skrót. Skróty z klawiszem Windows mogą być zajęte przez system.</p>
+      <div class="card">${KEYS.map(([k, name]) => `
+        <div class="row"><div class="txt"><b>${name}</b></div><button class="kbdrec" data-hk="${k}">${esc(cfg.hotkeys[k] || '—')}</button></div>`).join('')}
+      </div>`;
+  },
+};
+
+// ------------------------------------------------------------ akcje stron
+
+const after = {
+  general(root) {
+    $('testHorolog').onclick = async () => {
+      $('testResult').textContent = 'Sprawdzam…';
+      try { $('testResult').textContent = await invoke('horolog_test', { url: cfg.horolog.url }); }
+      catch (e) { $('testResult').textContent = String(e); }
+    };
+  },
+  bar(root) {
+    for (const el of root.querySelectorAll('[data-sw^="stat:"]')) {
+      el.onclick = () => {
+        const k = el.dataset.sw.slice(5);
+        const order = ['network', 'cpu', 'memory', 'volume', 'bluetooth', 'wifi', 'battery'];
+        const on = new Set(cfg.bar.stats);
+        if (on.has(k)) on.delete(k); else on.add(k);
+        cfg.bar.stats = order.filter((x) => on.has(x));
+        el.setAttribute('aria-checked', on.has(k) ? 'true' : 'false');
+        markDirty();
+      };
+    }
+    for (const el of root.querySelectorAll('[data-pin]')) {
+      el.oninput = el.onchange = () => { const [n, f] = el.dataset.pin.split('.'); cfg.pinned[+n][f] = el.value; markDirty(); };
+    }
+    for (const b of root.querySelectorAll('[data-pinpick]')) {
+      b.onclick = async () => {
+        const p = await invoke('pick_path', { folder: true });
+        if (p) { cfg.pinned[+b.dataset.pinpick].path = p; markDirty(); show(page); }
+      };
+    }
+    for (const b of root.querySelectorAll('[data-pindel]')) b.onclick = () => { cfg.pinned.splice(+b.dataset.pindel, 1); markDirty(); show(page); };
+    $('pinAdd').onclick = async () => {
+      const p = await invoke('pick_path', { folder: true });
+      if (!p) return;
+      cfg.pinned.push({ name: p.split(/[\\/]/).pop(), path: p, category: cfg.sections[0]?.id || 'praca' });
+      markDirty();
+      show(page);
+    };
+  },
+  dock(root) {
+    renderPreview();
+    renderEditor();
+    for (const n of ['seccolor', 'secname']) {
+      for (const el of root.querySelectorAll(`[data-${n}]`)) {
+        el.oninput = () => {
+          const s = cfg.sections[+el.dataset[n]];
+          if (n === 'seccolor') s.color = el.value; else s.name = el.value;
+          markDirty();
+          renderPreview();
+        };
+        if (n === 'seccolor') el.onchange = () => show(page);
+      }
+    }
+    const move = (from, to) => { const [x] = cfg.sections.splice(from, 1); cfg.sections.splice(to, 0, x); markDirty(); show(page); };
+    for (const b of root.querySelectorAll('[data-secup]')) b.onclick = () => move(+b.dataset.secup, +b.dataset.secup - 1);
+    for (const b of root.querySelectorAll('[data-secdown]')) b.onclick = () => move(+b.dataset.secdown, +b.dataset.secdown + 1);
+    for (const b of root.querySelectorAll('[data-secdel]')) b.onclick = () => { cfg.sections.splice(+b.dataset.secdel, 1); markDirty(); show(page); };
+    $('secAdd').onclick = () => { cfg.sections.push({ id: uid('sekcja'), name: 'Nowa sekcja', color: '#f472b6' }); markDirty(); show(page); };
+    $('appAdd').onclick = openPicker;
+
+    // Przeciąganie aplikacji między sekcjami i w obrębie sekcji.
+    let dragId = null;
+    for (const chip of root.querySelectorAll('.app-chip')) {
+      chip.onclick = () => { selectedApp = chip.dataset.app; show(page); };
+      chip.ondragstart = (e) => { dragId = chip.dataset.app; chip.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; };
+      chip.ondragend = () => chip.classList.remove('dragging');
+    }
+    for (const zone of root.querySelectorAll('[data-drop]')) {
+      const lane = zone.closest('.lane');
+      zone.ondragover = (e) => { e.preventDefault(); lane.classList.add('over'); };
+      zone.ondragleave = () => lane.classList.remove('over');
+      zone.ondrop = (e) => {
+        e.preventDefault();
+        lane.classList.remove('over');
+        if (!dragId) return;
+        const app = cfg.dock.find((a) => a.id === dragId);
+        if (!app) return;
+        // Wstaw przed kafelkiem, nad którym upuszczono (albo na koniec sekcji).
+        const target = e.target.closest('.app-chip');
+        cfg.dock.splice(cfg.dock.indexOf(app), 1);
+        app.category = zone.dataset.drop;
+        let idx;
+        if (target && target.dataset.app !== app.id) {
+          idx = cfg.dock.findIndex((a) => a.id === target.dataset.app);
+        } else {
+          const lastInSection = cfg.dock.map((a) => a.category).lastIndexOf(app.category);
+          idx = lastInSection + 1;
+        }
+        cfg.dock.splice(idx < 0 ? cfg.dock.length : idx, 0, app);
+        dragId = null;
+        markDirty();
+        show(page);
+      };
+    }
+  },
+  modes(root) {
+    for (const el of root.querySelectorAll('[data-mode]')) {
+      el.oninput = () => { const [n, f] = el.dataset.mode.split('.'); cfg.modes[+n][f] = el.value; markDirty(); };
+    }
+    for (const b of root.querySelectorAll('[data-dim]')) {
+      b.onclick = () => {
+        const [n, id] = b.dataset.dim.split(':');
+        const dim = cfg.modes[+n].dim;
+        const i = dim.indexOf(id);
+        if (i >= 0) dim.splice(i, 1); else dim.push(id);
+        b.classList.toggle('on', i < 0);
+        markDirty();
+      };
+    }
+    for (const b of root.querySelectorAll('[data-modedel]')) b.onclick = () => { cfg.modes.splice(+b.dataset.modedel, 1); markDirty(); show(page); };
+    $('modeAdd').onclick = () => { cfg.modes.push({ id: uid('tryb'), label: 'Nowy tryb', accent: '#0EA5E9', dim: [], quiet: true, playlist: '' }); markDirty(); show(page); };
+  },
+  radio(root) {
+    for (const el of root.querySelectorAll('[data-ct]')) {
+      el.oninput = () => { const [n, f] = el.dataset.ct.split('.'); cfg.contacts[+n][f] = el.value; markDirty(); };
+      if (el.type === 'color') el.onchange = () => show(page);
+    }
+    for (const el of root.querySelectorAll('[data-ctm]')) {
+      el.oninput = () => { cfg.contacts[+el.dataset.ctm].matches = el.value.split(',').map((x) => x.trim()).filter(Boolean); markDirty(); };
+    }
+    for (const b of root.querySelectorAll('[data-ctdel]')) b.onclick = () => { cfg.contacts.splice(+b.dataset.ctdel, 1); markDirty(); show(page); };
+    $('ctAdd').onclick = () => {
+      const used = new Set(cfg.contacts.map((c) => c.number));
+      let num = 2; while (used.has(String(num))) num++;
+      cfg.contacts.push({ name: 'NOWY', number: String(num), color: '#fbbf24', matches: [] });
+      markDirty(); show(page);
+    };
+    for (const b of root.querySelectorAll('[data-btdel]')) b.onclick = () => { cfg.radio.batchTimes.splice(+b.dataset.btdel, 1); markDirty(); show(page); };
+    $('btAdd').onclick = () => {
+      const v = $('btNew').value;
+      if (!v || cfg.radio.batchTimes.includes(v)) return;
+      cfg.radio.batchTimes.push(v);
+      cfg.radio.batchTimes.sort();
+      markDirty(); show(page);
+    };
+  },
+  notifications(root) {
+    for (const el of root.querySelectorAll('[data-nr]')) {
+      el.oninput = () => { const [n, f] = el.dataset.nr.split('.'); cfg.notifications.apps[+n][f] = el.value; markDirty(); };
+    }
+    for (const b of root.querySelectorAll('[data-nrt]')) {
+      b.onclick = () => { const [n, f] = b.dataset.nrt.split('.'); const r = cfg.notifications.apps[+n]; r[f] = !r[f]; b.classList.toggle('on', r[f]); markDirty(); };
+    }
+    for (const b of root.querySelectorAll('[data-nrdel]')) b.onclick = () => { cfg.notifications.apps.splice(+b.dataset.nrdel, 1); markDirty(); show(page); };
+    $('nrAdd').onclick = () => { cfg.notifications.apps.push({ matches: '', name: '', color: '', urgent: false, ignore: false }); markDirty(); show(page); };
+    $('openNotif').onclick = () => invoke('open_path', { path: 'ms-settings:notifications' });
+  },
+  spotify() {
+    $('spLogin').onclick = async () => {
+      if (JSON.stringify(cfg) !== saved) await save();
+      invoke('spotify_login').then(() => toast('Zaloguj się w przeglądarce')).catch((e) => toast(String(e), 3000));
+    };
+  },
+  hotkeys(root) {
+    for (const b of root.querySelectorAll('[data-hk]')) {
+      b.onclick = () => {
+        for (const o of root.querySelectorAll('.kbdrec')) o.classList.remove('rec');
+        b.classList.add('rec');
+        b.textContent = 'Naciśnij skrót…';
+        const onKey = (e) => {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          if (['Control', 'Alt', 'Shift', 'Meta'].includes(e.key)) return;
+          window.removeEventListener('keydown', onKey, true);
+          b.classList.remove('rec');
+          if (e.key === 'Escape') { b.textContent = cfg.hotkeys[b.dataset.hk] || '—'; return; }
+          let combo = '';
+          if (e.key !== 'Backspace') {
+            const mods = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Super'].filter(Boolean);
+            combo = [...mods, e.code].join('+');
+          }
+          cfg.hotkeys[b.dataset.hk] = combo;
+          b.textContent = combo || '—';
+          markDirty();
+        };
+        window.addEventListener('keydown', onKey, true);
+      };
+    }
+  },
+};
+
+// ------------------------------------------------------------ dock: podgląd i edytor
+
+function renderPreview() {
+  const el = $('pdock');
+  if (!el) return;
+  const order = cfg.sections.map((s) => s.id);
+  const apps = [...cfg.dock].sort((a, b) => order.indexOf(a.category) - order.indexOf(b.category));
+  el.innerHTML = apps.map((a, n) => {
+    const sep = apps[n + 1] && apps[n + 1].category !== a.category ? '<span class="sep"></span>' : '';
+    return `<span class="a">${appTile({ ...a, id: a.id + '-pv' })}<span class="s" style="background:${sectionColor(a.category)}"></span></span>${sep}`;
+  }).join('');
+}
+
+function renderEditor() {
+  const el = $('editor');
+  if (!el) return;
+  const a = cfg.dock.find((x) => x.id === selectedApp);
+  if (!a) {
+    el.innerHTML = '<h3>Edycja aplikacji</h3><span class="hint">Kliknij aplikację, żeby zmienić jej nazwę, ikonę, sekcję albo ścieżkę. Prawy klik na docku otwiera te ustawienia.</span>';
+    return;
+  }
+  const mode = a.icon === 'auto' ? 'auto' : BUILTIN_ICONS.includes(a.icon) ? 'builtin' : 'text';
+  el.innerHTML = `
+    <div class="row" style="min-height:0">${appTile({ ...a, id: a.id + '-ed' })}<h3 style="flex:1">${esc(a.name)}</h3></div>
+    <label class="field-l">Nazwa<input class="in" id="edName" value="${esc(a.name)}"></label>
+    <label class="field-l">Co uruchomić (plik .exe, skrót, adres WWW albo URI)
+      <span style="display:flex;gap:6px"><input class="in" style="flex:1" id="edPath" value="${esc(a.path)}"><button class="mini" id="edPick" aria-label="Wybierz plik">${icon('folder', 16)}</button></span>
+    </label>
+    <label class="field-l">Sekcja<select class="in" id="edSec">${cfg.sections.map((s) => `<option value="${esc(s.id)}" ${s.id === a.category ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+    <div class="field-l">Ikona
+      <div class="chips">
+        <button class="chip ${mode === 'auto' ? 'on' : ''}" data-im="auto">Z aplikacji</button>
+        <button class="chip ${mode === 'builtin' ? 'on' : ''}" data-im="builtin">Wbudowana</button>
+        <button class="chip ${mode === 'text' ? 'on' : ''}" data-im="text">Litery</button>
+      </div>
+    </div>
+    ${mode === 'builtin' ? `<div class="iconpick">${BUILTIN_ICONS.map((i) => `<button class="${a.icon === i ? 'on' : ''}" data-ib="${i}" aria-label="${i}">${icon(i, 18)}</button>`).join('')}</div>` : ''}
+    ${mode === 'text' ? `<label class="field-l">Litery (1–2)<input class="in" id="edText" maxlength="2" value="${esc(a.icon)}"></label>` : ''}
+    ${mode === 'auto' ? `<label class="field-l">Ikona z innego pliku (opcjonalnie)<span style="display:flex;gap:6px"><input class="in" style="flex:1" id="edIconPath" value="${esc(a.iconPath)}" placeholder="pusta = z pola „Co uruchomić”"><button class="mini" id="edIconPick" aria-label="Wybierz plik ikony">${icon('folder', 16)}</button></span></label>` : ''}
+    <label class="field-l">Proces (kropka „uruchomione”)<input class="in" id="edProc" value="${esc(a.process)}" placeholder="np. chrome.exe"></label>
+    <button class="btn" id="edDel" style="color:#fca5a5">${icon('trash', 16)}Usuń z docka</button>`;
+  const upd = (f, v, rerender = false) => { a[f] = v; markDirty(); if (rerender) show(page); else renderPreview(); };
+  $('edName').oninput = (e) => upd('name', e.target.value);
+  $('edName').onchange = () => show(page);
+  $('edPath').onchange = (e) => {
+    upd('path', e.target.value.trim(), true);
+    if (!a.process && /\.exe$/i.test(a.path)) { a.process = a.path.split(/[\\/]/).pop(); }
+  };
+  $('edPick').onclick = async () => {
+    const p = await invoke('pick_path', { folder: false });
+    if (!p) return;
+    a.path = p;
+    if (/\.exe$/i.test(p)) a.process = p.split(/[\\/]/).pop();
+    markDirty(); show(page);
+  };
+  $('edSec').onchange = (e) => upd('category', e.target.value, true);
+  for (const b of el.querySelectorAll('[data-im]')) {
+    b.onclick = () => {
+      const m = b.dataset.im;
+      upd('icon', m === 'auto' ? 'auto' : m === 'builtin' ? 'folder' : a.name.slice(0, 2).toUpperCase(), true);
+    };
+  }
+  for (const b of el.querySelectorAll('[data-ib]')) b.onclick = () => upd('icon', b.dataset.ib, true);
+  if ($('edText')) $('edText').onchange = (e) => upd('icon', e.target.value.toUpperCase() || '?', true);
+  if ($('edIconPath')) $('edIconPath').onchange = (e) => { iconCache.delete(a.iconPath); upd('iconPath', e.target.value.trim(), true); };
+  if ($('edIconPick')) $('edIconPick').onclick = async () => {
+    const p = await invoke('pick_path', { folder: false });
+    if (p) upd('iconPath', p, true);
+  };
+  $('edProc').oninput = (e) => upd('process', e.target.value.trim());
+  $('edDel').onclick = () => {
+    cfg.dock = cfg.dock.filter((x) => x.id !== a.id);
+    for (const m of cfg.modes) m.dim = m.dim.filter((d) => d !== a.id);
+    selectedApp = null;
+    markDirty(); show(page);
+  };
+}
+
+// ------------------------------------------------------------ wybór aplikacji
+
+async function openPicker() {
+  $('picker').classList.add('on');
+  $('pickSearch').value = '';
+  $('pickSearch').focus();
+  if (!startApps) startApps = await invoke('search_index').catch(() => []);
+  renderPicks();
+}
+function closePicker() { $('picker').classList.remove('on'); }
+
+function renderPicks() {
+  const q = $('pickSearch').value.trim().toLowerCase();
+  const list = (startApps || []).filter((a) => !q || a.name.toLowerCase().includes(q)).slice(0, 80);
+  $('pickList').innerHTML = list.map((a, n) => `<button class="pick" data-n="${n}"><span class="ph" id="pk-${n}"></span><span class="ellipsis">${esc(a.name)}</span></button>`).join('')
+    || '<span class="hint" style="padding:10px">Nic nie znaleziono — wybierz plik ręcznie.</span>';
+  list.slice(0, 30).forEach((a, n) => appIcon(a.path).then((url) => {
+    const ph = document.getElementById(`pk-${n}`);
+    if (url && ph) ph.outerHTML = `<img src="${url}" alt="">`;
+  }));
+  for (const b of $('pickList').querySelectorAll('.pick')) {
+    b.onclick = () => { const a = list[+b.dataset.n]; addApp(a.name, a.path); };
+  }
+}
+
+function addApp(name, path) {
+  const exe = /\.exe$/i.test(path) ? path.split(/[\\/]/).pop() : '';
+  const app = { id: uid(name), name, path, args: [], category: cfg.sections[0]?.id || 'praca', icon: /^https?:/i.test(path) ? 'globe' : 'auto', process: exe, iconPath: '', separatorAfter: false };
+  cfg.dock.push(app);
+  selectedApp = app.id;
+  markDirty();
+  closePicker();
+  show('dock');
+}
+
+$('pickClose').innerHTML = icon('close', 14, 2.4);
+$('pickClose').onclick = closePicker;
+$('picker').onclick = (e) => { if (e.target === $('picker')) closePicker(); };
+$('pickSearch').oninput = renderPicks;
+$('pickFile').onclick = async () => {
+  const p = await invoke('pick_path', { folder: false });
+  if (p) addApp(p.split(/[\\/]/).pop().replace(/\.(exe|lnk|url)$/i, ''), p);
+};
+$('pickUrl').onclick = () => {
+  const url = prompt('Adres WWW albo URI (np. https://…, spotify:, ms-settings:)');
+  if (url) addApp(url.replace(/^https?:\/\/(www\.)?/i, '').split(/[/:]/)[0] || 'Skrót', url.trim());
+};
+
+// ------------------------------------------------------------ szkielet
+
+function show(p) {
+  page = p;
+  for (const b of $('nav').querySelectorAll('button')) b.classList.toggle('on', b.dataset.page === p);
+  const scroll = $('content').scrollTop;
+  $('content').innerHTML = `<section class="page on">${render[p]()}</section>`;
+  const root = $('content').firstElementChild;
+  bind(root);
+  after[p]?.(root);
+  $('content').scrollTop = scroll;
+}
+
+async function load() {
+  cfg = await invoke('get_config');
+  // Uzupełnij brakujące pola starszych konfiguracji.
+  cfg.sections ||= [];
+  cfg.bar ||= { stats: [] };
+  for (const a of cfg.dock) { a.iconPath ??= ''; a.icon ??= 'auto'; }
+  saved = JSON.stringify(cfg);
+  markDirty();
+  show(page);
+}
+
+async function save() {
+  try {
+    await invoke('save_config', { config: cfg });
+    saved = JSON.stringify(cfg);
+    markDirty();
+    toast('Zapisano i zastosowano');
+  } catch (e) {
+    toast(`Nie zapisano: ${e}`, 4000);
+  }
+}
+
+$('nav').insertAdjacentHTML('beforeend', PAGES.map(([id, name, ic]) => `<button data-page="${id}">${icon(ic, 18)}${name}</button>`).join(''));
+for (const b of $('nav').querySelectorAll('button')) b.onclick = () => show(b.dataset.page);
+$('save').onclick = save;
+$('revert').onclick = () => { cfg = JSON.parse(saved); markDirty(); show(page); };
+window.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); save(); } });
+
+let statusKey = '';
+onSnapshot((s) => {
+  snap = s;
+  // Przerysuj tylko, gdy zmienił się status widoczny na stronie.
+  const key = JSON.stringify([s.radio?.notifications, s.music?.connected, s.music?.error]);
+  if (key === statusKey) return;
+  statusKey = key;
+  if (['notifications', 'spotify'].includes(page) && cfg && !document.activeElement?.matches('input, select')) show(page);
+});
+listen('config-changed', () => { if (cfg && JSON.stringify(cfg) === saved) load(); });
+load();
+</script>
+</body>
+</html>

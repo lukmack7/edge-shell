@@ -8,9 +8,13 @@ mod hotkeys;
 mod layout;
 mod notifications;
 mod platform;
+mod icons;
 mod radio;
+mod settings;
 mod spotify;
 mod state;
+mod stats;
+mod sys;
 
 use tauri::{Manager, RunEvent, WindowEvent};
 
@@ -25,20 +29,39 @@ fn main() {
         }))
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(hotkeys::plugin())
         .manage(shared)
         .setup(|app| {
             let handle = app.handle().clone();
-            if state::cfg(&handle).shell.hide_taskbar {
-                platform::set_taskbar_visible(false);
+            // Zapamiętaj pierwotny stan paska zadań (do przywrócenia przy wyjściu).
+            if !state::read(&handle, |rt| rt.store.taskbar_saved) {
+                let original = sys::taskbar_state();
+                state::update(&handle, true, |rt| {
+                    rt.store.taskbar_state = original;
+                    rt.store.taskbar_saved = true;
+                });
             }
+            let cfg = state::cfg(&handle);
+            if cfg.shell.hide_taskbar {
+                sys::hide_taskbar(true, 0);
+            }
+            settings::set_autostart(&handle, cfg.shell.autostart);
             layout::arrange(&handle);
+            // Po schowaniu paska zadań obszar roboczy zmienia się z opóźnieniem.
+            let h2 = handle.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(std::time::Duration::from_millis(1500));
+                layout::arrange(&h2);
+            });
             hotkeys::register(&handle);
             horolog::start(handle.clone());
             radio::start_server(handle.clone());
             spotify::start(handle.clone());
             engine::start(handle.clone());
             notifications::start(handle.clone());
+            stats::start(handle.clone());
             layout::start_edges(handle.clone());
 
             // Szuflada i Teraz chowają się, gdy klikniesz gdzie indziej.
@@ -51,6 +74,15 @@ fn main() {
                         }
                     });
                 }
+            }
+            if let Some(w) = app.get_webview_window("settings") {
+                let w2 = w.clone();
+                w.on_window_event(move |e| {
+                    if let WindowEvent::CloseRequested { api, .. } = e {
+                        api.prevent_close();
+                        let _ = w2.hide();
+                    }
+                });
             }
             if let Some(w) = app.get_webview_window("capture") {
                 let h = handle.clone();
@@ -99,6 +131,16 @@ fn main() {
             commands::open_config,
             commands::reload_config,
             commands::quit,
+            settings::get_config,
+            settings::save_config,
+            settings::open_settings,
+            settings::pick_path,
+            settings::horolog_test,
+            settings::get_stats,
+            settings::set_volume,
+            settings::toggle_mute,
+            icons::dock_icons,
+            icons::app_icon,
         ])
         .build(tauri::generate_context!())
         .expect("nie udało się uruchomić Edge Shell");

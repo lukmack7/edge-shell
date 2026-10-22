@@ -126,7 +126,7 @@ $('qaCalc').innerHTML = `${icon('calc', 16, 2)}Kalkulator`;
 $('qaHorolog').innerHTML = `${icon('clock', 16, 2)}Horolog`;
 
 $('collapse').onclick = () => invoke('hide_window', { label: 'drawer' });
-$('settings').onclick = () => invoke('open_config');
+$('settings').onclick = () => invoke('open_settings');
 $('qaShot').onclick = () => { invoke('hide_window', { label: 'drawer' }); invoke('open_path', { path: 'ms-screenclip:' }); };
 $('qaNote').onclick = () => invoke('show_capture');
 $('qaCalc').onclick = () => invoke('open_path', { path: 'calc.exe' });

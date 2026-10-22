@@ -35,7 +35,7 @@ invoke('get_snapshot').then(apply);
 setInterval(() => { if (snap) for (const cb of tickers) cb(snap); }, 1000);
 
 // Esc chowa okno (poza paskiem i dockiem).
-if (!['topbar', 'dock', 'glow'].includes(windowLabel)) {
+if (!['topbar', 'dock', 'glow', 'settings'].includes(windowLabel)) {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') invoke('hide_window', { label: windowLabel });
   });
@@ -145,7 +145,24 @@ const ICONS = {
   file: P('M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z') + P('M14 3v5h5'),
   camera: P('M4 8V5h3M17 5h3v3M20 16v3h-3M7 19H4v-3') + '<circle cx="12" cy="12" r="3"></circle>',
   replan: P('M3 12a9 9 0 0 1 15.5-6.3L21 8') + P('M21 3v5h-5') + P('M21 12a9 9 0 0 1-15.5 6.3L3 16') + P('M3 21v-5h5'),
+  cpu: '<rect x="6" y="6" width="12" height="12" rx="2"></rect><rect x="9.5" y="9.5" width="5" height="5" rx="1"></rect>' + P('M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4'),
+  ram: '<rect x="3" y="7" width="18" height="10" rx="1.5"></rect>' + P('M7 17v3M11 17v3M15 17v3M7 10v4M11 10v4M15 10v4'),
+  volume: P('M4 9v6h4l5 4V5L8 9z') + P('M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11'),
+  mute: P('M4 9v6h4l5 4V5L8 9z') + P('M17 9l5 6M22 9l-5 6'),
+  bluetooth: P('M7 7l10 10-5 4V3l5 4L7 17'),
+  down: P('M12 5v14M6 13l6 6 6-6'),
+  up: P('M12 19V5M6 11l6-6 6 6'),
+  plus: P('M12 5v14M5 12h14'),
+  trash: P('M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3'),
+  drag: '<circle cx="9" cy="6" r="1"></circle><circle cx="15" cy="6" r="1"></circle><circle cx="9" cy="12" r="1"></circle><circle cx="15" cy="12" r="1"></circle><circle cx="9" cy="18" r="1"></circle><circle cx="15" cy="18" r="1"></circle>',
+  pin: P('M12 17v5M5 17h14l-2-5V5H7v7z'),
+  keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"></rect>' + P('M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10'),
+  radio: '<circle cx="12" cy="12" r="2"></circle>' + P('M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5'),
+  layers: P('M12 3l9 5-9 5-9-5z') + P('M3 13l9 5 9-5'),
+  sliders: P('M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0') + '<circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle>',
 };
+
+export const BUILTIN_ICONS = ['folder', 'globe', 'sheet', 'terminal', 'mail', 'clock', 'chat', 'note', 'music', 'video', 'game', 'code', 'image', 'calc', 'settings'];
 const FILLED = {
   play: '<path d="M8 5l11 7-11 7z"></path>',
   pause: '<rect x="6" y="5" width="4" height="14"></rect><rect x="14" y="5" width="4" height="14"></rect>',

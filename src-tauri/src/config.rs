@@ -33,6 +33,53 @@ pub struct Config {
     pub shell: ShellCfg,
     pub focus: FocusCfg,
     pub notifications: NotificationsCfg,
+    /// Sekcje docka w kolejności; separator wstawiany między sekcjami.
+    pub sections: Vec<Section>,
+    pub bar: BarCfg,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Section {
+    pub id: String,
+    pub name: String,
+    pub color: String,
+}
+
+impl Default for Section {
+    fn default() -> Self {
+        Self { id: String::new(), name: String::new(), color: "#a1a1aa".into() }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct BarCfg {
+    /// Które statystyki pokazać w pasku: network, cpu, memory, volume,
+    /// bluetooth, wifi, battery.
+    pub stats: Vec<String>,
+}
+
+impl Default for BarCfg {
+    fn default() -> Self {
+        Self {
+            stats: ["network", "cpu", "memory", "volume", "bluetooth", "wifi", "battery"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+        }
+    }
+}
+
+pub fn default_sections() -> Vec<Section> {
+    let s = |id: &str, name: &str, color: &str| Section { id: id.into(), name: name.into(), color: color.into() };
+    vec![
+        s("praca", "Praca", "#60a5fa"),
+        s("projekty", "Projekty", "#22c55e"),
+        s("komunikacja", "Komunikacja", "#eab308"),
+        s("tworcze", "Twórcze i rozrywka", "#c084fc"),
+        s("system", "System", "#a1a1aa"),
+    ]
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -108,6 +155,8 @@ pub struct DockApp {
     pub icon: String,
     /// Nazwa procesu do kropki „uruchomione”, np. `chrome.exe`. Puste = bez kropki.
     pub process: String,
+    /// Plik, z którego wziąć ikonę, gdy `icon` = `auto` (puste = z `path`).
+    pub icon_path: String,
     /// Wstaw separator za tą ikoną.
     pub separator_after: bool,
 }
@@ -179,6 +228,8 @@ pub struct ShellCfg {
     /// Ile ms kursor musi stać przy krawędzi, żeby wysunąć panel.
     pub edge_delay_ms: u64,
     pub edge_glow_minutes: i64,
+    /// Uruchamiaj Edge Shell razem z Windows.
+    pub autostart: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -218,8 +269,9 @@ impl Default for DockApp {
             path: String::new(),
             args: vec![],
             category: "system".into(),
-            icon: String::new(),
+            icon: "auto".into(),
             process: String::new(),
+            icon_path: String::new(),
             separator_after: false,
         }
     }
@@ -278,11 +330,12 @@ impl Default for ShellCfg {
     fn default() -> Self {
         Self {
             reserve_top_bar: true,
-            hide_taskbar: false,
+            hide_taskbar: true,
             show_dock: true,
             show_bubbles: true,
             edge_delay_ms: 150,
             edge_glow_minutes: 15,
+            autostart: true,
         }
     }
 }
@@ -294,12 +347,13 @@ impl Default for FocusCfg {
 }
 
 fn app(id: &str, name: &str, path: &str, category: &str, icon: &str, process: &str) -> DockApp {
+    let real = !path.starts_with("http");
     DockApp {
         id: id.into(),
         name: name.into(),
         path: path.into(),
         category: category.into(),
-        icon: icon.into(),
+        icon: if real { "auto".into() } else { icon.into() },
         process: process.into(),
         ..DockApp::default()
     }
@@ -372,6 +426,8 @@ impl Default for Config {
             shell: ShellCfg::default(),
             focus: FocusCfg::default(),
             notifications: NotificationsCfg::default(),
+            sections: default_sections(),
+            bar: BarCfg::default(),
         }
     }
 }
@@ -381,7 +437,21 @@ impl Config {
         let path = config_path();
         match std::fs::read_to_string(&path) {
             Ok(text) => match serde_json::from_str::<Config>(&text) {
-                Ok(cfg) => cfg,
+                Ok(mut cfg) => {
+                    // Migracja z wersji bez sekcji: prawdziwe ikony zamiast wbudowanych.
+                    let old = serde_json::from_str::<serde_json::Value>(&text)
+                        .map(|v| v.get("sections").is_none())
+                        .unwrap_or(false);
+                    if old {
+                        for a in cfg.dock.iter_mut() {
+                            if !a.path.starts_with("http") {
+                                a.icon = "auto".into();
+                            }
+                        }
+                        cfg.save();
+                    }
+                    cfg
+                }
                 Err(err) => {
                     log::error!("config.json nieczytelny ({err}); używam domyślnych");
                     // Nie nadpisujemy pliku użytkownika — zostawiamy go do poprawy.
@@ -439,13 +509,32 @@ pub fn expand_env(path: &str) -> String {
     out
 }
 
-pub fn category_colors(category: &str) -> (&'static str, &'static str, &'static str) {
-    // (tło kafelka, kolor ikony, pasek kategorii)
-    match category {
-        "praca" => ("#1e3a5f", "#bfdbfe", "#60a5fa"),
-        "projekty" => ("#14422e", "#bbf7d0", "#22c55e"),
-        "komunikacja" => ("#4a3410", "#fde68a", "#eab308"),
-        "tworcze" => ("#3b1f5c", "#e9d5ff", "#c084fc"),
-        _ => ("#27272a", "#e4e4e7", "#a1a1aa"),
+/// (tło kafelka, kolor ikony, pasek sekcji) wyliczone z koloru sekcji.
+pub fn section_colors(sections: &[Section], id: &str) -> (String, String, String) {
+    let color = sections
+        .iter()
+        .find(|s| s.id == id)
+        .map(|s| s.color.clone())
+        .unwrap_or_else(|| "#a1a1aa".into());
+    let rgb = parse_hex(&color).unwrap_or((161, 161, 170));
+    let mix = |c: u8, base: u8, t: f32| ((c as f32) * t + (base as f32) * (1.0 - t)).round() as u8;
+    let bg = (mix(rgb.0, 20, 0.28), mix(rgb.1, 20, 0.28), mix(rgb.2, 23, 0.28));
+    let fg = (mix(rgb.0, 255, 0.35), mix(rgb.1, 255, 0.35), mix(rgb.2, 255, 0.35));
+    (hex(bg), hex(fg), color)
+}
+
+fn parse_hex(s: &str) -> Option<(u8, u8, u8)> {
+    let h = s.trim().trim_start_matches('#');
+    if h.len() != 6 {
+        return None;
     }
+    Some((
+        u8::from_str_radix(&h[0..2], 16).ok()?,
+        u8::from_str_radix(&h[2..4], 16).ok()?,
+        u8::from_str_radix(&h[4..6], 16).ok()?,
+    ))
+}
+
+fn hex(c: (u8, u8, u8)) -> String {
+    format!("#{:02x}{:02x}{:02x}", c.0, c.1, c.2)
 }

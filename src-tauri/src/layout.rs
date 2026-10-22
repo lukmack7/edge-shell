@@ -151,7 +151,8 @@ pub fn release(app: &AppHandle) {
         platform::appbar_remove(raw);
     }
     if state::cfg(app).shell.hide_taskbar {
-        platform::set_taskbar_visible(true);
+        let restore = state::read(app, |rt| rt.store.taskbar_state);
+        crate::sys::hide_taskbar(false, restore);
     }
 }
 

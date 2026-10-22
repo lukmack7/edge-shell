@@ -68,7 +68,7 @@ import { invoke, onSnapshot, onTick, esc, icon, ring, focusTiming, mmss, hhmm, b
 const $ = (id) => document.getElementById(id);
 $('close').innerHTML = icon('right', 18, 2);
 $('close').onclick = () => invoke('hide_window', { label: 'now' });
-$('cfg').onclick = () => invoke('open_config');
+$('cfg').onclick = () => invoke('open_settings');
 $('reload').onclick = () => invoke('reload_config').then(() => toast('Konfiguracja wczytana'));
 
 $('capture').addEventListener('keydown', async (e) => {

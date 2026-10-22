@@ -6,8 +6,9 @@
 <link rel="stylesheet" href="shared.css">
 <style>
   body { background: rgba(12, 12, 14, 0.9); border-bottom: 1px solid var(--line); }
-  .bar { position: relative; height: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 14px; }
-  .side { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .bar { position: relative; height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px; padding: 0 14px; }
+  .side { display: flex; align-items: center; gap: 14px; min-width: 0; overflow: hidden; }
+  .side.right { justify-content: flex-end; gap: 10px; }
   .logo { width: 26px; height: 26px; border-radius: 8px; border: 0; background: transparent; display: flex; align-items: center; justify-content: center; }
   .logo span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--text); }
   .logo:hover { background: var(--fill); }
@@ -15,9 +16,9 @@
   .modes { display: flex; gap: 2px; padding: 2px; border-radius: 999px; background: rgba(255,255,255,0.07); }
   .modes button { height: 24px; padding: 0 12px; border-radius: 999px; border: 0; background: transparent; color: var(--text-2); font-size: 12px; font-weight: 600; }
   .modes button.on { background: var(--accent); color: #fff; }
-  .center { position: absolute; left: 50%; transform: translateX(-50%); height: 28px; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: rgba(255,255,255,0.06); font-size: 12px; max-width: 54vw; }
+  .center { height: 28px; min-width: 0; display: flex; align-items: center; gap: 12px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-strong); background: rgba(255,255,255,0.06); font-size: 12px; max-width: 46vw; }
   .center:hover { background: rgba(255,255,255,0.1); }
-  .track { position: relative; width: min(600px, 30vw); height: 10px; flex: none; }
+  .track { position: relative; width: clamp(180px, 22vw, 600px); height: 10px; flex: none; }
   .track .rail { position: absolute; left: 0; right: 0; top: 4px; height: 2px; background: rgba(255,255,255,0.12); }
   .track .blk { position: absolute; top: 1px; height: 8px; border-radius: 3px; }
   .track .now { position: absolute; top: -4px; width: 2px; height: 18px; border-radius: 1px; background: #fff; }
@@ -30,6 +31,15 @@
   .eq i { width: 2px; background: #c084fc; animation: eq 0.9s ease-in-out infinite; }
   .eq i:nth-child(2) { animation-delay: 0.15s; } .eq i:nth-child(3) { animation-delay: 0.3s; }
   .eq.stop i { animation: none; height: 4px; }
+  .stats { display: flex; align-items: center; gap: 4px; }
+  .st { display: flex; align-items: center; gap: 5px; height: 26px; padding: 0 7px; border-radius: 8px; border: 0; background: transparent; color: var(--text-2); font-size: 12px; white-space: nowrap; }
+  .st:hover { background: rgba(255,255,255,0.08); }
+  .st .v { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .st .meter { width: 4px; height: 14px; border-radius: 2px; background: rgba(255,255,255,0.12); display: flex; align-items: flex-end; overflow: hidden; }
+  .st .meter i { display: block; width: 100%; border-radius: 2px; }
+  .net { display: flex; flex-direction: column; line-height: 1.05; font-family: var(--mono); font-size: 10px; text-align: right; }
+  .badge { font-size: 10px; font-weight: 700; color: var(--text); }
+  .sep { width: 1px; height: 16px; background: rgba(255,255,255,0.12); margin: 0 4px; }
   @keyframes eq { 0%, 100% { height: 4px; } 50% { height: 12px; } }
 </style>
 </head>
@@ -49,13 +59,13 @@
     <button class="chip" id="radio" aria-label="Radio — pokaż wiadomości"></button>
     <span class="chip" id="horolog" style="background:transparent;padding:0"></span>
     <button class="chip" id="music" aria-label="Muzyka" style="display:none"></button>
-    <span id="battery" style="display:flex;align-items:center;gap:6px"></span>
+    <span class="stats" id="stats"></span>
     <span id="date"></span>
     <span class="clock mono" id="clock"></span>
   </div>
 </div>
 <script type="module">
-import { invoke, onSnapshot, onTick, esc, focusTiming, mmss, blockColor, icon } from './shared.js';
+import { invoke, listen, onSnapshot, onTick, esc, focusTiming, mmss, blockColor, icon } from './shared.js';
 
 const $ = (id) => document.getElementById(id);
 $('logo').onclick = () => invoke('toggle_panel', { label: 'drawer' });
@@ -99,7 +109,8 @@ function renderStatic(s) {
   renderTrack(s);
 
   const waiting = s.radio.waiting;
-  $('radio').innerHTML = `${icon('bell', 13, 2)} Radio${waiting ? ` · ${waiting}` : ''}${s.radio.nextBatch ? ` · paczka o ${esc(s.radio.nextBatch)}` : ''}`;
+  $('radio').innerHTML = `${icon('bell', 13, 2)} Radio${waiting ? ` · ${waiting}` : ''}`;
+  $('radio').title = s.radio.nextBatch ? `Następna paczka o ${s.radio.nextBatch}` : 'Radio';
 
   const h = s.horolog;
   $('horolog').innerHTML = `<span class="dot" style="background:${h.connected ? 'var(--green)' : '#71717a'}"></span><span style="color:${h.connected ? '#bbf7d0' : 'var(--muted)'}">Horolog${h.connected ? '' : ' offline'}</span>`;
@@ -109,16 +120,12 @@ function renderStatic(s) {
   if (s.spotifyEnabled && m.connected && m.title) {
     $('music').style.display = '';
     $('music').dataset.playing = m.playing ? '1' : '0';
-    $('music').innerHTML = `<span class="eq ${m.playing ? '' : 'stop'}"><i></i><i></i><i></i></span><span class="ellipsis" style="max-width:180px">${esc(m.title)}</span>`;
+    $('music').innerHTML = `<span class="eq ${m.playing ? '' : 'stop'}"><i></i><i></i><i></i></span><span class="ellipsis" style="max-width:140px">${esc(m.title)}</span>`;
   } else {
     $('music').style.display = 'none';
   }
 
-  if (s.battery) {
-    $('battery').innerHTML = `${icon('battery', 18, 2)}<span class="mono">${s.battery.percent}%${s.battery.charging ? ' · ładuje' : ''}</span>`;
-  } else {
-    $('battery').innerHTML = '';
-  }
+  renderStats();
 }
 
 function renderClock(s) {
@@ -139,7 +146,69 @@ function renderClock(s) {
   }
 }
 
-onSnapshot((s) => { renderStatic(s); renderClock(s); });
+// --- Statystyki systemu -------------------------------------------------
+let stats = null;
+let statsOrder = ['network', 'cpu', 'memory', 'volume', 'bluetooth', 'wifi', 'battery'];
+
+function speed(bps) {
+  if (bps == null) return '–';
+  if (bps >= 1024 * 1024) return `${(bps / 1024 / 1024).toFixed(1)}MB/s`;
+  if (bps >= 1024) return `${(bps / 1024).toFixed(1)}KB/s`;
+  return `${bps}B/s`;
+}
+const meter = (pct, color) => `<span class="meter" aria-hidden="true"><i style="height:${Math.max(6, pct)}%;background:${color}"></i></span>`;
+const load = (p) => (p >= 85 ? '#f87171' : p >= 60 ? '#fbbf24' : '#4ade80');
+
+function wifiIcon(signal) {
+  const on = (min) => (signal != null && signal >= min ? 1 : 0.25);
+  return `<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <path d="M2 9a15 15 0 0 1 20 0" opacity="${on(75)}"></path><path d="M5 12.5a10 10 0 0 1 14 0" opacity="${on(45)}"></path>
+    <path d="M8.5 16a5 5 0 0 1 7 0" opacity="${on(15)}"></path><path d="M12 19.5h.01" opacity="${signal == null ? 0.25 : 1}"></path></svg>`;
+}
+function batteryIcon(pct, charging) {
+  const w = Math.round((Math.max(0, Math.min(100, pct)) / 100) * 14);
+  const color = charging ? '#4ade80' : pct <= 20 ? '#f87171' : 'currentColor';
+  return `<svg aria-hidden="true" width="22" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+    <rect x="2" y="7" width="18" height="10" rx="2"></rect><path d="M22 11v2" stroke-linecap="round"></path>
+    <rect x="4" y="9" width="${w}" height="6" rx="1" fill="${color}" stroke="none"></rect></svg>`;
+}
+
+const ITEMS = {
+  network: (st) => `<button class="st" data-open="ms-settings:network-status" title="Sieć: pobieranie / wysyłanie">
+      <span class="net"><span>${icon('down', 9, 3)} ${speed(st.downBps)}</span><span>${icon('up', 9, 3)} ${speed(st.upBps)}</span></span></button>`,
+  cpu: (st) => st.cpu == null ? '' : `<button class="st" data-open="taskmgr.exe" title="Procesor">${icon('cpu', 15)}<span class="v">${Math.round(st.cpu)}%</span>${meter(st.cpu, load(st.cpu))}</button>`,
+  memory: (st) => st.mem == null ? '' : `<button class="st" data-open="taskmgr.exe" title="Pamięć: ${st.memUsedGb?.toFixed(1)} / ${st.memTotalGb?.toFixed(1)} GB">${icon('ram', 15)}<span class="v">${Math.round(st.mem)}%</span>${meter(st.mem, load(st.mem))}</button>`,
+  volume: (st) => st.volume == null ? '' : `<button class="st" id="vol" title="Dźwięk — kliknij, by wyciszyć; kółko myszy zmienia głośność">${icon(st.muted ? 'mute' : 'volume', 16)}<span class="v">${st.muted ? '—' : st.volume + '%'}</span></button>`,
+  bluetooth: (st) => !st.btPresent ? '' : `<button class="st" data-open="ms-settings:bluetooth" title="Bluetooth: ${st.btConnected} połączonych">${icon('bluetooth', 15)}${st.btConnected ? `<span class="badge">${st.btConnected}</span>` : ''}</button>`,
+  wifi: (st) => `<button class="st" data-open="ms-settings:network-wifi" title="${st.wifiSsid ? esc(st.wifiSsid) + ' · ' + st.wifiSignal + '%' : 'Wi‑Fi: brak połączenia'}">${wifiIcon(st.wifiSignal)}</button>`,
+  battery: (st) => st.battery == null ? '' : `<button class="st" data-open="ms-settings:batterysaver" title="Bateria${st.charging ? ' · ładuje' : ''}">${batteryIcon(st.battery, st.charging)}<span class="v">${st.battery}%</span></button>`,
+};
+
+function renderStats() {
+  if (!stats) return;
+  $('stats').innerHTML = statsOrder.filter((k) => ITEMS[k]).map((k) => ITEMS[k](stats)).join('') + '<span class="sep" aria-hidden="true"></span>';
+  for (const b of $('stats').querySelectorAll('[data-open]')) b.onclick = () => invoke('open_path', { path: b.dataset.open });
+  const vol = document.getElementById('vol');
+  if (vol) {
+    vol.onclick = () => invoke('toggle_mute');
+    vol.onwheel = (e) => {
+      e.preventDefault();
+      const next = Math.max(0, Math.min(100, (stats.volume || 0) + (e.deltaY < 0 ? 2 : -2)));
+      stats.volume = next;
+      stats.muted = false;
+      renderStats();
+      invoke('set_volume', { level: next });
+    };
+  }
+}
+listen('stats', (st) => { stats = st; renderStats(); });
+invoke('get_stats').then((st) => { stats = st; renderStats(); });
+
+onSnapshot((s) => {
+  if (s.barStats) statsOrder = s.barStats;
+  renderStatic(s);
+  renderClock(s);
+});
 onTick((s) => { renderClock(s); if (new Date().getSeconds() === 0) renderTrack(s); });
 </script>
 </body>
