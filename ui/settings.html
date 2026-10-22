@@ -116,6 +116,7 @@
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" id="pickFile">Wybierz plik .exe…</button>
       <button class="btn" id="pickUrl">Adres WWW lub URI…</button>
+      <button class="btn" id="pickFolder">Folder jako stos…</button>
     </div>
   </div>
 </div>
@@ -237,6 +238,8 @@ const render = {
         <div class="row"><div class="txt"><b>Chowaj pasek zadań Windows</b><span>Pasek znika po starcie i wraca, gdy zamkniesz Edge Shell.</span></div>${sw(cfg.shell.hideTaskbar, 'shell.hideTaskbar')}</div>
         <div class="row"><div class="txt"><b>Rezerwuj miejsce na górny pasek</b><span>Zmaksymalizowane okna nie wchodzą pod pasek.</span></div>${sw(cfg.shell.reserveTopBar, 'shell.reserveTopBar')}</div>
         <div class="row"><div class="txt"><b>Pokazuj dock</b><span>Wyłącz, jeśli wolisz inny dock.</span></div>${sw(cfg.shell.showDock, 'shell.showDock')}</div>
+        <div class="row"><div class="txt"><b>Autoukrywanie docka</b><span>Dock chowa się i wysuwa od razu, gdy dotkniesz kursorem dolnej krawędzi pod nim.</span></div>${sw(cfg.shell.dockAutohide, 'shell.dockAutohide')}</div>
+        <div class="row"><div class="txt"><b>Chowaj wszystko przy pełnym ekranie</b><span>Gra, film albo prezentacja: pasek, dock i dymki znikają, krawędzie nie wysuwają paneli.</span></div>${sw(cfg.shell.hideInFullscreen, 'shell.hideInFullscreen')}</div>
         <div class="row"><div class="txt"><b>Dymki przy prawej krawędzi</b><span>Timer i muzyka, gdy panel Teraz jest schowany.</span></div>${sw(cfg.shell.showBubbles, 'shell.showBubbles')}</div>
       </div>
       <div class="card">
@@ -250,6 +253,18 @@ const render = {
         <div class="row"><div class="txt"><b>Kiedy pokazać raport</b><span>Karta z sektorami tygodnia i Twoimi najlepszymi godzinami.</span></div>
           <select class="in" id="repDay">${['wyłączony', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota', 'niedziela'].map((d, i) => `<option value="${i}" ${cfg.focus.reportWeekday === i ? 'selected' : ''}>${d}</option>`).join('')}</select>
           <input type="time" class="in" data-bind="focus.reportTime" style="width:120px">
+        </div>
+      </div>
+      <div class="card">
+        <h3>Kopia ustawień</h3>
+        <div class="row"><div class="txt"><b>Folder na kopię</b><span>Np. udział na home serwerze. Po każdym zapisie trafia tam plik EdgeShell-nazwa-komputera.json. Pusty = tylko kopie na tym komputerze.</span></div></div>
+        <div style="display:flex;gap:6px"><input class="in" style="flex:1" data-bind="backup.folder" placeholder="np. \\\\homeserver\\kopie"><button class="mini" id="bkPick" aria-label="Wybierz folder">${icon('folder', 16)}</button></div>
+        <div class="row" style="gap:8px;justify-content:flex-start">
+          <button class="btn" id="bkExport">${icon('download', 16)}Zapisz do pliku…</button>
+          <button class="btn" id="bkImport">${icon('up', 16)}Wczytaj z pliku…</button>
+        </div>
+        <div class="field-l">Ostatnie kopie na tym komputerze
+          <div class="list" id="bkList"><span class="hint">Wczytuję…</span></div>
         </div>
       </div>
       <div class="card">
@@ -461,6 +476,33 @@ const after = {
       try { $('testResult').textContent = await invoke('horolog_test', { url: cfg.horolog.url }); }
       catch (e) { $('testResult').textContent = String(e); }
     };
+    $('bkPick').onclick = async () => {
+      const p = await invoke('pick_path', { folder: true });
+      if (p) { cfg.backup.folder = p; markDirty(); show(page); }
+    };
+    $('bkExport').onclick = async () => {
+      try { const p = await invoke('backup_export'); if (p) toast('Zapisano kopię'); }
+      catch (e) { toast(`Nie zapisano: ${e}`, 4000); }
+    };
+    const reload = async (msg) => { cfg = null; await load(); toast(msg); };
+    $('bkImport').onclick = async () => {
+      if (JSON.stringify(cfg) !== saved && !confirm('Masz niezapisane zmiany — wczytanie pliku je zastąpi. Kontynuować?')) return;
+      try { if (await invoke('backup_import')) reload('Wczytano ustawienia z pliku'); }
+      catch (e) { toast(String(e), 5000); }
+    };
+    invoke('backup_list').then((list) => {
+      const el = $('bkList');
+      if (!el) return;
+      el.innerHTML = list.slice(0, 8).map((b) => `
+        <div class="item"><span style="flex:1">${esc(b.label)}</span><button class="btn" data-bk="${esc(b.file)}">Przywróć</button></div>`).join('')
+        || '<span class="hint">Kopia powstaje przy każdym zapisie ustawień.</span>';
+      for (const b of el.querySelectorAll('[data-bk]')) {
+        b.onclick = async () => {
+          try { await invoke('backup_restore', { file: b.dataset.bk }); reload('Przywrócono ustawienia'); }
+          catch (e) { toast(String(e), 5000); }
+        };
+      }
+    }).catch(() => {});
   },
   bar(root) {
     for (const el of root.querySelectorAll('[data-sw^="stat:"]')) {
@@ -675,7 +717,7 @@ function renderEditor() {
   el.innerHTML = `
     <div class="row" style="min-height:0">${appTile({ ...a, id: a.id + '-ed' })}<h3 style="flex:1">${esc(a.name)}</h3></div>
     <label class="field-l">Nazwa<input class="in" id="edName" value="${esc(a.name)}"></label>
-    <label class="field-l">Co uruchomić (plik .exe, skrót, adres WWW albo URI)
+    <label class="field-l">Co uruchomić (plik .exe, skrót, adres WWW, URI albo folder — folder otwiera się jako stos)
       <span style="display:flex;gap:6px"><input class="in" style="flex:1" id="edPath" value="${esc(a.path)}"><button class="mini" id="edPick" aria-label="Wybierz plik">${icon('folder', 16)}</button></span>
     </label>
     <label class="field-l">Sekcja<select class="in" id="edSec">${cfg.sections.map((s) => `<option value="${esc(s.id)}" ${s.id === a.category ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
@@ -771,6 +813,10 @@ $('pickFile').onclick = async () => {
   const p = await invoke('pick_path', { folder: false });
   if (p) addApp(p.split(/[\\/]/).pop().replace(/\.(exe|lnk|url)$/i, ''), p);
 };
+$('pickFolder').onclick = async () => {
+  const p = await invoke('pick_path', { folder: true });
+  if (p) addApp(p.split(/[\\/]/).filter(Boolean).pop() || 'Folder', p);
+};
 $('pickUrl').onclick = () => {
   const url = prompt('Adres WWW albo URI (np. https://…, spotify:, ms-settings:)');
   if (url) addApp(url.replace(/^https?:\/\/(www\.)?/i, '').split(/[/:]/)[0] || 'Skrót', url.trim());
@@ -794,6 +840,7 @@ async function load() {
   // Uzupełnij brakujące pola starszych konfiguracji.
   cfg.sections ||= [];
   cfg.bar ||= { stats: [] };
+  cfg.backup ||= { folder: '' };
   for (const a of cfg.dock) { a.iconPath ??= ''; a.icon ??= 'auto'; }
   saved = JSON.stringify(cfg);
   markDirty();

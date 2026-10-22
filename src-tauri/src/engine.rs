@@ -189,6 +189,13 @@ fn foreground(app: &AppHandle) {
     let Some(exe) = platform::foreground_exe() else { return };
     let file = platform::exe_name(&exe);
     let cfg = state::cfg(app);
+    // Przejście do aplikacji zdejmuje jej plakietkę.
+    if let Some(a) = cfg.dock.iter().find(|a| !a.process.is_empty() && a.process.to_lowercase() == file) {
+        if state::read(app, |rt| rt.badges.contains_key(&a.id)) {
+            let id = a.id.clone();
+            state::update(app, false, |rt| rt.badges.remove(&id));
+        }
+    }
     let name = cfg
         .dock
         .iter()

@@ -194,6 +194,8 @@ pub struct Runtime {
     pub friction_app: Option<String>,
     pub glow_until: Option<DateTime<Local>>,
     pub notif_status: String,
+    /// Nieprzeczytane powiadomienia na ikonach docka (id aplikacji → liczba).
+    pub badges: HashMap<String, u32>,
 }
 
 pub struct Shared {
@@ -286,11 +288,14 @@ pub fn snapshot(app: &AppHandle) -> Value {
             let running = !a.process.is_empty() && rt.running.contains(&a.process.to_lowercase());
             let windows = rt.window_counts.get(&a.process.to_lowercase()).copied().unwrap_or(0);
             let separator = ordered.get(n + 1).is_some_and(|next| next.category != a.category);
+            let badge = rt.badges.get(&a.id).copied().unwrap_or(0);
+            let stack = crate::stacks::is_folder(&a.path);
             json!({
                 "id": a.id, "name": a.name, "icon": a.icon, "category": a.category,
                 "bg": bg, "fg": fg, "stripe": stripe,
                 "dim": mode.dim.iter().any(|d| d == &a.id),
                 "running": running, "windows": windows, "separatorAfter": separator,
+                "badge": badge, "stack": stack,
             })
         })
         .collect();

@@ -162,6 +162,22 @@ pub fn app_name(aumid: &str) -> String {
     if last.is_empty() { "Windows".into() } else { last.to_string() }
 }
 
+/// Ikona docka, do której należy powiadomienie (po procesie, nazwie albo id).
+fn dock_app_for(app: &AppHandle, aumid: &str, source: &str) -> Option<String> {
+    let cfg = state::cfg(app);
+    let aumid = aumid.to_lowercase();
+    let source = source.to_lowercase();
+    cfg.dock
+        .iter()
+        .find(|a| {
+            let stem = a.process.to_lowercase().trim_end_matches(".exe").trim_start_matches("ms-").to_string();
+            [stem, a.name.to_lowercase(), a.id.to_lowercase()]
+                .iter()
+                .any(|k| k.len() >= 3 && (aumid.contains(k.as_str()) || source == *k))
+        })
+        .map(|a| a.id.clone())
+}
+
 fn rule<'a>(rules: &'a [NotifApp], aumid: &str, name: &str) -> Option<&'a NotifApp> {
     rules.iter().find(|r| {
         let m = r.matches.to_lowercase();
@@ -241,6 +257,9 @@ pub fn start(app: AppHandle) {
                     for raw in rows {
                         last_id = last_id.max(raw.id);
                         if let Some(msg) = to_radio(&app, &raw) {
+                            if let Some(id) = dock_app_for(&app, &raw.aumid, msg.app.as_deref().unwrap_or("")) {
+                                state::update(&app, false, |rt| *rt.badges.entry(id).or_insert(0) += 1);
+                            }
                             radio::deliver(&app, msg);
                         }
                     }

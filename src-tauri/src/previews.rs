@@ -61,6 +61,7 @@ pub fn previews_show(app: AppHandle, id: String, anchor: f64) -> usize {
         // Brak okien: zostaje sama podpowiedź z nazwą.
         return 0;
     }
+    crate::layout::DOCK_HOLD.store(true, std::sync::atomic::Ordering::Relaxed);
     let scale = dock.scale_factor().unwrap_or(1.0);
     let n = wins.len().min(6) as f64;
     let (w, h) = (((n * 236.0) + 24.0) * scale, 196.0 * scale);
@@ -122,6 +123,7 @@ pub fn previews_tip(app: AppHandle, text: String, anchor: f64) {
 #[tauri::command]
 pub fn previews_hide(app: AppHandle) {
     clear_thumbs();
+    crate::layout::DOCK_HOLD.store(false, std::sync::atomic::Ordering::Relaxed);
     if let Some(pv) = app.get_webview_window("preview") {
         let _ = pv.hide();
     }

@@ -3,7 +3,7 @@
 //! kontekstów, bateria i pasek zadań. Poza Windows funkcje są pustymi
 //! zaślepkami, żeby reszta kodu kompilowała się wszędzie.
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Rect {
     pub left: i32,
     pub top: i32,
@@ -246,6 +246,37 @@ mod imp {
         }
     }
 
+    /// Monitor, który w całości zajmuje aktywne okno (gra, film, prezentacja).
+    pub fn fullscreen_monitor() -> Option<Rect> {
+        use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+        use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, IsZoomed, GWL_STYLE, WS_CAPTION};
+        unsafe {
+            let h = GetForegroundWindow();
+            if h.0.is_null() || pid_of(h) == GetCurrentProcessId() {
+                return None;
+            }
+            let class = class_of(h);
+            if matches!(class.as_str(), "Progman" | "WorkerW" | "Shell_TrayWnd" | "Shell_SecondaryTrayWnd") {
+                return None;
+            }
+            // Zwykłe zmaksymalizowane okno z paskiem tytułu to nie pełny ekran.
+            let style = GetWindowLongW(h, GWL_STYLE) as u32;
+            if IsZoomed(h).as_bool() && style & WS_CAPTION.0 == WS_CAPTION.0 {
+                return None;
+            }
+            let mut r = RECT::default();
+            GetWindowRect(h, &mut r).ok()?;
+            let mon = MonitorFromWindow(h, MONITOR_DEFAULTTONEAREST);
+            let mut mi = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+            if !GetMonitorInfoW(mon, &mut mi).as_bool() {
+                return None;
+            }
+            let m = mi.rcMonitor;
+            (r.left <= m.left && r.top <= m.top && r.right >= m.right && r.bottom >= m.bottom)
+                .then_some(Rect { left: m.left, top: m.top, right: m.right, bottom: m.bottom })
+        }
+    }
+
     #[allow(dead_code)]
     pub fn unused(_: WPARAM) {}
 }
@@ -268,6 +299,7 @@ mod imp {
     pub fn restore(_: isize) -> bool { false }
     pub fn battery() -> Option<(u8, bool)> { None }
     pub fn set_taskbar_visible(_: bool) {}
+    pub fn fullscreen_monitor() -> Option<Rect> { None }
 }
 
 pub use imp::*;

@@ -17,6 +17,10 @@
   .app.dim .stripe { background: transparent !important; }
   .dots { position: absolute; top: -4px; right: -2px; display: flex; gap: 2px; }
   .dots i { width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px #18181b; }
+  .badge { position: absolute; top: -5px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; box-shadow: 0 0 0 2px #18181b; }
+  .app.stack .tile.real img { width: 46px; height: 46px; }
+  @keyframes reveal { from { transform: translateY(70%); opacity: 0.4; } to { transform: none; opacity: 1; } }
+  nav.reveal { animation: reveal 0.14s ease-out; }
   .sep { width: 1px; height: 34px; margin-bottom: 14px; background: rgba(255,255,255,0.12); }
 </style>
 </head>
@@ -49,20 +53,35 @@ function tile(a) {
 }
 
 onSnapshot((s) => { snap = s; render(s); });
+// Wysunięcie docka (autoukrywanie): krótki wjazd od dołu.
+listen('dock-reveal', () => {
+  dock.classList.remove('reveal');
+  void dock.offsetWidth;
+  dock.classList.add('reveal');
+});
 
 function render(s) {
   const key = JSON.stringify(s.dock) + Object.keys(icons).length;
   if (key === lastKey) return;
   lastKey = key;
   dock.innerHTML = s.dock.map((a) => `
-    <button class="app ${a.dim ? 'dim' : ''}" data-id="${esc(a.id)}" aria-label="${esc(a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}">
+    <button class="app ${a.dim ? 'dim' : ''} ${a.stack ? 'stack' : ''}" data-stack="${a.stack ? 1 : ''}" data-id="${esc(a.id)}" aria-label="${esc(a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}">
       ${tile(a)}
       <span class="stripe" style="background:${a.stripe}"></span>
-      ${a.windows || a.running ? `<span class="dots" aria-hidden="true">${'<i></i>'.repeat(Math.min(3, Math.max(1, a.windows || 1)))}</span>` : ''}
+      ${a.badge ? `<span class="badge" aria-label="${a.badge} nowych">${a.badge > 99 ? '99+' : a.badge}</span>`
+        : a.windows || a.running ? `<span class="dots" aria-hidden="true">${'<i></i>'.repeat(Math.min(3, Math.max(1, a.windows || 1)))}</span>` : ''}
     </button>${a.separatorAfter ? '<span class="sep" aria-hidden="true"></span>' : ''}`).join('');
   for (const b of dock.querySelectorAll('.app')) {
     const id = b.dataset.id;
+    const isStack = b.dataset.stack === '1';
     b.onclick = (e) => {
+      clearTimeout(hoverTimer);
+      if (isStack && !e.shiftKey) {
+        const r = b.getBoundingClientRect();
+        invoke('previews_hide');
+        invoke('stack_open', { id, anchor: r.left + r.width / 2 }).catch((err) => console.warn(err));
+        return;
+      }
       if (e.shiftKey) invoke('launch_new', { id });
       else invoke('launch', { id }).catch((err) => console.warn(err));
       invoke('previews_hide');
@@ -76,7 +95,7 @@ function render(s) {
       const anchor = r.left + r.width / 2;
       const name = s.dock.find((x) => x.id === id)?.name || '';
       invoke('previews_tip', { text: name, anchor });
-      hoverTimer = setTimeout(() => invoke('previews_show', { id, anchor }), 450);
+      if (!isStack) hoverTimer = setTimeout(() => invoke('previews_show', { id, anchor }), 450);
     };
     b.onmouseleave = () => { clearTimeout(hoverTimer); emitTo('preview', 'preview-leave', null); };
   }

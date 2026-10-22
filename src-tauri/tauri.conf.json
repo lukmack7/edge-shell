@@ -217,6 +217,20 @@
         "resizable": false,
         "shadow": false,
         "visible": false
+      },
+      {
+        "label": "stack",
+        "url": "stack.html",
+        "title": "Edge Shell — stos",
+        "width": 520,
+        "height": 420,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "visible": false
       }
     ]
   },

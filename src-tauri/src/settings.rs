@@ -23,6 +23,7 @@ pub fn save_config(app: AppHandle, config: Config) -> Res<()> {
         }
     }
     config.save();
+    crate::backup::snapshot(&config);
     if let Ok(mut c) = state::shared(&app).cfg.write() {
         *c = config.clone();
     }
@@ -42,9 +43,6 @@ pub fn apply(app: &AppHandle, before: &Config, now: &Config) {
         });
     }
     set_autostart(app, now.shell.autostart);
-    if let Some(dock) = app.get_webview_window("dock") {
-        let _ = if now.shell.show_dock { dock.show() } else { dock.hide() };
-    }
     layout::arrange(app);
     state::emit_snapshot(app);
     let _ = app.emit("config-changed", ());

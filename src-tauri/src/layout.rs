@@ -5,9 +5,18 @@
 
 use crate::platform::{self, Rect};
 use crate::state;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
+
+/// Gdzie stoi dock (do autoukrywania).
+static DOCK_RECT: Mutex<Rect> = Mutex::new(Rect { left: 0, top: 0, right: 0, bottom: 0 });
+static DOCK_VISIBLE: AtomicBool = AtomicBool::new(true);
+/// Podglądy okien albo stos folderu są otwarte — dock ma zostać wysunięty.
+pub static DOCK_HOLD: AtomicBool = AtomicBool::new(false);
+/// Monitor zajęty przez aplikację pełnoekranową.
+static FULLSCREEN: Mutex<Option<Rect>> = Mutex::new(None);
 
 /// Okna zarejestrowane jako paski systemowe (do zwolnienia przy wyjściu).
 static APPBARS: Mutex<Vec<isize>> = Mutex::new(Vec::new());
@@ -207,10 +216,10 @@ pub fn arrange(app: &AppHandle) {
     // Obszar roboczy mógł się zmienić po rezerwacji pasków.
     let s = screen(app);
 
-    if let Some(dock) = win(app, "dock") {
-        let _ = if cfg.shell.show_dock { dock.show() } else { dock.hide() };
-    }
     place_dock(app, None);
+    let dock_on = cfg.shell.show_dock && !cfg.shell.dock_autohide;
+    DOCK_VISIBLE.store(!dock_on, Ordering::Relaxed);
+    set_dock_visible(app, dock_on);
 
     let top = s.work.top + px(MARGIN, &s);
     let height = s.work.bottom - top - px(MARGIN + DOCK_H, &s);
@@ -246,6 +255,64 @@ pub fn arrange(app: &AppHandle) {
     }
     place_radio(app);
     sync_bubbles(app);
+    let fs = FULLSCREEN.lock().ok().and_then(|g| *g);
+    if let Some(fs) = fs {
+        hide_covered(app, fs);
+    }
+}
+
+fn inside(r: Rect, x: i32, y: i32) -> bool {
+    x >= r.left && x < r.right && y >= r.top && y < r.bottom
+}
+
+/// Chowa nasze okna leżące na monitorze zajętym przez pełny ekran.
+fn hide_covered(app: &AppHandle, fs: Rect) {
+    for (label, w) in app.webview_windows() {
+        let ours = label == "topbar" || label.starts_with("topbar-") || matches!(label.as_str(), "rail" | "dock" | "bubbles" | "preview" | "stack");
+        if !ours {
+            continue;
+        }
+        if let Ok(p) = w.outer_position() {
+            if inside(fs, p.x + 2, p.y + 2) {
+                let _ = w.hide();
+            }
+        }
+    }
+}
+
+fn set_fullscreen(app: &AppHandle, fs: Option<Rect>) {
+    if let Ok(mut g) = FULLSCREEN.lock() {
+        *g = fs;
+    }
+    match fs {
+        Some(r) => {
+            hide_covered(app, r);
+            DOCK_VISIBLE.store(false, Ordering::Relaxed);
+            DOCK_HOLD.store(false, Ordering::Relaxed);
+        }
+        None => arrange(app),
+    }
+}
+
+/// Pokazuje/chowa dock; przy wysunięciu dock dostaje krótką animację.
+pub fn set_dock_visible(app: &AppHandle, visible: bool) {
+    if DOCK_VISIBLE.swap(visible, Ordering::Relaxed) == visible {
+        return;
+    }
+    let Some(dock) = win(app, "dock") else { return };
+    if visible {
+        let _ = dock.show();
+        let _ = app.emit_to("dock", "dock-reveal", ());
+    } else {
+        let _ = dock.hide();
+        DOCK_HOLD.store(false, Ordering::Relaxed);
+        if let Some(pv) = win(app, "preview") {
+            let _ = pv.hide();
+        }
+        if let Some(st) = win(app, "stack") {
+            let _ = st.hide();
+        }
+    }
 }
 
 /// Dock ustala szerokość sam (po wyrenderowaniu ikon) i prosi o nią komendą.
@@ -260,6 +327,9 @@ pub fn place_dock(app: &AppHandle, logical_width: Option<f64>) {
     let x = (s.work.left + s.work.right - width) / 2;
     let y = s.work.bottom - h - px(6.0, &s);
     place(&dock, x, y, width, h);
+    if let Ok(mut r) = DOCK_RECT.lock() {
+        *r = Rect { left: x, top: y, right: x + width, bottom: y + h };
+    }
 }
 
 pub fn place_radio(app: &AppHandle) {
@@ -392,6 +462,11 @@ pub fn start_edges(app: AppHandle) {
         let mut delay = Duration::from_millis(state::cfg(&app).shell.edge_delay_ms);
         let mut refreshed = Instant::now();
         let mut monitors = monitors_signature(&app);
+        let mut shell = state::cfg(&app).shell;
+        let mut fs_checked = Instant::now();
+        let mut last_fs: Option<Rect> = None;
+        let mut dock_edge_since: Option<Instant> = None;
+        let mut dock_away_since: Option<Instant> = None;
         loop {
             std::thread::sleep(Duration::from_millis(40));
             // Ekran i opóźnienie odświeżamy co 2 s, nie przy każdym ruchu.
@@ -402,10 +477,53 @@ pub fn start_edges(app: AppHandle) {
                     arrange(&app);
                 }
                 s = screen(&app);
-                delay = Duration::from_millis(state::cfg(&app).shell.edge_delay_ms);
+                shell = state::cfg(&app).shell;
+                delay = Duration::from_millis(shell.edge_delay_ms);
                 refreshed = Instant::now();
             }
+
+            // Pełny ekran: sprawdzane co ćwierć sekundy.
+            if fs_checked.elapsed() > Duration::from_millis(250) {
+                fs_checked = Instant::now();
+                let fs = if shell.hide_in_fullscreen { platform::fullscreen_monitor() } else { None };
+                if fs != last_fs {
+                    last_fs = fs;
+                    set_fullscreen(&app, fs);
+                }
+            }
             let Some((x, y)) = platform::cursor() else { continue };
+
+            // Autoukrywanie docka: wysuwa się od razu po dotknięciu dolnej
+            // krawędzi pod dockiem, chowa pół sekundy po odjechaniu kursora.
+            let dock_fs = last_fs.is_some_and(|f| inside(f, s.monitor.left + 2, s.monitor.top + 2));
+            if shell.show_dock && shell.dock_autohide && !dock_fs {
+                let r = DOCK_RECT.lock().map(|g| *g).unwrap_or_default();
+                let visible = DOCK_VISIBLE.load(Ordering::Relaxed);
+                if !visible {
+                    let at_edge = y >= s.monitor.bottom - 2 && x >= r.left && x <= r.right;
+                    dock_edge_since = if at_edge { dock_edge_since.or(Some(Instant::now())) } else { None };
+                    if dock_edge_since.is_some_and(|t| t.elapsed() >= Duration::from_millis(60)) {
+                        set_dock_visible(&app, true);
+                        dock_edge_since = None;
+                        dock_away_since = None;
+                    }
+                } else {
+                    let pad = px(24.0, &s);
+                    let near = x >= r.left - pad && x <= r.right + pad && y >= r.top - pad;
+                    let hold = DOCK_HOLD.load(Ordering::Relaxed);
+                    dock_away_since = if near || hold { None } else { dock_away_since.or(Some(Instant::now())) };
+                    if dock_away_since.is_some_and(|t| t.elapsed() >= Duration::from_millis(500)) {
+                        set_dock_visible(&app, false);
+                        dock_away_since = None;
+                    }
+                }
+            }
+            // Na pełnym ekranie krawędzie nie wysuwają paneli (np. w grach).
+            if dock_fs {
+                left_since = None;
+                right_since = None;
+                continue;
+            }
             let in_band = y > s.work.top + px(40.0, &s) && y < s.work.bottom - px(DOCK_H + 20.0, &s);
 
             let at_left = in_band && x <= s.monitor.left;

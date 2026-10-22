@@ -87,6 +87,15 @@ Panele wysuwają się też same, gdy kursor dotknie lewej albo prawej krawędzi 
 - **Ikony** do wyboru: `folder`, `globe`, `sheet`, `terminal`, `mail`, `clock`, `chat`, `note`, `music`, `video`, `game`, `code`, `image`, `calc`, `settings`.
 - **`shell.hideTaskbar`** chowa pasek zadań Windows. To funkcja eksperymentalna: Windows 11 potrafi go przywrócić. Edge Shell sam pokazuje go z powrotem przy wyjściu.
 
+## Bezpiecznik, dock i kopia ustawień
+
+- **Bezpiecznik** — razem z Edge Shell startuje mały proces strażnika (ten sam plik `.exe` z `--watchdog`). Jeśli Edge Shell padnie albo zawiesi się na ~15 s, strażnik przywraca pasek zadań Windows i każe programom ponownie zgłosić ikony zasobnika. Po odwieszeniu Edge Shell wraca do swojego układu.
+- **Autoukrywanie docka** — dock wysuwa się od razu po dotknięciu dolnej krawędzi pod nim i chowa pół sekundy po odjechaniu kursora (nie chowa się, gdy są otwarte podglądy okien albo stos).
+- **Pełny ekran** — gra, film albo prezentacja na pełnym ekranie chowa pasek, lewy pasek, dock i dymki na tym monitorze; krawędzie nie wysuwają wtedy paneli.
+- **Plakietki** — powiadomienie z aplikacji, która ma ikonę w docku, dokłada licznik na ikonie. Przejście do aplikacji zdejmuje plakietkę.
+- **Stosy** — folder dodany do docka (*Dodaj aplikację → Folder jako stos…*) po kliknięciu pokazuje siatkę najnowszych plików. Shift+klik otwiera folder w Eksploratorze.
+- **Kopia ustawień** — każdy zapis w ustawieniach tworzy kopię w `%APPDATA%\EdgeShell\backups` (ostatnie 20) i — jeśli wskazano folder, np. udział na home serwerze — plik `EdgeShell-<komputer>.json` w tym folderze. W *Ustawienia → Ogólne* jest też eksport, import i przywracanie.
+
 ## Horolog
 
 Edge Shell korzysta z tych tras API Horologa (bez logowania, więc trzymaj Horologa w sieci domowej albo za VPN):

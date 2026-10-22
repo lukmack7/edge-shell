@@ -36,6 +36,15 @@ pub struct Config {
     /// Sekcje docka w kolejności; separator wstawiany między sekcjami.
     pub sections: Vec<Section>,
     pub bar: BarCfg,
+    pub backup: BackupCfg,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct BackupCfg {
+    /// Folder na automatyczną kopię ustawień (np. udział na home serwerze).
+    /// Pusty = tylko kopie lokalne.
+    pub folder: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -240,6 +249,10 @@ pub struct ShellCfg {
     pub tray_in_rail: bool,
     /// Pasek na każdym monitorze (dock i panele zostają na głównym).
     pub bar_on_all_monitors: bool,
+    /// Dock chowa się i wysuwa po dotknięciu dolnej krawędzi.
+    pub dock_autohide: bool,
+    /// Gra, film albo prezentacja na pełnym ekranie chowa pasek, dock i dymki.
+    pub hide_in_fullscreen: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -354,6 +367,8 @@ impl Default for ShellCfg {
             show_rail: true,
             tray_in_rail: true,
             bar_on_all_monitors: true,
+            dock_autohide: true,
+            hide_in_fullscreen: true,
         }
     }
 }
@@ -444,6 +459,7 @@ impl Default for Config {
             notifications: NotificationsCfg::default(),
             sections: default_sections(),
             bar: BarCfg::default(),
+            backup: BackupCfg::default(),
         }
     }
 }

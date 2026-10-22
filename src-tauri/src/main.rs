@@ -18,10 +18,17 @@ mod state;
 mod stats;
 mod sys;
 mod tray;
+mod watchdog;
+mod backup;
+mod stacks;
 
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
 fn main() {
+    // Ten sam plik .exe działa też jako bezpiecznik (osobny proces).
+    if watchdog::run_if_requested() {
+        return;
+    }
     let cfg = config::Config::load();
     let shared = state::Shared::new(cfg);
 
@@ -51,6 +58,9 @@ fn main() {
                 sys::hide_taskbar(true, 0);
             }
             settings::set_autostart(&handle, cfg.shell.autostart);
+            // Bezpiecznik: gdyby Edge Shell padł, przywróci pasek zadań i zasobnik.
+            let restore = state::read(&handle, |rt| rt.store.taskbar_state);
+            watchdog::spawn(restore, cfg.shell.hide_taskbar);
             layout::arrange(&handle);
             // Po schowaniu paska zadań obszar roboczy zmienia się z opóźnieniem.
             let h2 = handle.clone();
@@ -72,6 +82,7 @@ fn main() {
                 }));
             }
             layout::start_edges(handle.clone());
+            stacks::init(&handle);
 
             // Szuflada i Teraz chowają się, gdy klikniesz gdzie indziej.
             for label in ["drawer", "now"] {
@@ -171,6 +182,12 @@ fn main() {
             insights::get_report,
             insights::tray_items,
             insights::tray_click,
+            stacks::stack_open,
+            stacks::stack_close,
+            backup::backup_list,
+            backup::backup_restore,
+            backup::backup_export,
+            backup::backup_import,
         ])
         .build(tauri::generate_context!())
         .expect("nie udało się uruchomić Edge Shell");

@@ -94,6 +94,9 @@ fn open_target(app: &AppHandle, path: &str, args: &[String]) -> Res<()> {
 pub fn launch(app: AppHandle, id: String) -> Res<String> {
     let cfg = state::cfg(&app);
     let Some(entry) = cfg.dock.iter().find(|a| a.id == id) else { return Err("nie ma takiej aplikacji".into()) };
+    if state::read(&app, |rt| rt.badges.contains_key(&id)) {
+        state::update(&app, false, |rt| rt.badges.remove(&id));
+    }
     let mode = cfg.mode(&state::read(&app, |rt| rt.store.mode.clone()));
     if mode.dim.contains(&id) {
         state::update(&app, false, |rt| rt.friction_app = Some(id.clone()));
