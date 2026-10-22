@@ -6,6 +6,9 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -62,6 +65,32 @@ jobs:
           for c in chunks:
               print('::error title=build::' + c.replace('%', '%25').replace('\r', '').replace('\n', '%0A'))
           EOF
+
+      # Pełny log błędów na gałąź ci-logs (do odczytu bez pobierania artefaktów).
+      - name: Save build log
+        if: failure()
+        shell: bash
+        run: |
+          python - <<'EOF2'
+          import re
+          raw = open('build.log', encoding='utf-8', errors='replace').read()
+          lines = [re.sub(r'\x1b\[[0-9;]*m', '', l) for l in raw.splitlines()]
+          keep = [i for i, l in enumerate(lines) if l.startswith('error') or l.startswith('warning: unused')]
+          out = []
+          for i in keep:
+              if lines[i].startswith('error'):
+                  out.extend(lines[i:i + 30])
+                  out.append('')
+          if not out:
+              out = lines[-200:]
+          open('errors.txt', 'w', encoding='utf-8').write('\n'.join(out))
+          EOF2
+          mkdir -p /tmp/ci && cp errors.txt /tmp/ci/errors.txt
+          cd /tmp/ci
+          git init -q -b ci-logs
+          git config user.name ci && git config user.email ci@example.com
+          git add errors.txt && git commit -q -m "build log ${GITHUB_SHA}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${GITHUB_REPOSITORY}.git" ci-logs
 
       - name: Upload installer
         uses: actions/upload-artifact@v4
