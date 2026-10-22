@@ -22,7 +22,11 @@
   .title { max-width: 100%; font-size: 22px; font-weight: 650; color: var(--p-accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 0.5s ease; }
   .artist { max-width: 100%; font-size: 14px; color: rgba(255,255,255,0.72); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .prog { display: flex; align-items: center; gap: 12px; padding: 16px 24px 4px; font-family: var(--mono); font-size: 12px; color: rgba(255,255,255,0.75); }
-  .track { flex: 1; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.15); overflow: hidden; }
+  .seek { flex: 1; padding: 8px 0; cursor: pointer; touch-action: none; }
+  .track { position: relative; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.15); transition: height 0.12s; }
+  .seek:hover .track, .seek.drag .track { height: 7px; }
+  .track::after { content: ''; position: absolute; top: 50%; left: var(--knob, 0%); width: 13px; height: 13px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%) scale(0); transition: transform 0.12s; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
+  .seek:hover .track::after, .seek.drag .track::after { transform: translate(-50%, -50%) scale(1); }
   .track i { display: block; height: 100%; width: 0; background: var(--p-accent); border-radius: 3px; transition: background 0.5s ease; }
   .ctl { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 8px 0 6px; }
   .tabs { display: flex; justify-content: center; gap: 6px; padding: 0 0 12px; flex: none; }
@@ -187,7 +191,7 @@ function render() {
         <div class="card">
           <div class="art" id="drag" style="background-image:url('${esc(m.art)}')"><div class="tools">${tools(false)}</div></div>
           <div class="meta"><span class="title" title="${esc(m.title)}">${esc(m.title)}</span><span class="artist" title="${esc(m.album || '')}">${esc(m.artist)}</span></div>
-          <div class="prog"><span id="pos">0:00</span><span class="track"><i id="bar"></i></span><span id="len">0:00</span></div>
+          <div class="prog"><span id="pos">0:00</span><span class="seek" id="seek" title="Przewiń"><span class="track" id="trk"><i id="bar"></i></span></span><span id="len">0:00</span></div>
           <div class="ctl">
             <button class="sk" id="prev" aria-label="Poprzedni">${icon('prev', 20)}</button>
             <button class="pp" id="pp" aria-label="${m.playing ? 'Pauza' : 'Graj'}">${icon(m.playing ? 'pause' : 'play', 22)}</button>
@@ -225,7 +229,10 @@ function tick() {
   const m = s.music;
   const bar = document.getElementById('bar');
   if (!bar || !m.durationMs) return;
-  const e = elapsed(m);
+  // Podczas przeciągania (i chwilę po nim) pokazujemy wybrane miejsce, nie stan ze Spotify.
+  const e = seekMs != null ? seekMs : elapsed(m);
+  const trk = document.getElementById('trk');
+  if (trk) trk.style.setProperty('--knob', `${(e / m.durationMs) * 100}%`);
   bar.style.width = `${(e / m.durationMs) * 100}%`;
   const pos = document.getElementById('pos');
   if (pos) {
@@ -236,8 +243,46 @@ function tick() {
 
 const ctl = (action) => invoke('spotify_control', { action }).catch((e) => flash(String(e)));
 
+// ------------------------------------------------------------------ przewijanie
+
+let seekMs = null;
+let seekHold = null;
+function seekAt(el, clientX) {
+  const r = el.getBoundingClientRect();
+  const ratio = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+  return Math.round(ratio * (s.music.durationMs || 0));
+}
+function wireSeek(el) {
+  if (!el) return;
+  el.onpointerdown = (e) => {
+    if (!s?.music?.durationMs) return;
+    e.preventDefault();
+    e.stopPropagation();
+    el.setPointerCapture(e.pointerId);
+    el.classList.add('drag');
+    clearTimeout(seekHold);
+    seekMs = seekAt(el, e.clientX);
+    tick();
+    el.onpointermove = (ev) => { seekMs = seekAt(el, ev.clientX); tick(); };
+    el.onpointerup = async () => {
+      el.onpointermove = null;
+      el.onpointerup = null;
+      el.classList.remove('drag');
+      const target = seekMs;
+      try {
+        await invoke('spotify_control', { action: `seek:${target}` });
+        // Uprzedzamy odpowiedź Spotify, żeby pasek nie skakał wstecz.
+        s.music.progressMs = target;
+        s.music.fetchedAtMs = Date.now();
+      } catch (err) { flash(String(err)); }
+      seekHold = setTimeout(() => { seekMs = null; tick(); }, 1200);
+    };
+  };
+}
+
 function wire() {
   const $ = (id) => document.getElementById(id);
+  wireSeek($('seek'));
   if ($('pp')) $('pp').onclick = (e) => { e.stopPropagation(); ctl(s.music.playing ? 'pause' : 'play'); };
   if ($('prev')) $('prev').onclick = () => ctl('previous');
   if ($('next')) $('next').onclick = () => ctl('next');

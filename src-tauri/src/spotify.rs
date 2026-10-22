@@ -160,6 +160,7 @@ pub async fn control(app: &AppHandle, action: &str, body: Option<serde_json::Val
         "pause" => client.put(format!("{base}/pause")),
         "next" => client.post(format!("{base}/next")),
         "previous" => client.post(format!("{base}/previous")),
+        a if a.starts_with("seek:") => client.put(format!("{base}/seek?position_ms={}", &a[5..])),
         a if a.starts_with("volume:") => client.put(format!("{base}/volume?volume_percent={}", &a[7..])),
         _ => return Err(format!("nieznana akcja {action}")),
     };
