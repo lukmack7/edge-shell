@@ -19,6 +19,8 @@ mod stats;
 mod sys;
 mod tray;
 mod watchdog;
+mod palette;
+mod automations;
 mod backup;
 mod stacks;
 
@@ -83,6 +85,8 @@ fn main() {
             }
             layout::start_edges(handle.clone());
             stacks::init(&handle);
+            palette::init(&handle);
+            automations::start(handle.clone());
 
             // Szuflada i Teraz chowają się, gdy klikniesz gdzie indziej.
             for label in ["drawer", "now"] {
@@ -188,6 +192,15 @@ fn main() {
             backup::backup_restore,
             backup::backup_export,
             backup::backup_import,
+            palette::palette_query,
+            palette::palette_run,
+            palette::palette_show,
+            palette::palette_hide,
+            palette::palette_keys,
+            palette::palette_commands,
+            automations::automation_answer,
+            automations::automation_run,
+            automations::automation_status,
         ])
         .build(tauri::generate_context!())
         .expect("nie udało się uruchomić Edge Shell");

@@ -91,6 +91,16 @@ pub struct RadioMsg {
     /// Co otworzyć przyciskiem „Otwórz”, np. `shell:AppsFolder\<AUMID>`.
     #[serde(default)]
     pub open_target: Option<String>,
+    /// Pytanie automatyzacji: id reguły, karta pokazuje „Tak / Nie”.
+    #[serde(default)]
+    pub ask: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LogEntry {
+    pub at: DateTime<Local>,
+    pub text: String,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -120,6 +130,11 @@ pub struct Store {
     pub taskbar_saved: bool,
     pub history: Vec<HistEntry>,
     pub week_cache: Vec<DayItem>,
+    /// Radio w ciszy do tej chwili (automatyzacje).
+    pub quiet_until: Option<DateTime<Local>>,
+    /// Ostatnie wykonanie reguły automatyzacji.
+    pub rule_last: HashMap<String, DateTime<Local>>,
+    pub automation_log: Vec<LogEntry>,
 }
 
 impl Store {

@@ -96,6 +96,19 @@ Panele wysuwają się też same, gdy kursor dotknie lewej albo prawej krawędzi 
 - **Stosy** — folder dodany do docka (*Dodaj aplikację → Folder jako stos…*) po kliknięciu pokazuje siatkę najnowszych plików. Shift+klik otwiera folder w Eksploratorze.
 - **Kopia ustawień** — każdy zapis w ustawieniach tworzy kopię w `%APPDATA%\EdgeShell\backups` (ostatnie 20) i — jeśli wskazano folder, np. udział na home serwerze — plik `EdgeShell-<komputer>.json` w tym folderze. W *Ustawienia → Ogólne* jest też eksport, import i przywracanie.
 
+## Paleta poleceń
+
+`Ctrl+Alt+Space` albo lupa na lewym pasku. Jedno pole na wszystko:
+
+- **szybkie klawisze** — `fk 45` fokus na 45 min, `fb` fokus na bieżący blok, `fp` pauza, `tp` / `tn` / `tr` tryby, `m treść` myśl do Horologa, `og` odłóż okna, `sp` / `sn` Spotify, `ts` / `tx` Tailscale exit node, `= 12*3` kalkulator, `pl` przeplanuj, `rap` raport, `ust` ustawienia (klawisze zmienisz w *Ustawienia → Skróty*),
+- **wyszukiwanie** — otwarte okna (Enter przełącza zamiast otwierać drugi raz), aplikacje z docka i menu Start, pliki z Pulpitu, Dokumentów, Pobranych i przypiętych folderów, bloki z Horologa,
+- **Tab** — więcej akcji dla wyniku (otwórz folder, kopiuj ścieżkę, na półkę, zamknij okno, oznacz jako zrobione…),
+- gdy nic nie pasuje, ostatni wynik wrzuca wpisany tekst do Horologa.
+
+## Automatyzacje
+
+*Ustawienia → Automatyzacje*: reguły „Gdy → to”. Warunki: czas (dni tygodnia), monitor (po nazwie z EDID albo dowolny dodatkowy), sieć Wi‑Fi, nowy plik w folderze (wzorzec, np. `*.pdf`), blok z Horologa (spotkanie, fokus…, X min wcześniej), aplikacja / pełny ekran, bateria, bezczynność. Akcje wykonują się po kolei: tryb, Spotify, cisza radia, karta radia, półka, odłożenie / zamknięcie okien aplikacji, uruchomienie, jasność, głośność, fokus, schowanie docka i pasków, dowolne polecenie `cmd`. Opcje: *najpierw zapytaj* (karta radia z „Tak / Nie”), *nie częściej niż*, *gdy warunek minie, przywróć*. Dziennik pokazuje, co się wykonało. Przykładowe reguły są dodane, ale wyłączone.
+
 ## Horolog
 
 Edge Shell korzysta z tych tras API Horologa (bez logowania, więc trzymaj Horologa w sieci domowej albo za VPN):

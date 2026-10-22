@@ -37,6 +37,198 @@ pub struct Config {
     pub sections: Vec<Section>,
     pub bar: BarCfg,
     pub backup: BackupCfg,
+    pub palette: PaletteCfg,
+    pub automations: Vec<Rule>,
+}
+
+// ---------------------------------------------------------------------------
+// Paleta poleceń
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PaletteCfg {
+    /// Szybkie klawisze: polecenie → skrót (2–3 litery).
+    pub keys: Vec<QuickKey>,
+    /// Exit node Tailscale dla polecenia `ts` (nazwa maszyny w tailnecie).
+    pub tailscale_node: String,
+    /// Dodatkowe foldery przeszukiwane przez paletę (oprócz Pulpitu,
+    /// Dokumentów, Pobranych i przypiętych folderów).
+    pub folders: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct QuickKey {
+    /// focus | focus_block | pause | mode:<id> | capture | stash | spotify |
+    /// spotify_next | tailscale | tailscale_off | calc | replan | report | settings
+    pub cmd: String,
+    pub key: String,
+}
+
+impl Default for PaletteCfg {
+    fn default() -> Self {
+        let k = |cmd: &str, key: &str| QuickKey { cmd: cmd.into(), key: key.into() };
+        Self {
+            keys: vec![
+                k("focus", "fk"),
+                k("focus_block", "fb"),
+                k("pause", "fp"),
+                k("mode:praca", "tp"),
+                k("mode:nauka", "tn"),
+                k("mode:rozrywka", "tr"),
+                k("capture", "m"),
+                k("stash", "og"),
+                k("spotify", "sp"),
+                k("spotify_next", "sn"),
+                k("tailscale", "ts"),
+                k("tailscale_off", "tx"),
+                k("calc", "="),
+                k("replan", "pl"),
+                k("report", "rap"),
+                k("settings", "ust"),
+            ],
+            tailscale_node: "homeserver".into(),
+            folders: vec![],
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Automatyzacje: „Gdy → to”
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Rule {
+    pub id: String,
+    pub enabled: bool,
+    pub trigger: Trigger,
+    pub actions: Vec<RuleAction>,
+    /// Najpierw zapytaj kartą radia („Tak / Nie”).
+    pub ask: bool,
+    /// Nie częściej niż co tyle minut (0 = bez limitu).
+    pub cooldown_min: u32,
+    /// Gdy warunek minie (spotkanie się skończy, gra zamknie…), cofnij akcje.
+    pub revert: bool,
+}
+
+impl Default for Rule {
+    fn default() -> Self {
+        Self { id: String::new(), enabled: true, trigger: Trigger::default(), actions: vec![], ask: false, cooldown_min: 30, revert: false }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct Trigger {
+    /// time | monitor | wifi | folder | horolog | app | battery | idle
+    pub kind: String,
+    /// Czas: `18:00` i dni tygodnia 1–7 (pon–nd).
+    pub time: String,
+    pub days: Vec<u32>,
+    /// Monitor: fragment nazwy (pusty = dowolny dodatkowy monitor).
+    pub monitor: String,
+    /// Wi‑Fi: nazwa sieci.
+    pub ssid: String,
+    /// Folder: ścieżka i wzorzec pliku, np. `*.pdf`.
+    pub folder: String,
+    pub pattern: String,
+    /// Horolog: meeting | focus | task | habit | any i ile minut wcześniej.
+    pub horolog_kind: String,
+    pub minutes_before: i64,
+    /// Aplikacja: proces (np. `steam.exe`) albo pusty + `fullscreen`.
+    pub app: String,
+    pub fullscreen: bool,
+    /// Bateria poniżej (%).
+    pub battery_below: u8,
+    /// Bezczynność dłuższa niż (min).
+    pub idle_minutes: u32,
+}
+
+impl Default for Trigger {
+    fn default() -> Self {
+        Self {
+            kind: "time".into(),
+            time: "18:00".into(),
+            days: vec![1, 2, 3, 4, 5],
+            monitor: String::new(),
+            ssid: String::new(),
+            folder: "%USERPROFILE%\\Downloads".into(),
+            pattern: "*".into(),
+            horolog_kind: "meeting".into(),
+            minutes_before: 1,
+            app: String::new(),
+            fullscreen: false,
+            battery_below: 20,
+            idle_minutes: 10,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct RuleAction {
+    /// mode | spotify | quiet | message | shelf | minimize | close | launch |
+    /// brightness | volume | focus | hide_shell | command
+    pub kind: String,
+    pub value: String,
+}
+
+pub fn default_rules() -> Vec<Rule> {
+    let a = |kind: &str, value: &str| RuleAction { kind: kind.into(), value: value.into() };
+    let t = |kind: &str| Trigger { kind: kind.into(), ..Trigger::default() };
+    vec![
+        Rule { id: "monitor-praca".into(), enabled: false, trigger: t("monitor"), actions: vec![a("mode", "praca")], ..Rule::default() },
+        Rule {
+            id: "wieczor".into(),
+            enabled: false,
+            trigger: Trigger { time: "18:00".into(), ..t("time") },
+            actions: vec![a("mode", "rozrywka"), a("spotify", "play")],
+            ask: true,
+            ..Rule::default()
+        },
+        Rule {
+            id: "wifi-biuro".into(),
+            enabled: false,
+            trigger: Trigger { ssid: "Biuro".into(), ..t("wifi") },
+            actions: vec![a("mode", "praca"), a("quiet", "12:00")],
+            ..Rule::default()
+        },
+        Rule {
+            id: "pdf-polka".into(),
+            enabled: false,
+            trigger: Trigger { pattern: "*.pdf".into(), ..t("folder") },
+            actions: vec![a("shelf", ""), a("message", "Nowy PDF na półce")],
+            cooldown_min: 0,
+            ..Rule::default()
+        },
+        Rule {
+            id: "spotkanie".into(),
+            enabled: false,
+            trigger: t("horolog"),
+            actions: vec![a("spotify", "pause"), a("minimize", "Discord.exe")],
+            revert: true,
+            cooldown_min: 0,
+            ..Rule::default()
+        },
+        Rule {
+            id: "bateria".into(),
+            enabled: false,
+            trigger: t("battery"),
+            actions: vec![a("brightness", "50")],
+            ..Rule::default()
+        },
+        Rule {
+            id: "gra".into(),
+            enabled: false,
+            trigger: Trigger { fullscreen: true, ..t("app") },
+            actions: vec![a("quiet", "")],
+            revert: true,
+            cooldown_min: 0,
+            ..Rule::default()
+        },
+    ]
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -460,6 +652,8 @@ impl Default for Config {
             sections: default_sections(),
             bar: BarCfg::default(),
             backup: BackupCfg::default(),
+            palette: PaletteCfg::default(),
+            automations: default_rules(),
         }
     }
 }

@@ -17,6 +17,8 @@ static DOCK_VISIBLE: AtomicBool = AtomicBool::new(true);
 pub static DOCK_HOLD: AtomicBool = AtomicBool::new(false);
 /// Monitor zajęty przez aplikację pełnoekranową.
 static FULLSCREEN: Mutex<Option<Rect>> = Mutex::new(None);
+/// Automatyzacja „schowaj dock i paski” — działa jak pełny ekran na głównym monitorze.
+pub static FORCE_HIDE: AtomicBool = AtomicBool::new(false);
 
 /// Okna zarejestrowane jako paski systemowe (do zwolnienia przy wyjściu).
 static APPBARS: Mutex<Vec<isize>> = Mutex::new(Vec::new());
@@ -485,7 +487,13 @@ pub fn start_edges(app: AppHandle) {
             // Pełny ekran: sprawdzane co ćwierć sekundy.
             if fs_checked.elapsed() > Duration::from_millis(250) {
                 fs_checked = Instant::now();
-                let fs = if shell.hide_in_fullscreen { platform::fullscreen_monitor() } else { None };
+                let fs = if FORCE_HIDE.load(Ordering::Relaxed) {
+                    Some(s.monitor)
+                } else if shell.hide_in_fullscreen {
+                    platform::fullscreen_monitor()
+                } else {
+                    None
+                };
                 if fs != last_fs {
                     last_fs = fs;
                     set_fullscreen(&app, fs);

@@ -19,6 +19,7 @@
 </head>
 <body>
 <div class="rail">
+  <button class="tool" id="palette" aria-label="Paleta poleceń"></button>
   <button class="nav" data-view="files" aria-label="Pliki"></button>
   <button class="nav" data-view="apps" aria-label="Aplikacje"></button>
   <button class="nav" data-view="clip" aria-label="Schowek"></button>
@@ -51,6 +52,9 @@ for (const b of document.querySelectorAll('.nav')) {
     emitTo('drawer', 'drawer-view', current);
   };
 }
+document.getElementById('palette').innerHTML = icon('search', 19);
+document.getElementById('palette').title = 'Paleta poleceń';
+document.getElementById('palette').onclick = () => invoke('palette_show');
 document.getElementById('capture').innerHTML = icon('note', 19);
 document.getElementById('capture').onclick = () => invoke('show_capture');
 document.getElementById('settings').innerHTML = icon('settings', 19);

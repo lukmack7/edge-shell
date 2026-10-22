@@ -436,6 +436,30 @@ mod imp {
         })()
     }
 
+    /// Przyjazne nazwy podłączonych monitorów (z EDID przez WMI), np. `DELL U3423WE`.
+    pub fn monitor_names() -> Vec<String> {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let script = "Get-CimInstance -Namespace root\\wmi -ClassName WmiMonitorID | ForEach-Object { -join [char[]]($_.UserFriendlyName | Where-Object { $_ -ne 0 }) }";
+        let Ok(out) = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+        else {
+            return Vec::new();
+        };
+        String::from_utf8_lossy(&out.stdout).lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect()
+    }
+
+    /// Okna (uchwyty) należące do procesu o danej nazwie pliku, np. `discord.exe`.
+    pub fn close_windows_of(exe: &str) {
+        let exe = exe.to_lowercase();
+        for w in crate::platform::app_windows() {
+            if crate::platform::exe_name(&w.exe) == exe {
+                close_window(w.hwnd);
+            }
+        }
+    }
+
     // ---------------- Tapeta i jasność ----------------
 
     pub fn set_wallpaper(path: &str) -> bool {
@@ -590,6 +614,8 @@ mod imp {
     pub fn thumb_place(_: isize, _: i32, _: i32, _: i32, _: i32) {}
     pub fn thumb_unregister(_: isize) {}
     pub fn explorer_tray() -> Option<isize> { None }
+    pub fn monitor_names() -> Vec<String> { Vec::new() }
+    pub fn close_windows_of(_: &str) {}
 }
 
 pub use imp::*;

@@ -3,7 +3,7 @@
 
 use crate::{layout, state};
 use std::sync::Mutex;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 static ACTIONS: Mutex<Vec<(u32, &'static str)>> = Mutex::new(Vec::new());
@@ -30,10 +30,7 @@ fn run(app: &AppHandle, action: &str) {
         "drawer" => layout::toggle_panel(app, "drawer"),
         "now" => layout::toggle_panel(app, "now"),
         "capture" => layout::show_window(app, "capture", true),
-        "search" => {
-            layout::set_panel(app, "drawer", true);
-            let _ = app.emit_to("drawer", "focus-search", ());
-        }
+        "search" => crate::palette::show(app),
         "radio" => crate::radio::release_batch(app),
         "focus" => {
             let app = app.clone();

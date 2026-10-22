@@ -231,6 +231,20 @@
         "resizable": false,
         "shadow": false,
         "visible": false
+      },
+      {
+        "label": "palette",
+        "url": "palette.html",
+        "title": "Edge Shell — paleta",
+        "width": 780,
+        "height": 600,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "visible": false
       }
     ]
   },

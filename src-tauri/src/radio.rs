@@ -68,6 +68,7 @@ pub fn from_incoming(app: &AppHandle, inc: Incoming) -> RadioMsg {
         at: Local::now(),
         app: None,
         open_target: None,
+        ask: None,
     }
 }
 
@@ -101,6 +102,7 @@ pub fn pit_wall(app: &AppHandle, message: String, reply: Option<String>) {
             at: Local::now(),
             app: None,
             open_target: None,
+            ask: None,
         },
     );
 }
@@ -119,7 +121,8 @@ fn lighten(hex: &str) -> String {
 pub fn deliver(app: &AppHandle, msg: RadioMsg) {
     let cfg = state::cfg(app);
     let mode = state::read(app, |rt| rt.store.mode.clone());
-    let quiet = cfg.mode(&mode).quiet;
+    let quiet_override = state::read(app, |rt| rt.store.quiet_until.is_some_and(|t| t > Local::now()));
+    let quiet = cfg.mode(&mode).quiet || quiet_override;
     let vip = msg.number.parse::<u8>().is_ok_and(|n| (1..=9).contains(&n));
     if msg.urgent || vip || !quiet {
         state::update(app, false, |rt| rt.showing.push_back(msg));

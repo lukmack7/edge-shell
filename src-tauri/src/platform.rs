@@ -277,6 +277,19 @@ mod imp {
         }
     }
 
+    /// Ile sekund od ostatniego ruchu myszy / klawisza.
+    pub fn idle_secs() -> u64 {
+        use windows::Win32::System::SystemInformation::GetTickCount;
+        use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+        let mut li = LASTINPUTINFO { cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32, dwTime: 0 };
+        unsafe {
+            if !GetLastInputInfo(&mut li).as_bool() {
+                return 0;
+            }
+            (GetTickCount().wrapping_sub(li.dwTime) / 1000) as u64
+        }
+    }
+
     #[allow(dead_code)]
     pub fn unused(_: WPARAM) {}
 }
@@ -300,6 +313,7 @@ mod imp {
     pub fn battery() -> Option<(u8, bool)> { None }
     pub fn set_taskbar_visible(_: bool) {}
     pub fn fullscreen_monitor() -> Option<Rect> { None }
+    pub fn idle_secs() -> u64 { 0 }
 }
 
 pub use imp::*;

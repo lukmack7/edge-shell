@@ -77,6 +77,27 @@
   .iconpick button { height: 36px; border-radius: 8px; border: 1px solid var(--line); background: #0f0f11; color: var(--text-2); display: flex; align-items: center; justify-content: center; }
   .iconpick button.on { border-color: var(--accent); color: var(--text); background: #1d1214; }
 
+  /* Automatyzacje */
+  .autogrid { display: grid; grid-template-columns: minmax(0, 1fr) 400px; gap: 20px; align-items: start; }
+  .rules { display: flex; flex-direction: column; gap: 10px; }
+  .rule { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; background: #161619; border: 1px solid var(--line); }
+  .rule.sel { background: #1b1b1f; border-color: var(--accent); }
+  .rule.off { opacity: 0.5; }
+  .rule .open { flex: 1; min-width: 0; display: flex; align-items: center; gap: 14px; padding: 0; border: 0; background: transparent; text-align: left; }
+  .rule .tag { width: 40px; height: 38px; flex: none; border-radius: 10px; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+  .rule .wt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
+  .rule .wt em { color: var(--muted); font-style: normal; }
+  .rule .last { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .lbl { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; color: var(--muted); }
+  .actrow { display: flex; align-items: center; gap: 6px; padding: 8px; border-radius: 12px; background: #0f0f11; border: 1px solid var(--line-strong); }
+  .actrow .n { width: 18px; flex: none; font-family: var(--mono); font-size: 12px; color: var(--muted); text-align: center; }
+  .actrow .in { height: 34px; }
+  .addact { height: 36px; border-radius: 10px; border: 1px dashed rgba(255,255,255,0.2); background: transparent; color: var(--muted); font-size: 13px; }
+  .addact:hover { color: var(--text); border-color: rgba(255,255,255,0.35); }
+  .logl { display: flex; gap: 12px; font-size: 13px; line-height: 1.4; }
+  .logl span:first-child { flex: none; width: 74px; font-family: var(--mono); color: var(--muted); }
+  .daychips .chip { min-width: 40px; justify-content: center; }
+
   /* Okno wyboru aplikacji */
   .modal { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(0,0,0,0.55); z-index: 10; }
   .modal.on { display: flex; }
@@ -137,6 +158,7 @@ const PAGES = [
   ['bar', 'Górny pasek', 'layers'],
   ['dock', 'Dock', 'apps'],
   ['modes', 'Tryby', 'clock'],
+  ['auto', 'Automatyzacje', 'replan'],
   ['radio', 'Radio i kontakty', 'radio'],
   ['notifications', 'Powiadomienia', 'bell'],
   ['spotify', 'Spotify', 'music'],
@@ -452,16 +474,59 @@ const render = {
       </div>`;
   },
 
+  auto() {
+    if (!cfg.automations.find((r) => r.id === selectedRule)) selectedRule = cfg.automations[0]?.id || null;
+    const list = cfg.automations.map((r) => {
+      const [, , color] = TRIG.find((t) => t[0] === r.trigger.kind) || TRIG[0];
+      return `
+      <div class="rule ${r.id === selectedRule ? 'sel' : ''} ${r.enabled ? '' : 'off'}">
+        <button class="open" data-rule="${esc(r.id)}" aria-label="Edytuj regułę">
+          <span class="tag" style="background:${color}">${esc(ruleTag(r))}</span>
+          <span class="wt"><span><em>Gdy </em>${esc(describeTrigger(r.trigger))}</span><span><em>to </em><b style="font-weight:600">${esc(r.actions.map(describeAction).join(', ') || '— brak akcji —')}</b></span></span>
+          <span class="last">${esc(autoStatus?.last?.[r.id] || '—')}</span>
+        </button>
+        ${sw(r.enabled, 'rule:' + r.id)}
+      </div>`;
+    }).join('');
+    const log = (autoStatus?.log || []).map((l) => `<div class="logl"><span>${esc(l.t)}</span><span>${esc(l.text)}</span></div>`).join('')
+      || '<span class="hint">Tu pojawi się, co i kiedy zrobiły reguły.</span>';
+    return `
+      <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+        <h2>Automatyzacje</h2>
+        <button class="btn primary" id="ruleAdd">${icon('plus', 16, 2)}Nowa reguła</button>
+      </div>
+      <p class="lead">Gdy coś się dzieje, Edge Shell robi to za Ciebie. Kliknij regułę, żeby ją edytować; przełącznik ją włącza.</p>
+      <div class="autogrid">
+        <div class="rules">${list || '<span class="hint">Nie masz jeszcze reguł.</span>'}</div>
+        <div style="display:flex;flex-direction:column;gap:14px" class="editor">
+          <div class="card" id="ruleEd"></div>
+          <div class="card" style="gap:8px"><span class="lbl">DZIENNIK</span>${log}</div>
+        </div>
+      </div>`;
+  },
+
   hotkeys() {
     const KEYS = [
       ['drawer', 'Szuflada'], ['now', 'Panel Teraz'], ['capture', 'Wrzuć myśl'],
-      ['focus', 'Start / pauza fokusu'], ['search', 'Szukaj w szufladzie'], ['radio', 'Pokaż radio z paczki'],
+      ['focus', 'Start / pauza fokusu'], ['search', 'Paleta poleceń'], ['radio', 'Pokaż radio z paczki'],
     ];
     return `
       <h2>Skróty klawiszowe</h2>
       <p class="lead">Kliknij pole i naciśnij nowy skrót. Backspace czyści skrót. Skróty z klawiszem Windows mogą być zajęte przez system.</p>
       <div class="card">${KEYS.map(([k, name]) => `
         <div class="row"><div class="txt"><b>${name}</b></div><button class="kbdrec" data-hk="${k}">${esc(cfg.hotkeys[k] || '—')}</button></div>`).join('')}
+      </div>
+      <div class="card">
+        <h3>Paleta poleceń — szybkie klawisze</h3>
+        <span class="hint">Wpisz w palecie 2–3 litery zamiast szukać w menu, np. <b>fk 45</b> = fokus na 45 minut, <b>m treść</b> = myśl do Horologa, <b>= 12*3</b> = kalkulator. Puste pole wyłącza polecenie.</span>
+        <div class="grid2">${paletteCommands().map(([cmd, label]) => `
+          <div class="row" style="min-height:40px"><div class="txt"><b>${esc(label)}</b></div><input class="in" style="width:90px;font-family:var(--mono)" data-pkey="${esc(cmd)}" value="${esc(paletteKey(cmd))}" maxlength="6" aria-label="Klawisz: ${esc(label)}"></div>`).join('')}
+        </div>
+        <label class="field-l">Tailscale — exit node dla „ts” (nazwa maszyny w tailnecie)<input class="in" data-bind="palette.tailscaleNode" placeholder="homeserver"></label>
+        <div class="field-l">Dodatkowe foldery przeszukiwane przez paletę (Pulpit, Dokumenty, Pobrane i przypięte foldery są zawsze)
+          <div class="list">${cfg.palette.folders.map((f, n) => `<div class="item"><span style="flex:1" class="ellipsis">${esc(f)}</span><button class="mini" data-pfdel="${n}" aria-label="Usuń">${icon('trash', 16)}</button></div>`).join('')}</div>
+          <div><button class="btn" id="pfAdd">${icon('plus', 16, 2)}Dodaj folder</button></div>
+        </div>
       </div>`;
   },
 };
@@ -689,8 +754,298 @@ const after = {
         window.addEventListener('keydown', onKey, true);
       };
     }
+    for (const el of root.querySelectorAll('[data-pkey]')) {
+      el.oninput = () => {
+        const cmd = el.dataset.pkey;
+        const key = el.value.trim().toLowerCase();
+        const k = cfg.palette.keys.find((x) => x.cmd === cmd);
+        if (k) k.key = key; else cfg.palette.keys.push({ cmd, key });
+        markDirty();
+      };
+    }
+    for (const b of root.querySelectorAll('[data-pfdel]')) b.onclick = () => { cfg.palette.folders.splice(+b.dataset.pfdel, 1); markDirty(); show(page); };
+    $('pfAdd').onclick = async () => {
+      const p = await invoke('pick_path', { folder: true });
+      if (p) { cfg.palette.folders.push(p); markDirty(); show(page); }
+    };
+  },
+  auto(root) {
+    if (!autoLoading) {
+      autoLoading = true;
+      invoke('automation_status').then((st) => { autoStatus = st; if (page === 'auto') show('auto'); }).catch(() => {});
+    }
+    for (const b of root.querySelectorAll('[data-rule]')) b.onclick = () => { selectedRule = b.dataset.rule; show(page); };
+    for (const el of root.querySelectorAll('[data-sw^="rule:"]')) {
+      el.onclick = () => {
+        const r = cfg.automations.find((x) => x.id === el.dataset.sw.slice(5));
+        r.enabled = !r.enabled;
+        markDirty(); show(page);
+      };
+    }
+    $('ruleAdd').onclick = () => {
+      const r = newRule();
+      cfg.automations.push(r);
+      selectedRule = r.id;
+      markDirty(); show(page);
+    };
+    renderRuleEditor();
   },
 };
+
+// ------------------------------------------------------------ automatyzacje
+
+const TRIG = [
+  ['time', 'Czas', '#7C3AED'], ['monitor', 'Monitor', '#0f6cbd'], ['wifi', 'Wi‑Fi', '#16a34a'], ['folder', 'Folder', '#b45309'],
+  ['horolog', 'Horolog', '#D42E25'], ['app', 'Aplikacja', '#5865f2'], ['battery', 'Bateria', '#52525b'], ['idle', 'Bezczynność', '#3f3f46'],
+];
+const ACTS = [
+  ['mode', 'Przełącz tryb'], ['spotify', 'Spotify'], ['quiet', 'Radio: cisza'], ['message', 'Radio: wiadomość'],
+  ['shelf', 'Połóż plik na półce'], ['minimize', 'Odłóż okna aplikacji'], ['close', 'Zamknij aplikację'], ['launch', 'Uruchom z docka'],
+  ['brightness', 'Jasność'], ['volume', 'Głośność'], ['focus', 'Start fokusu'], ['hide_shell', 'Schowaj dock i paski'], ['command', 'Polecenie (cmd)'],
+];
+const DAY = ['pon', 'wt', 'śr', 'czw', 'pt', 'sob', 'nd'];
+const HKINDS = [['meeting', 'Spotkanie'], ['focus', 'Blok fokusu'], ['task', 'Zadanie'], ['habit', 'Nawyk'], ['any', 'Dowolny blok']];
+const REVERTABLE = ['monitor', 'wifi', 'horolog', 'app', 'battery', 'idle'];
+let selectedRule = null;
+let autoStatus = null;
+let autoLoading = false;
+
+function newRule() {
+  return {
+    id: uid('regula'), enabled: true, ask: false, cooldownMin: 30, revert: false,
+    trigger: { kind: 'time', time: '09:00', days: [1, 2, 3, 4, 5], monitor: '', ssid: '', folder: '%USERPROFILE%\\Downloads', pattern: '*', horologKind: 'meeting', minutesBefore: 1, app: '', fullscreen: false, batteryBelow: 20, idleMinutes: 10 },
+    actions: [{ kind: 'mode', value: cfg.modes[0]?.id || 'praca' }],
+  };
+}
+
+function daysLabel(days) {
+  const d = [...days].sort().join(',');
+  if (d === '1,2,3,4,5,6,7') return 'codziennie';
+  if (d === '1,2,3,4,5') return 'w dni robocze';
+  if (d === '6,7') return 'w weekend';
+  if (!days.length) return 'nigdy';
+  return [...days].sort().map((n) => DAY[n - 1]).join(', ');
+}
+
+function describeTrigger(t) {
+  switch (t.kind) {
+    case 'time': return `jest ${t.time} ${daysLabel(t.days)}`;
+    case 'monitor': return t.monitor.trim() ? `podłączę monitor „${t.monitor.trim()}”` : 'podłączę dodatkowy monitor';
+    case 'wifi': return `połączę się z Wi‑Fi „${t.ssid.trim()}”`;
+    case 'folder': {
+      const name = t.folder.replace(/[\\/]+$/, '').split(/[\\/]/).pop() || 'folder';
+      const what = !t.pattern.trim() || t.pattern.trim() === '*' ? 'nowy plik' : `plik ${t.pattern.trim()}`;
+      return `w folderze ${name} pojawi się ${what}`;
+    }
+    case 'horolog': {
+      const k = { meeting: 'spotkanie', focus: 'blok fokusu', task: 'zadanie', habit: 'nawyk' }[t.horologKind] || 'dowolny blok';
+      return t.minutesBefore > 0 ? `za ${t.minutesBefore} min zaczyna się ${k}` : `zaczyna się ${k}`;
+    }
+    case 'app':
+      if (t.fullscreen && !t.app.trim()) return 'coś działa na pełnym ekranie';
+      if (t.fullscreen) return `${t.app.trim()} działa na pełnym ekranie`;
+      return `uruchomię ${t.app.trim() || '…'}`;
+    case 'battery': return `bateria spadnie poniżej ${t.batteryBelow}%`;
+    case 'idle': return `nie ruszam komputera ${t.idleMinutes} min`;
+    default: return t.kind;
+  }
+}
+
+function describeAction(a) {
+  const v = (a.value || '').trim();
+  switch (a.kind) {
+    case 'mode': return `tryb ${cfg.modes.find((m) => m.id === v)?.label || v}`;
+    case 'spotify': return { pause: 'Spotify: pauza', next: 'Spotify: następny' }[v] || (v.startsWith('spotify:') ? 'Spotify: playlista' : 'Spotify: graj');
+    case 'quiet': return !v ? 'radio: tylko pilne' : v.includes(':') ? `radio: cisza do ${v}` : `radio: cisza na ${v} min`;
+    case 'message': return `radio: „${v}”`;
+    case 'shelf': return 'połóż na półce';
+    case 'minimize': return `odłóż okna: ${v}`;
+    case 'close': return `zamknij: ${v}`;
+    case 'launch': return `uruchom ${cfg.dock.find((d) => d.id === v)?.name || v}`;
+    case 'brightness': return `jasność ${v}%`;
+    case 'volume': return `głośność ${v}%`;
+    case 'focus': return `fokus ${v} min`;
+    case 'hide_shell': return 'schowaj dock i paski';
+    case 'command': return `polecenie: ${v}`;
+    default: return a.kind;
+  }
+}
+
+function ruleTag(r) {
+  return { time: r.trigger.time, monitor: 'MON', wifi: 'WiFi', folder: 'DIR', horolog: 'H', app: 'APP', battery: 'BAT', idle: 'ZZZ' }[r.trigger.kind] || '?';
+}
+
+function actionValue(a, n) {
+  const opt = (v, l) => `<option value="${esc(v)}" ${a.value === v ? 'selected' : ''}>${esc(l)}</option>`;
+  switch (a.kind) {
+    case 'mode': return `<select class="in" style="flex:1" data-av="${n}">${cfg.modes.map((m) => opt(m.id, m.label)).join('')}</select>`;
+    case 'spotify': {
+      const custom = a.value.startsWith('spotify:');
+      return `<select class="in" style="flex:1" data-av="${n}">${opt('play', 'graj')}${opt('pause', 'pauza')}${opt('next', 'następny')}<option value="spotify:" ${custom ? 'selected' : ''}>playlista…</option></select>
+        ${custom ? `<input class="in" style="flex:1" data-avt="${n}" value="${esc(a.value)}" placeholder="spotify:playlist:…">` : ''}`;
+    }
+    case 'launch': return `<select class="in" style="flex:1" data-av="${n}">${cfg.dock.map((d) => opt(d.id, d.name)).join('')}</select>`;
+    case 'shelf': case 'hide_shell': return '<span class="hint" style="flex:1">bez ustawień</span>';
+    default: {
+      const ph = { quiet: '12:00, 30 (min) albo puste = do końca', message: 'treść karty, {plik} = nazwa pliku', minimize: 'Discord.exe, Steam.exe', close: 'Discord.exe',
+        brightness: '0–100', volume: '0–100', focus: 'minuty, np. 45', command: 'np. tailscale set --exit-node=' }[a.kind] || '';
+      return `<input class="in" style="flex:1" data-avt="${n}" value="${esc(a.value)}" placeholder="${esc(ph)}">`;
+    }
+  }
+}
+
+function triggerFields(t) {
+  switch (t.kind) {
+    case 'time': return `
+      <div class="row" style="min-height:0"><input type="time" class="in" id="tTime" value="${esc(t.time)}" style="width:130px"><span class="hint">${esc(daysLabel(t.days))}</span></div>
+      <div class="chips daychips">${DAY.map((d, i) => `<button class="chip ${t.days.includes(i + 1) ? 'on' : ''}" data-day="${i + 1}">${d}</button>`).join('')}</div>`;
+    case 'monitor': return `
+      <input class="in" id="tMon" value="${esc(t.monitor)}" placeholder="fragment nazwy, np. DELL — puste = dowolny dodatkowy">
+      <span class="hint">${autoStatus?.monitors?.length ? `Teraz wykryte: ${autoStatus.monitors.map((m) => `<button class="chip" data-mon="${esc(m)}">${esc(m)}</button>`).join(' ')}` : 'Wykrywam monitory…'}</span>`;
+    case 'wifi': return `
+      <input class="in" id="tSsid" value="${esc(t.ssid)}" placeholder="nazwa sieci">
+      ${autoStatus?.ssid ? `<span class="hint">Teraz: <button class="chip" id="tSsidNow">${esc(autoStatus.ssid)}</button></span>` : ''}`;
+    case 'folder': return `
+      <span style="display:flex;gap:6px"><input class="in" style="flex:1" id="tDir" value="${esc(t.folder)}"><button class="mini" id="tDirPick" aria-label="Wybierz folder">${icon('folder', 16)}</button></span>
+      <label class="field-l">Pliki pasujące do wzorca<input class="in" id="tPat" value="${esc(t.pattern)}" placeholder="*.pdf"></label>`;
+    case 'horolog': return `
+      <div class="row" style="min-height:0"><select class="in" id="tHk" style="flex:1">${HKINDS.map(([k, l]) => `<option value="${k}" ${t.horologKind === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+      <input type="number" class="in" id="tMb" min="0" max="60" value="${t.minutesBefore}" style="width:80px"><span class="hint">min przed</span></div>`;
+    case 'app': return `
+      <input class="in" id="tApp" value="${esc(t.app)}" placeholder="proces, np. steam.exe — puste = dowolna">
+      <div class="row" style="min-height:0"><div class="txt"><b>Tylko na pełnym ekranie</b><span>Gra, film, prezentacja</span></div>${sw(t.fullscreen, 'tfs')}</div>`;
+    case 'battery': return `<div class="row" style="min-height:0"><input type="range" min="5" max="60" step="5" id="tBat" value="${t.batteryBelow}" style="flex:1"><span id="tBatV" class="mono">${t.batteryBelow}%</span></div>`;
+    case 'idle': return `<div class="row" style="min-height:0"><input type="number" class="in" id="tIdle" min="1" max="240" value="${t.idleMinutes}" style="width:90px"><span class="hint">minut bez ruchu myszy i klawiatury</span></div>`;
+    default: return '';
+  }
+}
+
+function renderRuleEditor() {
+  const el = $('ruleEd');
+  if (!el) return;
+  const r = cfg.automations.find((x) => x.id === selectedRule);
+  if (!r) { el.innerHTML = '<h3>Edycja reguły</h3><span class="hint">Dodaj regułę przyciskiem „Nowa reguła”.</span>'; return; }
+  const t = r.trigger;
+  const COOL = [[0, 'bez limitu'], [5, 'raz na 5 min'], [15, 'raz na 15 min'], [30, 'raz na 30 min'], [60, 'raz na godzinę'], [240, 'raz na 4 h'], [1440, 'raz na dobę']];
+  el.innerHTML = `
+    <h3>Edycja reguły</h3>
+    <span class="lbl">GDY</span>
+    <div class="chips">${TRIG.map(([k, l]) => `<button class="chip ${t.kind === k ? 'on' : ''}" data-tk="${k}">${l}</button>`).join('')}</div>
+    ${triggerFields(t)}
+    <span class="lbl">TO (W TEJ KOLEJNOŚCI)</span>
+    ${r.actions.map((a, n) => `
+      <div class="actrow">
+        <span class="n">${n + 1}.</span>
+        <select class="in" style="width:150px" data-ak="${n}">${ACTS.map(([k, l]) => `<option value="${k}" ${a.kind === k ? 'selected' : ''}>${l}</option>`).join('')}</select>
+        ${actionValue(a, n)}
+        <button class="mini" data-aup="${n}" aria-label="Wyżej" ${n === 0 ? 'disabled' : ''} style="width:28px">${icon('up', 14, 2)}</button>
+        <button class="mini" data-adel="${n}" aria-label="Usuń akcję" style="width:28px">${icon('trash', 14)}</button>
+      </div>`).join('')}
+    <button class="addact" id="aAdd">+ dodaj akcję</button>
+    <div class="row" style="min-height:36px"><div class="txt"><b>Najpierw zapytaj</b><span>Karta radia z „Tak / Nie”</span></div>${sw(r.ask, 'rask')}</div>
+    ${REVERTABLE.includes(t.kind) ? `<div class="row" style="min-height:36px"><div class="txt"><b>Gdy warunek minie, przywróć</b><span>Np. po spotkaniu Spotify gra dalej, okna wracają</span></div>${sw(r.revert, 'rrev')}</div>` : ''}
+    <div class="row" style="min-height:36px"><div class="txt"><b>Nie częściej niż</b></div><select class="in" id="rCool">${COOL.map(([v, l]) => `<option value="${v}" ${r.cooldownMin === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="rRun" style="flex:1">Uruchom teraz</button>
+      <button class="btn primary" id="rSave" style="flex:1">Zapisz</button>
+      <button class="mini" id="rDel" aria-label="Usuń regułę" style="color:#fca5a5">${icon('trash', 16)}</button>
+    </div>`;
+
+  const redraw = () => { markDirty(); show(page); };
+  const setT = (k, v, again = false) => { t[k] = v; markDirty(); if (again) show(page); else refreshListOnly(); };
+  for (const b of el.querySelectorAll('[data-tk]')) b.onclick = () => {
+    t.kind = b.dataset.tk;
+    if (!REVERTABLE.includes(t.kind)) r.revert = false;
+    if (t.kind === 'horolog' || t.kind === 'app') r.revert = true;
+    redraw();
+  };
+  for (const b of el.querySelectorAll('[data-day]')) b.onclick = () => {
+    const d = +b.dataset.day;
+    t.days = t.days.includes(d) ? t.days.filter((x) => x !== d) : [...t.days, d].sort();
+    redraw();
+  };
+  const on = (id, ev, fn) => { const x = $(id); if (x) x[ev] = fn; };
+  on('tTime', 'onchange', (e) => setT('time', e.target.value || '09:00', true));
+  on('tMon', 'oninput', (e) => setT('monitor', e.target.value));
+  for (const b of el.querySelectorAll('[data-mon]')) b.onclick = () => setT('monitor', b.dataset.mon, true);
+  on('tSsid', 'oninput', (e) => setT('ssid', e.target.value));
+  on('tSsidNow', 'onclick', () => setT('ssid', autoStatus.ssid, true));
+  on('tDir', 'onchange', (e) => setT('folder', e.target.value.trim(), true));
+  on('tDirPick', 'onclick', async () => { const p = await invoke('pick_path', { folder: true }); if (p) setT('folder', p, true); });
+  on('tPat', 'oninput', (e) => setT('pattern', e.target.value.trim() || '*'));
+  on('tHk', 'onchange', (e) => setT('horologKind', e.target.value, true));
+  on('tMb', 'onchange', (e) => setT('minutesBefore', Math.max(0, +e.target.value || 0), true));
+  on('tApp', 'oninput', (e) => setT('app', e.target.value.trim()));
+  on('tBat', 'oninput', (e) => { $('tBatV').textContent = `${e.target.value}%`; setT('batteryBelow', +e.target.value); });
+  on('tIdle', 'onchange', (e) => setT('idleMinutes', Math.max(1, +e.target.value || 10), true));
+  for (const b of el.querySelectorAll('[data-sw]')) {
+    b.onclick = () => {
+      const k = b.dataset.sw;
+      if (k === 'tfs') t.fullscreen = !t.fullscreen;
+      if (k === 'rask') r.ask = !r.ask;
+      if (k === 'rrev') r.revert = !r.revert;
+      redraw();
+    };
+  }
+  for (const s2 of el.querySelectorAll('[data-ak]')) s2.onchange = () => {
+    const a = r.actions[+s2.dataset.ak];
+    a.kind = s2.value;
+    a.value = { mode: cfg.modes[0]?.id || '', spotify: 'play', launch: cfg.dock[0]?.id || '', brightness: '50', volume: '30', focus: '25' }[a.kind] || '';
+    redraw();
+  };
+  for (const s2 of el.querySelectorAll('[data-av]')) s2.onchange = () => {
+    r.actions[+s2.dataset.av].value = s2.value === 'spotify:' ? 'spotify:playlist:' : s2.value;
+    redraw();
+  };
+  for (const i2 of el.querySelectorAll('[data-avt]')) i2.oninput = () => { r.actions[+i2.dataset.avt].value = i2.value; markDirty(); refreshListOnly(); };
+  for (const b of el.querySelectorAll('[data-aup]')) b.onclick = () => {
+    const n = +b.dataset.aup;
+    [r.actions[n - 1], r.actions[n]] = [r.actions[n], r.actions[n - 1]];
+    redraw();
+  };
+  for (const b of el.querySelectorAll('[data-adel]')) b.onclick = () => { r.actions.splice(+b.dataset.adel, 1); redraw(); };
+  $('aAdd').onclick = () => { r.actions.push({ kind: 'message', value: '' }); redraw(); };
+  $('rCool').onchange = (e) => { r.cooldownMin = +e.target.value; markDirty(); };
+  $('rRun').onclick = async () => {
+    try { await invoke('automation_run', { rule: r }); toast('Wykonano'); autoLoading = false; setTimeout(() => show(page), 900); }
+    catch (e) { toast(String(e), 4000); }
+  };
+  $('rSave').onclick = save;
+  $('rDel').onclick = () => {
+    cfg.automations = cfg.automations.filter((x) => x.id !== r.id);
+    selectedRule = cfg.automations[0]?.id || null;
+    redraw();
+  };
+}
+
+/** Odśwież tylko opis reguły na liście (bez przerysowania edytora z polem w trakcie pisania). */
+function refreshListOnly() {
+  const r = cfg.automations.find((x) => x.id === selectedRule);
+  const btn = document.querySelector(`[data-rule="${CSS.escape(selectedRule || '')}"] .wt`);
+  if (!r || !btn) return;
+  btn.innerHTML = `<span><em>Gdy </em>${esc(describeTrigger(r.trigger))}</span><span><em>to </em><b style="font-weight:600">${esc(r.actions.map(describeAction).join(', ') || '— brak akcji —')}</b></span>`;
+}
+
+// ------------------------------------------------------------ paleta: klawisze
+
+const PALETTE_CMDS = [
+  ['focus', 'Start fokusu'], ['focus_block', 'Fokus na bieżący blok'], ['pause', 'Pauza / wznów'], ['capture', 'Wrzuć myśl'],
+  ['stash', 'Odłóż okna do garażu'], ['spotify', 'Spotify: play / pauza'], ['spotify_next', 'Spotify: następny'],
+  ['tailscale', 'Tailscale: exit node'], ['tailscale_off', 'Tailscale: wyłącz'], ['calc', 'Kalkulator'],
+  ['replan', 'Przeplanuj dzień'], ['report', 'Raport tygodnia'], ['settings', 'Ustawienia'],
+];
+function paletteCommands() {
+  return [...PALETTE_CMDS, ...cfg.modes.map((m) => [`mode:${m.id}`, `Tryb ${m.label}`])];
+}
+function paletteKey(cmd) {
+  const k = cfg.palette.keys.find((x) => x.cmd === cmd);
+  if (k) return k.key;
+  if (cmd.startsWith('mode:')) {
+    const m = cfg.modes.find((x) => `mode:${x.id}` === cmd);
+    return m ? `t${m.label[0].toLowerCase()}` : '';
+  }
+  return '';
+}
 
 // ------------------------------------------------------------ dock: podgląd i edytor
 
@@ -841,6 +1196,8 @@ async function load() {
   cfg.sections ||= [];
   cfg.bar ||= { stats: [] };
   cfg.backup ||= { folder: '' };
+  cfg.palette ||= { keys: [], tailscaleNode: '', folders: [] };
+  cfg.automations ||= [];
   for (const a of cfg.dock) { a.iconPath ??= ''; a.icon ??= 'auto'; }
   saved = JSON.stringify(cfg);
   markDirty();

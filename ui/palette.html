@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — paleta</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { padding: 10px; }
+  .pal { height: 100%; display: flex; flex-direction: column; border-radius: 20px; overflow: hidden; background: rgba(22,22,26,0.985); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 30px 80px rgba(0,0,0,0.55); }
+  .head { display: flex; align-items: center; gap: 14px; height: 64px; padding: 0 20px; border-bottom: 1px solid var(--line); flex: none; color: var(--muted); }
+  .head input { flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; color: var(--text); font-family: var(--mono); font-size: 20px; caret-color: var(--accent); }
+  .head input::placeholder { color: #71717a; font-family: var(--font); font-size: 17px; }
+  .chip { height: 26px; padding: 0 10px; display: flex; align-items: center; border-radius: 8px; background: rgba(212,46,37,0.18); color: #fca5a5; font-size: 12px; font-weight: 600; white-space: nowrap; }
+  .chip:empty { display: none; }
+  .body { flex: 1; min-height: 0; display: grid; grid-template-columns: 430px minmax(0, 1fr); }
+  .list { overflow-y: auto; padding: 10px; border-right: 1px solid rgba(255,255,255,0.06); scrollbar-width: thin; }
+  .gname { display: block; padding: 10px 10px 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .row { width: 100%; display: flex; align-items: center; gap: 12px; height: 52px; padding: 0 12px; border: 0; border-radius: 12px; background: transparent; text-align: left; }
+  .row.sel { background: rgba(255,255,255,0.08); }
+  .tile { width: 32px; height: 32px; flex: none; border-radius: 9px; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+  .txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .txt b { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .txt span { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .key { font-family: var(--mono); font-size: 11px; padding: 3px 7px; border-radius: 6px; background: rgba(255,255,255,0.08); color: var(--text-2); }
+  .key:empty { display: none; }
+  .pv { display: flex; flex-direction: column; gap: 14px; padding: 22px; min-height: 0; overflow-y: auto; }
+  .pv .lbl { font-size: 11px; font-weight: 600; letter-spacing: 0.08em; color: var(--muted); }
+  .pv .t { font-size: 19px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+  .pv .b { font-size: 14px; color: var(--text-2); line-height: 1.55; white-space: pre-line; overflow-wrap: anywhere; }
+  .effect { margin-top: auto; display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 12px; background: rgba(255,255,255,0.04); }
+  .effect span:first-child { font-size: 12px; color: var(--muted); }
+  .effect span:last-child { font-size: 13px; line-height: 1.5; white-space: pre-line; }
+  .acts { display: flex; flex-direction: column; gap: 4px; }
+  .act { height: 42px; padding: 0 12px; display: flex; align-items: center; gap: 10px; border: 1px solid transparent; border-radius: 10px; background: transparent; text-align: left; font-size: 14px; }
+  .act.sel { background: rgba(212,46,37,0.16); border-color: #D42E25; }
+  .act i { font-style: normal; font-family: var(--mono); font-size: 12px; color: var(--muted); width: 14px; }
+  .foot { display: flex; align-items: center; gap: 18px; height: 42px; padding: 0 20px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); flex: none; }
+  .foot b { color: #e4e4e7; font-weight: 600; }
+  .empty { padding: 30px 14px; color: var(--muted); font-size: 13px; line-height: 1.6; }
+</style>
+</head>
+<body>
+<div class="pal">
+  <div class="head">
+    <span id="ic"></span>
+    <input id="q" placeholder="Szukaj albo wpisz polecenie — np. fk 45, tr, m kupić bilety" autocomplete="off" spellcheck="false">
+    <span class="chip" id="chip"></span>
+  </div>
+  <div class="body">
+    <div class="list" id="list" role="listbox" aria-label="Wyniki"></div>
+    <div class="pv" id="pv"></div>
+  </div>
+  <div class="foot">
+    <span><b>↵</b> wykonaj</span>
+    <span><b>Tab</b> więcej akcji</span>
+    <span><b>↑↓</b> wybór</span>
+    <span><b>Esc</b> zamknij</span>
+    <span style="margin-left:auto" id="hint"></span>
+  </div>
+</div>
+<script type="module">
+import { invoke, listen, esc, icon } from './shared.js';
+
+const $ = (id) => document.getElementById(id);
+const q = $('q');
+let rows = [];
+let sel = 0;
+let actMode = false;
+let actSel = 0;
+let seq = 0;
+let answer = { chip: '', groups: [] };
+
+$('ic').innerHTML = icon('search', 20);
+
+async function query() {
+  const my = ++seq;
+  const a = await invoke('palette_query', { query: q.value }).catch(() => null);
+  if (!a || my !== seq) return;
+  answer = a;
+  rows = a.groups.flatMap((g) => g.items);
+  sel = 0;
+  actMode = false;
+  render();
+}
+
+function render() {
+  $('chip').textContent = answer.chip || '';
+  let n = 0;
+  $('list').innerHTML = answer.groups.map((g) => `
+    <span class="gname">${esc(g.name)}</span>
+    ${g.items.map((r) => {
+      const i = n++;
+      return `<button class="row ${i === sel ? 'sel' : ''}" data-i="${i}" role="option" aria-selected="${i === sel}">
+        <span class="tile" style="background:${esc(r.tile)}">${esc(r.mono)}</span>
+        <span class="txt"><b>${esc(r.title)}</b><span>${esc(r.sub)}</span></span>
+        <span class="key">${esc(r.key || (i === sel ? '↵' : ''))}</span>
+      </button>`;
+    }).join('')}`).join('') || '<div class="empty">Nic nie pasuje.</div>';
+  for (const b of $('list').querySelectorAll('.row')) {
+    b.onmousemove = () => { const i = +b.dataset.i; if (i !== sel) { sel = i; actMode = false; render(); } };
+    b.onclick = () => run(+b.dataset.i, null);
+  }
+  const cur = $('list').querySelector('.row.sel');
+  if (cur) cur.scrollIntoView({ block: 'nearest' });
+  renderPreview();
+}
+
+function renderPreview() {
+  const r = rows[sel];
+  if (!r) { $('pv').innerHTML = ''; $('hint').textContent = ''; return; }
+  const p = r.preview;
+  if (actMode && r.actions.length) {
+    $('pv').innerHTML = `
+      <span class="lbl">WIĘCEJ AKCJI</span>
+      <span class="t">${esc(r.title)}</span>
+      <div class="acts">${r.actions.map((a, i) => `<button class="act ${i === actSel ? 'sel' : ''}" data-a="${i}"><i>${i + 1}</i>${esc(a.label)}</button>`).join('')}</div>
+      <div class="effect"><span>Tab albo Esc</span><span>wraca do podglądu</span></div>`;
+    for (const b of $('pv').querySelectorAll('.act')) b.onclick = () => run(sel, r.actions[+b.dataset.a].id);
+  } else {
+    $('pv').innerHTML = `
+      <span class="lbl">PODGLĄD</span>
+      <span class="t">${esc(p.title)}</span>
+      <span class="b">${esc(p.body)}</span>
+      ${p.effect ? `<div class="effect"><span>Co się stanie po Enter</span><span>${esc(p.effect)}</span></div>` : ''}`;
+  }
+  $('hint').textContent = r.actions.length ? `${r.actions.length} ${r.actions.length === 1 ? 'akcja' : 'akcje'} pod Tab` : '';
+}
+
+async function run(i, action) {
+  const r = rows[i];
+  if (!r) return;
+  try {
+    await invoke('palette_run', { id: r.id, action });
+  } catch (e) {
+    $('chip').textContent = String(e);
+  }
+}
+
+q.addEventListener('input', query);
+document.addEventListener('keydown', (e) => {
+  const r = rows[sel];
+  if (e.key === 'Escape') {
+    e.preventDefault();
+    if (actMode) { actMode = false; renderPreview(); } else invoke('palette_hide');
+  } else if (e.key === 'Tab') {
+    e.preventDefault();
+    if (r && r.actions.length) { actMode = !actMode; actSel = 0; renderPreview(); }
+  } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    const d = e.key === 'ArrowDown' ? 1 : -1;
+    if (actMode && r) { actSel = (actSel + d + r.actions.length) % r.actions.length; renderPreview(); }
+    else if (rows.length) { sel = (sel + d + rows.length) % rows.length; render(); }
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (actMode && r) run(sel, r.actions[actSel].id);
+    else run(sel, null);
+  } else if (actMode && r && /^[1-9]$/.test(e.key) && r.actions[+e.key - 1]) {
+    e.preventDefault();
+    run(sel, r.actions[+e.key - 1].id);
+  }
+});
+
+listen('palette-open', () => {
+  q.value = '';
+  q.focus();
+  query();
+});
+query();
+</script>
+</body>
+</html>
