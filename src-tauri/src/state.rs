@@ -211,6 +211,18 @@ pub struct Runtime {
     pub notif_status: String,
     /// Nieprzeczytane powiadomienia na ikonach docka (id aplikacji → liczba).
     pub badges: HashMap<String, u32>,
+    /// Uruchomione aplikacje z oknami, których nie ma w docku (w kolejności otwarcia).
+    pub open_apps: Vec<OpenApp>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenApp {
+    /// Nazwa pliku małymi literami, np. `notepad.exe`.
+    pub exe: String,
+    pub path: String,
+    pub name: String,
+    pub windows: usize,
 }
 
 pub struct Shared {
@@ -295,7 +307,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
     let section_index = |id: &str| cfg.sections.iter().position(|s| s.id == id).unwrap_or(usize::MAX);
     let mut ordered: Vec<&crate::config::DockApp> = cfg.dock.iter().collect();
     ordered.sort_by_key(|a| section_index(&a.category));
-    let dock: Vec<Value> = ordered
+    let mut dock: Vec<Value> = ordered
         .iter()
         .enumerate()
         .map(|(n, a)| {
@@ -314,6 +326,21 @@ pub fn snapshot(app: &AppHandle) -> Value {
             })
         })
         .collect();
+
+    // Otwarte aplikacje spoza docka — za separatorem, żeby szybko do nich przejść.
+    if !rt.open_apps.is_empty() {
+        if let Some(last) = dock.last_mut() {
+            last["separatorAfter"] = json!(true);
+        }
+        for o in &rt.open_apps {
+            dock.push(json!({
+                "id": format!("run:{}", o.exe), "name": o.name, "icon": "auto", "category": "",
+                "bg": "#27272a", "fg": "#e4e4e7", "stripe": "rgba(255,255,255,0.35)",
+                "dim": false, "running": true, "windows": o.windows, "separatorAfter": false,
+                "badge": 0, "stack": false, "unpinned": true, "path": o.path,
+            }));
+        }
+    }
 
     let day: Vec<Value> = rt
         .plan

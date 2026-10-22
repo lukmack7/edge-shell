@@ -214,16 +214,82 @@ fn foreground(app: &AppHandle) {
     }
 }
 
+static DESCRIPTIONS: std::sync::Mutex<Option<std::collections::HashMap<String, String>>> = std::sync::Mutex::new(None);
+
+/// Ładna nazwa aplikacji: opis z pliku .exe (zapamiętany), inaczej nazwa pliku.
+fn app_display_name(path: &str, exe: &str, title: &str) -> String {
+    if exe == "applicationframehost.exe" {
+        return title.rsplit(" - ").next().unwrap_or(title).trim().to_string();
+    }
+    if let Ok(g) = DESCRIPTIONS.lock() {
+        if let Some(n) = g.as_ref().and_then(|m| m.get(path)) {
+            return n.clone();
+        }
+    }
+    let stem = exe.trim_end_matches(".exe");
+    let fallback = {
+        let mut c = stem.chars();
+        match c.next() {
+            Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+            None => String::new(),
+        }
+    };
+    let name = crate::sys::file_description(path)
+        .filter(|d| d.chars().count() <= 32 && !d.to_lowercase().contains("host"))
+        .unwrap_or(fallback);
+    if let Ok(mut g) = DESCRIPTIONS.lock() {
+        g.get_or_insert_with(std::collections::HashMap::new).insert(path.to_string(), name.clone());
+    }
+    name
+}
+
 fn running(app: &AppHandle) {
     let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
-    for w in platform::app_windows() {
+    let windows = platform::app_windows();
+    for w in &windows {
         *counts.entry(platform::exe_name(&w.exe)).or_insert(0) += 1;
     }
     let set: std::collections::HashSet<String> = counts.keys().cloned().collect();
-    if state::read(app, |rt| rt.window_counts != counts) {
+
+    // Aplikacje spoza docka: kolejność otwarcia zostaje stała.
+    let cfg = state::cfg(app);
+    let pinned: std::collections::HashSet<String> = cfg
+        .dock
+        .iter()
+        .flat_map(|a| {
+            let mut v = Vec::new();
+            if !a.process.trim().is_empty() {
+                v.push(a.process.trim().to_lowercase());
+            }
+            if a.path.to_lowercase().ends_with(".exe") {
+                v.push(platform::exe_name(&a.path));
+            }
+            v
+        })
+        .collect();
+    let mut open: Vec<state::OpenApp> = state::read(app, |rt| rt.open_apps.clone());
+    open.retain(|o| counts.contains_key(&o.exe) && !pinned.contains(&o.exe));
+    for o in open.iter_mut() {
+        o.windows = counts[&o.exe];
+    }
+    for w in &windows {
+        let exe = platform::exe_name(&w.exe);
+        if exe.is_empty() || pinned.contains(&exe) || open.iter().any(|o| o.exe == exe) {
+            continue;
+        }
+        open.push(state::OpenApp {
+            name: app_display_name(&w.exe, &exe, &w.title),
+            path: w.exe.clone(),
+            windows: counts[&exe],
+            exe,
+        });
+    }
+
+    if state::read(app, |rt| rt.window_counts != counts || rt.open_apps != open) {
         state::update(app, false, |rt| {
             rt.running = set;
             rt.window_counts = counts;
+            rt.open_apps = open;
         });
     }
 }

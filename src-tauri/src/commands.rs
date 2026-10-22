@@ -92,6 +92,20 @@ fn open_target(app: &AppHandle, path: &str, args: &[String]) -> Res<()> {
 /// Uruchamia aplikację z docka. Wyciszona w bieżącym trybie → żółta flaga.
 #[tauri::command]
 pub fn launch(app: AppHandle, id: String) -> Res<String> {
+    // Otwarta aplikacja spoza docka: przejdź do jej okna (kolejne kliknięcia — następne okna).
+    if id.starts_with("run:") {
+        let wins = crate::previews::windows_of(&app, &id);
+        if wins.is_empty() {
+            return Err("aplikacja już nie działa".into());
+        }
+        let fg = platform::foreground_hwnd();
+        let next = match wins.iter().position(|w| w.hwnd == fg) {
+            Some(i) => &wins[(i + 1) % wins.len()],
+            None => &wins[0],
+        };
+        crate::sys::activate(next.hwnd);
+        return Ok("activated".into());
+    }
     let cfg = state::cfg(&app);
     let Some(entry) = cfg.dock.iter().find(|a| a.id == id) else { return Err("nie ma takiej aplikacji".into()) };
     if state::read(&app, |rt| rt.badges.contains_key(&id)) {
@@ -122,9 +136,41 @@ pub fn launch(app: AppHandle, id: String) -> Res<String> {
 /// Nowe okno aplikacji (środkowy klik albo Shift+klik w docku).
 #[tauri::command]
 pub fn launch_new(app: AppHandle, id: String) -> Res<()> {
+    if let Some(exe) = id.strip_prefix("run:") {
+        let path = state::read(&app, |rt| rt.open_apps.iter().find(|o| o.exe == exe).map(|o| o.path.clone()));
+        return match path {
+            Some(p) => open_target(&app, &p, &[]),
+            None => Err("aplikacja już nie działa".into()),
+        };
+    }
     let cfg = state::cfg(&app);
     let Some(entry) = cfg.dock.iter().find(|a| a.id == id) else { return Err("nie ma takiej aplikacji".into()) };
     open_target(&app, &entry.path, &entry.args)
+}
+
+/// Przypina otwartą aplikację do docka (prawy klik na jej ikonie).
+#[tauri::command]
+pub fn dock_pin(app: AppHandle, exe: String) -> Res<()> {
+    let Some(o) = state::read(&app, |rt| rt.open_apps.iter().find(|o| o.exe == exe).cloned()) else {
+        return Err("aplikacja już nie działa".into());
+    };
+    let mut cfg = state::cfg(&app);
+    let base: String = o.exe.trim_end_matches(".exe").chars().filter(|c| c.is_alphanumeric()).collect();
+    let mut id = if base.is_empty() { "app".to_string() } else { base };
+    while cfg.dock.iter().any(|a| a.id == id) {
+        id.push('2');
+    }
+    let category = cfg.sections.last().map(|s| s.id.clone()).unwrap_or_else(|| "system".into());
+    cfg.dock.push(crate::config::DockApp {
+        id,
+        name: o.name,
+        path: o.path,
+        category,
+        icon: "auto".into(),
+        process: o.exe,
+        ..crate::config::DockApp::default()
+    });
+    crate::settings::save_config(app, cfg)
 }
 
 #[tauri::command]

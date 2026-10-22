@@ -26,6 +26,9 @@ pub struct Slot {
 
 /// Okna danej aplikacji z docka (po nazwie procesu albo pliku .exe).
 pub fn windows_of(app: &AppHandle, id: &str) -> Vec<AppWindow> {
+    if let Some(exe) = id.strip_prefix("run:") {
+        return platform::app_windows().into_iter().filter(|w| platform::exe_name(&w.exe) == exe).collect();
+    }
     let cfg = state::cfg(app);
     let Some(a) = cfg.dock.iter().find(|a| a.id == id) else { return Vec::new() };
     let mut names: Vec<String> = Vec::new();

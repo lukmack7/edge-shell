@@ -450,6 +450,45 @@ mod imp {
         String::from_utf8_lossy(&out.stdout).lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect()
     }
 
+    /// Opis pliku z zasobów wersji (np. „Microsoft Edge”) — ładna nazwa aplikacji.
+    pub fn file_description(path: &str) -> Option<String> {
+        use windows::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
+        let wide = HSTRING::from(path);
+        unsafe {
+            let size = GetFileVersionInfoSizeW(&wide, None);
+            if size == 0 {
+                return None;
+            }
+            let mut buf = vec![0u8; size as usize];
+            GetFileVersionInfoW(&wide, 0, size, buf.as_mut_ptr() as *mut c_void).ok()?;
+            let mut ptr: *mut c_void = std::ptr::null_mut();
+            let mut len = 0u32;
+            let mut langs: Vec<String> = Vec::new();
+            if VerQueryValueW(buf.as_ptr() as *const c_void, windows::core::w!("\\VarFileInfo\\Translation"), &mut ptr, &mut len).as_bool() && len >= 4 {
+                let words = std::slice::from_raw_parts(ptr as *const u16, (len / 2) as usize);
+                for pair in words.chunks(2) {
+                    if pair.len() == 2 {
+                        langs.push(format!("{:04x}{:04x}", pair[0], pair[1]));
+                    }
+                }
+            }
+            langs.extend(["040904b0".to_string(), "040904e4".to_string(), "041504b0".to_string()]);
+            for l in langs {
+                let key = HSTRING::from(format!("\\StringFileInfo\\{l}\\FileDescription"));
+                let mut p2: *mut c_void = std::ptr::null_mut();
+                let mut n = 0u32;
+                if VerQueryValueW(buf.as_ptr() as *const c_void, &key, &mut p2, &mut n).as_bool() && n > 1 {
+                    let text = String::from_utf16_lossy(std::slice::from_raw_parts(p2 as *const u16, n as usize));
+                    let text = text.trim_end_matches('\0').trim().to_string();
+                    if !text.is_empty() {
+                        return Some(text);
+                    }
+                }
+            }
+            None
+        }
+    }
+
     /// Okna (uchwyty) należące do procesu o danej nazwie pliku, np. `discord.exe`.
     pub fn close_windows_of(exe: &str) {
         let exe = exe.to_lowercase();
@@ -616,6 +655,7 @@ mod imp {
     pub fn explorer_tray() -> Option<isize> { None }
     pub fn monitor_names() -> Vec<String> { Vec::new() }
     pub fn close_windows_of(_: &str) {}
+    pub fn file_description(_: &str) -> Option<String> { None }
 }
 
 pub use imp::*;

@@ -174,6 +174,7 @@ fn main() {
             icons::dock_icons,
             icons::app_icon,
             commands::launch_new,
+            commands::dock_pin,
             previews::previews_show,
             previews::previews_layout,
             previews::previews_hide,

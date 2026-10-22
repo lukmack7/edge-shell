@@ -14,6 +14,7 @@
   .tile img { width: 44px; height: 44px; object-fit: contain; image-rendering: auto; }
   .stripe { width: 28px; height: 3px; border-radius: 2px; }
   .app.dim { opacity: 0.35; filter: grayscale(1); }
+  .app.unpinned .stripe { width: 6px; border-radius: 50%; height: 4px; }
   .app.dim .stripe { background: transparent !important; }
   .dots { position: absolute; top: -4px; right: -2px; display: flex; gap: 2px; }
   .dots i { width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px #18181b; }
@@ -44,7 +45,25 @@ async function loadIcons() {
 listen('config-changed', loadIcons);
 loadIcons();
 
+// Ikony otwartych aplikacji spoza docka (z pliku .exe), pobierane raz.
+const runIcons = {};
+function runIcon(a) {
+  if (!(a.id in runIcons)) {
+    runIcons[a.id] = null;
+    invoke('app_icon', { path: a.path }).then((url) => {
+      runIcons[a.id] = url;
+      if (url) { lastKey = ''; if (snap) render(snap); }
+    }).catch(() => {});
+  }
+  return runIcons[a.id];
+}
+
 function tile(a) {
+  if (a.unpinned) {
+    const url = runIcon(a);
+    if (url) return `<span class="tile real"><img src="${url}" alt=""></span>`;
+    return `<span class="tile" style="background:${a.bg};color:${a.fg};font-weight:700;font-size:18px">${esc((a.name || '?')[0].toUpperCase())}</span>`;
+  }
   if (a.icon === 'auto' && icons[a.id]) {
     return `<span class="tile real"><img src="${icons[a.id]}" alt=""></span>`;
   }
@@ -61,11 +80,11 @@ listen('dock-reveal', () => {
 });
 
 function render(s) {
-  const key = JSON.stringify(s.dock) + Object.keys(icons).length;
+  const key = JSON.stringify(s.dock) + Object.keys(icons).length + Object.values(runIcons).filter(Boolean).length;
   if (key === lastKey) return;
   lastKey = key;
   dock.innerHTML = s.dock.map((a) => `
-    <button class="app ${a.dim ? 'dim' : ''} ${a.stack ? 'stack' : ''}" data-stack="${a.stack ? 1 : ''}" data-id="${esc(a.id)}" aria-label="${esc(a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}">
+    <button class="app ${a.dim ? 'dim' : ''} ${a.stack ? 'stack' : ''} ${a.unpinned ? 'unpinned' : ''}" data-stack="${a.stack ? 1 : ''}" data-id="${esc(a.id)}" aria-label="${esc(a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}">
       ${tile(a)}
       <span class="stripe" style="background:${a.stripe}"></span>
       ${a.badge ? `<span class="badge" aria-label="${a.badge} nowych">${a.badge > 99 ? '99+' : a.badge}</span>`
@@ -87,13 +106,23 @@ function render(s) {
       invoke('previews_hide');
     };
     b.onauxclick = (e) => { if (e.button === 1) invoke('launch_new', { id }); };
+    // Prawy klik na otwartej aplikacji spoza docka: przypnij ją na stałe.
+    if (id.startsWith('run:')) {
+      b.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        invoke('previews_hide');
+        invoke('dock_pin', { exe: id.slice(4) }).catch((err) => console.warn(err));
+      };
+    }
     // Najechanie: po chwili żywe podglądy okien tej aplikacji.
     b.onmouseenter = () => {
       clearTimeout(hoverTimer);
       emitTo('preview', 'preview-enter', null);
       const r = b.getBoundingClientRect();
       const anchor = r.left + r.width / 2;
-      const name = s.dock.find((x) => x.id === id)?.name || '';
+      const item = s.dock.find((x) => x.id === id);
+      const name = item ? (item.unpinned ? `${item.name} · prawy klik: przypnij` : item.name) : '';
       invoke('previews_tip', { text: name, anchor });
       if (!isStack) hoverTimer = setTimeout(() => invoke('previews_show', { id, anchor }), 450);
     };
