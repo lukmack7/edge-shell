@@ -158,7 +158,8 @@
         "visible": false,
         "decorations": true,
         "resizable": true,
-        "skipTaskbar": false
+        "skipTaskbar": false,
+        "dragDropEnabled": false
       },
       {
         "label": "rail",

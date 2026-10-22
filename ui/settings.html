@@ -69,6 +69,7 @@
   .app-chip:hover { border-color: var(--line-strong); }
   .app-chip.sel { border-color: var(--accent); background: #1d1214; }
   .app-chip.dragging { opacity: 0.4; }
+  .app-chip img, .app-chip .t { -webkit-user-drag: none; pointer-events: none; }
   .app-chip .t { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; }
   .app-chip .t img { width: 34px; height: 34px; }
   .app-chip .n { width: 100%; font-size: 11px; text-align: center; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -624,12 +625,12 @@ const after = {
     let dragId = null;
     for (const chip of root.querySelectorAll('.app-chip')) {
       chip.onclick = () => { selectedApp = chip.dataset.app; show(page); };
-      chip.ondragstart = (e) => { dragId = chip.dataset.app; chip.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; };
+      chip.ondragstart = (e) => { dragId = chip.dataset.app; chip.classList.add('dragging'); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); };
       chip.ondragend = () => chip.classList.remove('dragging');
     }
     for (const zone of root.querySelectorAll('[data-drop]')) {
       const lane = zone.closest('.lane');
-      zone.ondragover = (e) => { e.preventDefault(); lane.classList.add('over'); };
+      zone.ondragover = (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; lane.classList.add('over'); };
       zone.ondragleave = () => lane.classList.remove('over');
       zone.ondrop = (e) => {
         e.preventDefault();
