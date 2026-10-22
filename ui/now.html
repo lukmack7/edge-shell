@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — Teraz</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .panel { display: flex; flex-direction: column; gap: 14px; padding: 16px; }
+  .head { display: flex; align-items: center; justify-content: space-between; }
+  h2 { margin: 0; font-size: 17px; font-weight: 600; }
+  .sub { font-size: 11px; color: var(--muted); }
+  .card { display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 18px; background: var(--fill); border: 1px solid rgba(255,255,255,0.06); }
+  .chip { align-self: flex-start; font-size: 11px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: var(--accent); color: #fff; }
+  .chip.meeting { background: #fde68a; color: #3a2a06; }
+  .chip.buffer { background: #3f3f46; color: #e4e4e7; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+  .list { display: flex; flex-direction: column; gap: 4px; }
+  .item { flex: none; display: flex; align-items: center; gap: 10px; height: 38px; padding: 0 10px; border-radius: 10px; }
+  .item.now { background: var(--fill-strong); }
+  .item.done { opacity: 0.55; }
+  .item .t { width: 40px; flex: none; font-size: 12px; color: var(--muted); }
+  .item .bar3 { width: 4px; height: 22px; border-radius: 2px; flex: none; }
+  .item .k { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .progress { height: 6px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+  .progress i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+  .music { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 14px; background: var(--fill); }
+  .art { width: 44px; height: 44px; flex: none; border-radius: 10px; background: #27272a center/cover no-repeat; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+  .round { width: 40px; height: 40px; flex: none; border-radius: 50%; border: 0; background: var(--text); color: #0b0a0b; display: flex; align-items: center; justify-content: center; }
+  .ghost { width: 36px; height: 36px; flex: none; border-radius: 50%; border: 0; background: transparent; color: var(--text-2); display: flex; align-items: center; justify-content: center; }
+  .ghost:hover { background: var(--fill); }
+  .foot { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; color: var(--muted); }
+  .foot button { border: 0; background: transparent; color: var(--muted); font-size: 11px; padding: 4px 6px; border-radius: 6px; }
+  .foot button:hover { color: var(--text); background: var(--fill); }
+</style>
+</head>
+<body>
+<aside class="panel" aria-label="Teraz">
+  <div class="head">
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <h2>Teraz</h2>
+      <span class="sub" id="sub"></span>
+    </div>
+    <button class="icon-btn" id="close" aria-label="Schowaj panel Teraz"></button>
+  </div>
+
+  <section class="card" id="focus"></section>
+
+  <label style="display:flex;flex-direction:column;gap:6px">
+    <span class="label" style="display:flex;justify-content:space-between"><span>Wrzuć myśl</span><span id="capHk" style="letter-spacing:0;text-transform:none;font-weight:500"></span></span>
+    <span class="field"><input id="capture" type="text" placeholder="np. „oddzwonić do serwisu jutro rano, 15 min”" autocomplete="off"></span>
+    <span class="sub" id="capInfo">Horolog sam znajdzie miejsce w planie</span>
+  </label>
+
+  <div class="list scroll" id="day" aria-label="Plan na dziś" style="flex:1;min-height:80px"></div>
+
+  <div class="card" style="gap:8px;padding:12px" id="week"></div>
+
+  <div class="music" id="music" style="display:none"></div>
+
+  <div class="foot">
+    <span id="status" class="ellipsis"></span>
+    <span style="display:flex;flex:none"><button id="cfg">Ustawienia</button><button id="reload">Wczytaj ponownie</button></span>
+  </div>
+</aside>
+<script type="module">
+import { invoke, onSnapshot, onTick, esc, icon, ring, focusTiming, mmss, hhmm, blockColor, KIND_LABEL, toast } from './shared.js';
+
+const $ = (id) => document.getElementById(id);
+$('close').innerHTML = icon('right', 18, 2);
+$('close').onclick = () => invoke('hide_window', { label: 'now' });
+$('cfg').onclick = () => invoke('open_config');
+$('reload').onclick = () => invoke('reload_config').then(() => toast('Konfiguracja wczytana'));
+
+$('capture').addEventListener('keydown', async (e) => {
+  if (e.key !== 'Enter') return;
+  const text = $('capture').value.trim();
+  if (!text) return;
+  $('capture').disabled = true;
+  $('capInfo').textContent = 'Wysyłam do Horologa…';
+  try {
+    $('capInfo').textContent = await invoke('capture', { text });
+    $('capture').value = '';
+  } catch (err) {
+    $('capInfo').textContent = String(err);
+  } finally {
+    $('capture').disabled = false;
+    $('capture').focus();
+  }
+});
+
+let focusKey = '';
+
+function renderFocus(s) {
+  const f = s.focus;
+  const el = $('focus');
+  const key = JSON.stringify([f, s.paused, s.next, s.mode.accent]);
+  if (key !== focusKey) {
+    focusKey = key;
+    if (!f) {
+      const next = s.next
+        ? `<span style="font-size:13px;color:var(--text-2)">Następne: <b>${esc(s.next.title)}</b> o ${hhmm(s.next.start)}</span>`
+        : '<span style="font-size:13px;color:var(--text-2)">Na dziś nic więcej w planie.</span>';
+      el.innerHTML = `
+        <span class="label">Teraz nic nie trwa</span>
+        ${next}
+        <div style="display:flex;gap:8px">
+          <button class="btn primary" style="flex:1" id="adhoc">Start fokusu</button>
+          <button class="btn" id="replan0" aria-label="Przeplanuj">${icon('replan', 16, 2)}</button>
+        </div>`;
+      $('adhoc').onclick = () => invoke('focus_start_adhoc', {});
+      $('replan0').onclick = () => invoke('replan').then(() => toast('Przeplanowano')).catch((e) => toast(String(e)));
+    } else {
+      const kind = f.kind === 'meeting' || f.kind === 'busy' ? 'meeting' : f.kind === 'buffer' ? 'buffer' : '';
+      const chip = `${KIND_LABEL[f.kind] || 'fokus'}${f.priority ? ` · P${f.priority}` : ''}`;
+      el.innerHTML = `
+        <div style="display:flex;align-items:center;gap:16px">
+          <span id="ring" style="flex:none"></span>
+          <div style="display:flex;flex-direction:column;gap:6px;min-width:0">
+            <span class="chip ${kind}">${esc(chip.charAt(0).toUpperCase() + chip.slice(1))}</span>
+            <span style="font-size:17px;font-weight:600;line-height:1.25">${esc(f.title)}</span>
+            <span class="sub">${f.start ? `${hhmm(f.start)}–${hhmm(f.end)}` : ''}${f.source === 'adhoc' ? ' · sesja własna' : ''}</span>
+          </div>
+        </div>
+        ${f.completable ? `
+        <div class="grid3">
+          <button class="btn primary" id="pause">${s.paused ? 'Wznów' : 'Pauza'}</button>
+          <button class="btn" id="done">${icon('check', 16, 2.2)}Skończone</button>
+          <button class="btn" id="replan">Przeplanuj</button>
+        </div>` : `
+        <div style="display:flex;gap:8px">
+          <button class="btn" style="flex:1" id="replan">Przeplanuj resztę dnia</button>
+        </div>`}`;
+      if ($('pause')) $('pause').onclick = () => invoke('focus_toggle_pause');
+      if ($('done')) $('done').onclick = () => invoke('focus_finish').catch((e) => toast(String(e)));
+      $('replan').onclick = () => invoke('replan').then(() => toast('Przeplanowano')).catch((e) => toast(String(e)));
+    }
+  }
+  const t = focusTiming(s);
+  const r = $('ring');
+  if (r && t) {
+    const label = s.paused ? 'PAUZA' : mmss(t.left);
+    const color = f.kind === 'meeting' || f.kind === 'busy' ? '#fbbf24' : f.kind === 'buffer' ? '#a1a1aa' : s.mode.accent;
+    r.innerHTML = ring(104, 10, t.progress, color,
+      `<text x="52" y="58" text-anchor="middle" fill="#f4f4f5" font-family="Cascadia Mono, Consolas, monospace" font-size="${label.length > 5 ? 16 : 20}" font-weight="600">${label}</text>`);
+  }
+}
+
+function renderDay(s) {
+  const items = s.day || [];
+  if (!items.length) {
+    $('day').innerHTML = `<span class="label" style="margin-bottom:4px">Dziś</span><div class="empty">${s.horolog.connected ? 'Pusty plan na dziś.' : 'Brak planu — Horolog offline.'}</div>`;
+    return;
+  }
+  const rows = items.map((i) => {
+    const delta = i.deltaMin == null ? '' : i.deltaMin > 0 ? `+${i.deltaMin} min` : i.deltaMin < 0 ? `${i.deltaMin} min` : 'w czasie';
+    const cls = i.status === 'now' ? 'now' : ['past', 'early', 'ontime', 'late'].includes(i.status) ? 'done' : '';
+    return `<div class="item ${cls}">
+      <span class="t mono">${hhmm(i.start)}</span>
+      <span class="bar3" style="background:${blockColor(i, s.mode.accent)}"></span>
+      <span class="ellipsis" style="flex:1;font-size:13px">${esc(i.title)}</span>
+      <span class="k">${i.status === 'now' ? 'teraz' : delta || KIND_LABEL[i.kind] || ''}</span>
+    </div>`;
+  }).join('');
+  $('day').innerHTML = `<span class="label" style="margin-bottom:4px">Dziś</span>${rows}`;
+}
+
+function renderWeek(s) {
+  const goal = s.weekFocus.goalHours * 60;
+  const mins = s.weekFocus.minutes;
+  const pct = goal ? Math.min(100, (mins / goal) * 100) : 0;
+  const h = (m) => `${Math.floor(m / 60)} h ${String(Math.round(m % 60)).padStart(2, '0')}`;
+  $('week').innerHTML = `
+    <span style="display:flex;justify-content:space-between;font-size:12px"><span style="font-weight:500">Fokus w planie</span><span class="mono" style="color:var(--muted)">${h(mins)} / ${s.weekFocus.goalHours} h</span></span>
+    <div class="progress"><i style="width:${pct}%"></i></div>`;
+}
+
+function renderMusic(s) {
+  const el = $('music');
+  if (!s.spotifyEnabled) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  const m = s.music;
+  if (!m.connected) {
+    el.innerHTML = `<span class="art">${icon('music', 18)}</span>
+      <span style="flex:1;font-size:12px;color:var(--muted)">${esc(m.error || 'Spotify nie jest połączone')}</span>
+      <button class="btn" style="height:36px" id="spLogin">Połącz</button>`;
+    $('spLogin').onclick = () => invoke('spotify_login').catch((e) => toast(String(e)));
+    return;
+  }
+  const elapsed = m.playing ? m.progressMs + (Date.now() - m.fetchedAtMs) : m.progressMs;
+  const pct = m.durationMs ? Math.min(100, (elapsed / m.durationMs) * 100) : 0;
+  el.innerHTML = `
+    <span class="art" style="${m.art ? `background-image:url('${esc(m.art)}')` : ''}">${m.art ? '' : icon('music', 18)}</span>
+    <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+      <span class="ellipsis" style="font-size:13px;font-weight:500">${esc(m.title || 'Nic nie gra')}</span>
+      <span class="ellipsis" style="font-size:11px;color:var(--muted)">${esc(m.artist)}</span>
+      <span class="progress" style="height:3px"><i style="width:${pct}%;background:#c084fc"></i></span>
+    </span>
+    <button class="ghost" id="spNext" aria-label="Następny utwór">${icon('next', 16)}</button>
+    <button class="round" id="spPlay" aria-label="${m.playing ? 'Pauza' : 'Odtwórz'}">${icon(m.playing ? 'pause' : 'play', 16)}</button>`;
+  $('spNext').onclick = () => invoke('spotify_control', { action: 'next' }).catch((e) => toast(String(e)));
+  $('spPlay').onclick = () => invoke('spotify_control', { action: m.playing ? 'pause' : 'play' }).catch((e) => toast(String(e)));
+}
+
+onSnapshot((s) => {
+  $('sub').textContent = `z Horologa · tryb ${s.mode.label}`;
+  $('capHk').textContent = s.hotkeys.capture;
+  const h = s.horolog;
+  $('status').innerHTML = h.connected
+    ? `<span style="color:#bbf7d0">● połączono</span>`
+    : `<span>● offline</span>${h.pendingCaptures ? ` · ${h.pendingCaptures} myśli czeka` : ''}`;
+  renderFocus(s);
+  renderDay(s);
+  renderWeek(s);
+  renderMusic(s);
+});
+onTick((s) => { renderFocus(s); renderMusic(s); });
+</script>
+</body>
+</html>

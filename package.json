@@ -1,0 +1,14 @@
+{
+  "name": "edge-shell",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Nakładka na Windows: szuflady, panel Teraz z Horologiem, radio i dock",
+  "scripts": {
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  }
+}

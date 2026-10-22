@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — dymki</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; }
+  .b { position: relative; width: 58px; height: 58px; border-radius: 50%; border: 0; padding: 0; background: rgba(16,16,19,0.94); display: flex; align-items: center; justify-content: center; box-shadow: 0 10px 30px rgba(0,0,0,0.45); }
+  .b > svg { position: absolute; inset: 0; }
+  .b .ic { position: relative; display: flex; }
+  .b .t { position: relative; font-family: var(--mono); font-size: 12px; font-weight: 600; }
+  .b.music { color: #e9d5ff; background: #2a1645 center/cover no-repeat; }
+</style>
+</head>
+<body>
+<button class="b" id="timer" aria-label="Panel Teraz"></button>
+<button class="b music" id="music" aria-label="Muzyka" style="display:none"></button>
+<script type="module">
+import { invoke, onSnapshot, onTick, ring, focusTiming, mmss, icon, esc } from './shared.js';
+
+const $ = (id) => document.getElementById(id);
+$('timer').onclick = () => invoke('set_panel', { label: 'now', open: true });
+$('music').onclick = () => {
+  const playing = $('music').dataset.playing === '1';
+  invoke('spotify_control', { action: playing ? 'pause' : 'play' }).catch(() => {});
+};
+
+function render(s) {
+  const t = focusTiming(s);
+  const label = t ? (s.paused ? '||' : mmss(t.left).slice(0, 5)) : '';
+  $('timer').innerHTML = `${ring(58, 3, t ? t.progress : 1, s.mode.accent)}<span class="t">${t ? esc(label) : `<span class="ic">${icon('clock', 20)}</span>`}</span>`;
+  const m = s.music;
+  if (s.spotifyEnabled && m.connected && m.title) {
+    $('music').style.display = '';
+    $('music').dataset.playing = m.playing ? '1' : '0';
+    $('music').style.backgroundImage = m.art ? `url('${m.art.replace(/'/g, '')}')` : '';
+    const elapsed = m.playing ? m.progressMs + (Date.now() - m.fetchedAtMs) : m.progressMs;
+    const p = m.durationMs ? elapsed / m.durationMs : 0;
+    $('music').innerHTML = `${ring(58, 3, p, '#c084fc')}${m.art ? '' : `<span class="ic">${icon(m.playing ? 'pause' : 'play', 18)}</span>`}`;
+  } else {
+    $('music').style.display = 'none';
+  }
+}
+onSnapshot(render);
+onTick(render);
+</script>
+</body>
+</html>

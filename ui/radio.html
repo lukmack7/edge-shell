@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — radio</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .card { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; padding: 18px; border-radius: 16px; background: var(--bg-solid); border: 1px solid rgba(255,255,255,0.1); animation: slide 0.22s ease-out; }
+  @keyframes slide { from { transform: translateY(-8px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .num { font-size: 60px; font-weight: 800; font-style: italic; line-height: 0.85; letter-spacing: -0.04em; }
+  .who { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; font-size: 21px; font-weight: 800; font-style: italic; text-align: right; }
+  .line { height: 3px; border-radius: 2px; }
+  .quote { margin: 0; font-size: 15px; font-weight: 700; text-transform: uppercase; line-height: 1.35; overflow-wrap: anywhere; }
+  .msg { max-height: 82px; overflow: hidden; }
+  .reply { max-height: 62px; overflow: hidden; }
+  .x { width: 28px; height: 28px; border-radius: 8px; border: 0; background: var(--fill); color: var(--text-2); display: flex; align-items: center; justify-content: center; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: auto; }
+  .meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="card" id="card" role="status" aria-live="polite"></div>
+<script type="module">
+import { invoke, onSnapshot, esc, icon, hhmm } from './shared.js';
+
+const card = document.getElementById('card');
+let shownId = '';
+let state = 'idle';
+
+function render(s) {
+  const m = s.radio.current;
+  if (!m) { card.innerHTML = ''; shownId = ''; return; }
+  if (m.id === shownId && state === 'sending') return;
+  if (m.id !== shownId) state = 'ready';
+  shownId = m.id;
+  const total = s.radio.showingCount;
+  card.innerHTML = `
+    <div class="top">
+      <span class="num" style="color:${esc(m.color)}">${esc(m.number)}</span>
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        <span class="who"><span style="color:${esc(m.color)}">${esc(m.name)}</span><span>RADIO</span></span>
+        <button class="x" id="close" aria-label="Zamknij">${icon('close', 12, 2.4)}</button>
+      </div>
+    </div>
+    <span class="line" style="background:${esc(m.color)}"></span>
+    <p class="quote msg" style="color:${esc(m.color)}">„${esc(m.message)}”</p>
+    ${m.reply ? `
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <span style="font-size:10px;font-weight:700;letter-spacing:0.12em;color:var(--muted)" id="replyLabel">${m.replyUrl ? 'PROPOZYCJA ODPOWIEDZI' : 'ODPOWIEDŹ · TRAFI DO SCHOWKA'}</span>
+        <p class="quote reply">„${esc(m.reply)}”</p>
+      </div>` : ''}
+    <div class="grid2">
+      ${m.reply ? '<button class="btn light" id="send">Wyślij odpowiedź</button>' : '<button class="btn light" id="ok">Rozumiem</button>'}
+      <button class="btn" id="later">${total > 1 ? 'Następne radio' : 'Do paczki'}</button>
+    </div>
+    <div class="meta"><span>@${esc(m.source)} · ${hhmm(m.at)}</span><span class="mono">1/${total}</span></div>`;
+
+  document.getElementById('close').onclick = () => invoke('radio_next');
+  const later = document.getElementById('later');
+  later.onclick = () => invoke(total > 1 ? 'radio_next' : 'radio_later');
+  const ok = document.getElementById('ok');
+  if (ok) ok.onclick = () => invoke('radio_next');
+  const send = document.getElementById('send');
+  if (send) {
+    send.onclick = async () => {
+      send.disabled = true;
+      state = 'sending';
+      try {
+        const result = await invoke('radio_reply', { text: m.reply });
+        send.textContent = result;
+        setTimeout(() => { state = 'idle'; invoke('radio_next'); }, 900);
+      } catch (err) {
+        send.disabled = false;
+        state = 'ready';
+        document.getElementById('replyLabel').textContent = `NIE WYSŁANO: ${String(err).toUpperCase()}`;
+      }
+    };
+  }
+}
+
+onSnapshot(render);
+</script>
+</body>
+</html>

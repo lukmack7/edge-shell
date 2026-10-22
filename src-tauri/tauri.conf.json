@@ -1,0 +1,166 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Edge Shell",
+  "version": "0.1.0",
+  "identifier": "pl.lukmack.edgeshell",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "label": "topbar",
+        "url": "topbar.html",
+        "title": "Edge Shell — pasek",
+        "width": 1920,
+        "height": 36,
+        "x": 0,
+        "y": 0,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "focus": false
+      },
+      {
+        "label": "dock",
+        "url": "dock.html",
+        "title": "Edge Shell — dock",
+        "width": 820,
+        "height": 92,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "focus": false
+      },
+      {
+        "label": "drawer",
+        "url": "drawer.html",
+        "title": "Edge Shell — szuflada",
+        "width": 380,
+        "height": 800,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "dragDropEnabled": true
+      },
+      {
+        "label": "now",
+        "url": "now.html",
+        "title": "Edge Shell — Teraz",
+        "width": 400,
+        "height": 800,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false
+      },
+      {
+        "label": "radio",
+        "url": "radio.html",
+        "title": "Edge Shell — radio",
+        "width": 380,
+        "height": 330,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "focus": false
+      },
+      {
+        "label": "friction",
+        "url": "friction.html",
+        "title": "Edge Shell — żółta flaga",
+        "width": 480,
+        "height": 300,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false
+      },
+      {
+        "label": "bubbles",
+        "url": "bubbles.html",
+        "title": "Edge Shell — dymki",
+        "width": 84,
+        "height": 160,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "focus": false
+      },
+      {
+        "label": "capture",
+        "url": "capture.html",
+        "title": "Edge Shell — wrzuć myśl",
+        "width": 640,
+        "height": 120,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false
+      },
+      {
+        "label": "glow",
+        "url": "glow.html",
+        "title": "Edge Shell — krawędź",
+        "width": 12,
+        "height": 800,
+        "visible": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "focus": false
+      }
+    ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  }
+}

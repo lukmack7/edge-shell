@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — wrzuć myśl</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .box { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 10px; padding: 16px 18px; border-radius: 20px; background: #18181b; border: 1px solid rgba(255,255,255,0.12); }
+  .in { display: flex; align-items: center; gap: 12px; }
+  .in .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex: none; }
+  input { flex: 1; min-width: 0; height: 44px; border: 0; outline: none; background: transparent; color: var(--text); font-size: 20px; user-select: text; }
+  input::placeholder { color: #71717a; }
+  .info { font-size: 12px; color: var(--muted); padding-left: 22px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="in">
+    <span class="dot" aria-hidden="true"></span>
+    <input id="text" type="text" aria-label="Wrzuć myśl do Horologa" placeholder="Co wpadło do głowy? Enter — i wracasz do pracy" autocomplete="off">
+  </div>
+  <span class="info" id="info">Horolog zrozumie język naturalny: „raport dla szefa do piątku, 2 h”. Esc zamyka.</span>
+</div>
+<script type="module">
+import { invoke, listen } from './shared.js';
+
+const input = document.getElementById('text');
+const info = document.getElementById('info');
+const DEFAULT = info.textContent;
+
+window.addEventListener('focus', () => { input.focus(); });
+listen('snapshot', () => {});
+
+input.addEventListener('keydown', async (e) => {
+  if (e.key !== 'Enter') return;
+  const text = input.value.trim();
+  if (!text) return;
+  input.disabled = true;
+  info.textContent = 'Wysyłam…';
+  try {
+    info.textContent = await invoke('capture', { text });
+    input.value = '';
+    setTimeout(() => { info.textContent = DEFAULT; invoke('hide_window', { label: 'capture' }); }, 1100);
+  } catch (err) {
+    info.textContent = String(err);
+  } finally {
+    input.disabled = false;
+    input.focus();
+  }
+});
+</script>
+</body>
+</html>

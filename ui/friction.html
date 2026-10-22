@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — chwila na decyzję</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .dlg { position: absolute; inset: 0; display: flex; flex-direction: column; gap: 12px; padding: 24px; border-radius: 22px; background: #18181b; border: 1px solid rgba(255,255,255,0.1); border-top: 4px solid var(--yellow); }
+  h1 { margin: 0; font-size: 20px; font-weight: 600; line-height: 1.3; }
+  p { margin: 0; font-size: 14px; color: var(--text-2); line-height: 1.5; }
+  .row { display: flex; gap: 8px; margin-top: 6px; }
+  .row .btn { flex: 1; height: 46px; font-size: 14px; }
+  .link { border: 0; background: transparent; color: var(--muted); font-size: 13px; height: 36px; border-radius: 8px; }
+  .link:not(:disabled):hover { color: var(--text); background: var(--fill); }
+</style>
+</head>
+<body>
+<div class="dlg" role="dialog" aria-labelledby="title">
+  <span class="label" id="mode"></span>
+  <h1 id="title"></h1>
+  <p id="text"></p>
+  <div class="row">
+    <button class="btn primary" id="back">Wracam do pracy</button>
+    <button class="btn" id="buffer">Do bufora</button>
+  </div>
+  <button class="link" id="force" disabled></button>
+</div>
+<script type="module">
+import { invoke, onSnapshot, minutesUntil, toast } from './shared.js';
+
+const $ = (id) => document.getElementById(id);
+let shownFor = '';
+let timer = null;
+
+$('back').onclick = () => invoke('friction_close');
+$('buffer').onclick = async () => {
+  try { toast(await invoke('friction_to_buffer'), 1200); } catch (e) { toast(String(e)); }
+};
+$('force').onclick = () => invoke('launch_force');
+
+function countdown() {
+  let left = 5;
+  $('force').disabled = true;
+  clearInterval(timer);
+  const tick = () => {
+    $('force').textContent = left > 0 ? `Otwórz mimo to · ${left} s` : 'Otwórz mimo to';
+    if (left <= 0) { $('force').disabled = false; clearInterval(timer); }
+    left -= 1;
+  };
+  tick();
+  timer = setInterval(tick, 1000);
+}
+
+onSnapshot((s) => {
+  if (!s.friction) { shownFor = ''; return; }
+  $('mode').textContent = `Tryb ${s.mode.label}`;
+  $('title').textContent = `${s.friction.name} jest teraz wyciszone`;
+  const buffer = (s.day || []).find((i) => i.kind === 'buffer' && new Date(i.start) > Date.now());
+  const parts = [];
+  if (s.focus && s.focus.end) parts.push(`Ten blok kończy się za ${Math.max(0, minutesUntil(s.focus.end))} min.`);
+  if (buffer) parts.push(`Najbliższy bufor o ${new Date(buffer.start).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}.`);
+  parts.push('Otworzyć teraz czy wrzucić do przerwy?');
+  $('text').textContent = parts.join(' ');
+  if (shownFor !== s.friction.id) {
+    shownFor = s.friction.id;
+    countdown();
+    $('back').focus();
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — dock</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { display: flex; align-items: flex-end; justify-content: center; }
+  nav { display: inline-flex; align-items: flex-end; gap: 8px; padding: 10px 10px 7px; margin-bottom: 4px; border-radius: 22px; background: rgba(16,16,19,0.86); border: 1px solid var(--line); }
+  .app { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0; border: 0; background: transparent; transition: transform 0.12s ease; }
+  .app:hover { transform: translateY(-3px); }
+  .tile { width: 52px; height: 52px; border-radius: 15px; display: flex; align-items: center; justify-content: center; }
+  .stripe { width: 28px; height: 3px; border-radius: 2px; }
+  .app.dim { opacity: 0.35; filter: grayscale(1); }
+  .app.dim .stripe { background: transparent !important; }
+  .run { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: #fff; border: 2px solid #18181b; }
+  .sep { width: 1px; height: 34px; margin-bottom: 14px; background: rgba(255,255,255,0.12); }
+  .tip { position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%); padding: 3px 8px; border-radius: 6px; background: #27272a; font-size: 11px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.1s; }
+  .app:hover .tip { opacity: 1; }
+</style>
+</head>
+<body>
+<nav id="dock" aria-label="Dock"></nav>
+<script type="module">
+import { invoke, onSnapshot, esc, icon } from './shared.js';
+
+const dock = document.getElementById('dock');
+let lastKey = '';
+
+onSnapshot((s) => {
+  const key = JSON.stringify(s.dock);
+  if (key === lastKey) return;
+  lastKey = key;
+  dock.innerHTML = s.dock.map((a) => `
+    <button class="app ${a.dim ? 'dim' : ''}" data-id="${esc(a.id)}" aria-label="${esc(a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}">
+      <span class="tile" style="background:${a.bg};color:${a.fg}">${icon(a.icon || a.name, 24)}</span>
+      <span class="stripe" style="background:${a.stripe}"></span>
+      ${a.running ? '<span class="run" aria-hidden="true"></span>' : ''}
+      <span class="tip">${esc(a.name)}</span>
+    </button>${a.separatorAfter ? '<span class="sep" aria-hidden="true"></span>' : ''}`).join('');
+  for (const b of dock.querySelectorAll('.app')) {
+    b.onclick = () => invoke('launch', { id: b.dataset.id }).catch((e) => console.warn(e));
+  }
+  // Okno docka dopasowuje się do szerokości ikon (+ miejsce na podpowiedź).
+  requestAnimationFrame(() => {
+    const width = Math.ceil(dock.getBoundingClientRect().width) + 24;
+    invoke('dock_resize', { width });
+  });
+});
+</script>
+</body>
+</html>

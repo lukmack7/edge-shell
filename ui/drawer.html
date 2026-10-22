@@ -1,0 +1,314 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — szuflada</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .panel { display: flex; }
+  .rail { width: 60px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 0; border-right: 1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.25); }
+  .rail button { width: 44px; height: 44px; border-radius: 12px; border: 0; background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+  .rail button.on { background: var(--fill-strong); color: var(--text); }
+  .rail button:hover { color: var(--text); }
+  .content { flex: 1; min-width: 0; padding: 16px; display: flex; flex-direction: column; gap: 18px; }
+  .head { display: flex; align-items: baseline; justify-content: space-between; }
+  h2 { margin: 0; font-size: 17px; font-weight: 600; }
+  section { display: flex; flex-direction: column; gap: 8px; }
+  .row { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 10px; border: 0; background: transparent; text-align: left; width: 100%; }
+  .row:hover, .row.sel { background: var(--fill); }
+  .bar3 { width: 3px; height: 18px; border-radius: 2px; flex: none; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .tile { height: 52px; display: flex; align-items: center; gap: 10px; padding: 0 10px; border-radius: 12px; border: 0; background: var(--fill); font-size: 13px; text-align: left; }
+  .tile:hover { background: var(--fill-strong); }
+  .tile .sq { width: 28px; height: 28px; border-radius: 8px; flex: none; }
+  .shelf { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 14px; border: 1.5px dashed rgba(255,255,255,0.2); transition: background 0.15s, border-color 0.15s; }
+  .shelf.over { background: rgba(255,255,255,0.06); border-color: var(--accent); }
+  .shelf-item { display: flex; align-items: center; gap: 6px; height: 36px; padding: 0 4px 0 10px; border-radius: 10px; background: rgba(255,255,255,0.07); }
+  .shelf-item .name { flex: 1; border: 0; background: transparent; text-align: left; padding: 0; }
+  .mini { width: 28px; height: 28px; border-radius: 8px; border: 0; background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+  .mini:hover { background: var(--fill-strong); color: var(--text); }
+  .stash { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; background: var(--fill); }
+  .count { width: 36px; height: 36px; flex: none; border-radius: 10px; background: #4a3410; color: #fde68a; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .clip { padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,0.04); border: 0; text-align: left; font-size: 12px; color: var(--text-2); max-height: 64px; overflow: hidden; white-space: pre-wrap; word-break: break-word; }
+  .clip:hover { background: var(--fill-strong); }
+  .calc { padding: 8px 10px; border-radius: 10px; background: rgba(255,255,255,0.04); font-size: 12px; color: var(--muted); }
+  .view { display: none; flex-direction: column; gap: 18px; min-height: 0; }
+  .view.on { display: flex; }
+</style>
+</head>
+<body>
+<aside class="panel" aria-label="Szuflada">
+  <nav class="rail" aria-label="Widoki szuflady">
+    <button data-view="files" class="on" aria-label="Pliki"></button>
+    <button data-view="apps" aria-label="Aplikacje"></button>
+    <button data-view="clip" aria-label="Schowek"></button>
+    <button data-view="garage" aria-label="Odłożone konteksty"></button>
+    <div style="flex:1"></div>
+    <button id="settings" aria-label="Otwórz konfigurację"></button>
+    <button id="collapse" aria-label="Schowaj szufladę" style="border:1px solid var(--line)"></button>
+  </nav>
+  <div class="content scroll">
+    <div class="head"><h2 id="title">Pliki</h2><span class="kbd" id="hk"></span></div>
+
+    <label class="field">
+      <span id="searchIcon"></span>
+      <input id="search" type="text" aria-label="Szukaj, licz, uruchamiaj" placeholder="Szukaj, licz, uruchamiaj…" autocomplete="off">
+    </label>
+    <div id="results" style="display:none;flex-direction:column;gap:2px;margin-top:-10px"></div>
+
+    <div class="view on" data-view="files">
+      <section>
+        <span class="label">Półka</span>
+        <div class="shelf" id="shelf"></div>
+      </section>
+      <section>
+        <span class="label">Przypięte</span>
+        <div class="grid2" id="pinned"></div>
+      </section>
+      <section>
+        <span class="label">Ostatnie</span>
+        <div id="recent" style="display:flex;flex-direction:column;gap:2px"></div>
+      </section>
+      <section>
+        <span class="label">Szybkie akcje</span>
+        <div class="grid2">
+          <button class="btn" id="qaShot"></button>
+          <button class="btn" id="qaNote"></button>
+          <button class="btn" id="qaCalc"></button>
+          <button class="btn" id="qaHorolog"></button>
+        </div>
+      </section>
+    </div>
+
+    <div class="view" data-view="apps">
+      <section>
+        <span class="label">Wszystkie aplikacje</span>
+        <div id="apps" style="display:flex;flex-direction:column;gap:2px"></div>
+      </section>
+    </div>
+
+    <div class="view" data-view="clip">
+      <section>
+        <span class="label">Schowek · kliknij, żeby skopiować</span>
+        <div id="clips" style="display:flex;flex-direction:column;gap:6px"></div>
+      </section>
+    </div>
+
+    <div class="view" data-view="garage">
+      <section>
+        <span class="label">Odłóż to, co masz teraz otwarte</span>
+        <label class="field"><input id="stashName" type="text" placeholder="Nazwa, np. „Faktury październik”" aria-label="Nazwa kontekstu"></label>
+        <button class="btn primary" id="stashBtn">Odłóż okna do garażu</button>
+      </section>
+      <section>
+        <span class="label">Odłożone konteksty</span>
+        <div id="stashes" style="display:flex;flex-direction:column;gap:8px"></div>
+      </section>
+    </div>
+  </div>
+</aside>
+<script type="module">
+import { invoke, listen, onSnapshot, esc, icon, toast } from './shared.js';
+
+const $ = (id) => document.getElementById(id);
+const VIEW_ICONS = { files: 'folder', apps: 'apps', clip: 'clipboard', garage: 'stack' };
+const VIEW_TITLES = { files: 'Pliki', apps: 'Aplikacje', clip: 'Schowek', garage: 'Garaż' };
+for (const b of document.querySelectorAll('.rail button[data-view]')) {
+  b.innerHTML = icon(VIEW_ICONS[b.dataset.view], 20);
+  b.onclick = () => showView(b.dataset.view);
+}
+$('settings').innerHTML = icon('settings', 18);
+$('collapse').innerHTML = icon('left', 18, 2);
+$('searchIcon').innerHTML = icon('search', 16, 2);
+$('qaShot').innerHTML = `${icon('camera', 16, 2)}Zrzut ekranu`;
+$('qaNote').innerHTML = `${icon('note', 16, 2)}Myśl`;
+$('qaCalc').innerHTML = `${icon('calc', 16, 2)}Kalkulator`;
+$('qaHorolog').innerHTML = `${icon('clock', 16, 2)}Horolog`;
+
+$('collapse').onclick = () => invoke('hide_window', { label: 'drawer' });
+$('settings').onclick = () => invoke('open_config');
+$('qaShot').onclick = () => { invoke('hide_window', { label: 'drawer' }); invoke('open_path', { path: 'ms-screenclip:' }); };
+$('qaNote').onclick = () => invoke('show_capture');
+$('qaCalc').onclick = () => invoke('open_path', { path: 'calc.exe' });
+$('qaHorolog').onclick = () => invoke('open_horolog');
+
+function showView(view) {
+  for (const el of document.querySelectorAll('[data-view]')) el.classList.toggle('on', el.dataset.view === view);
+  $('title').textContent = VIEW_TITLES[view];
+  if (view === 'apps') renderApps();
+}
+
+// --- Wyszukiwarka: aplikacje z menu Start + przypięte + ostatnie + kalkulator ---
+let index = [];
+let snap = null;
+invoke('search_index').then((list) => { index = list; renderApps(); });
+
+function renderApps() {
+  $('apps').innerHTML = index.length
+    ? index.map((e) => `<button class="row" data-path="${esc(e.path)}"><span class="ellipsis">${esc(e.name)}</span></button>`).join('')
+    : '<div class="empty">Brak skrótów w menu Start.</div>';
+  bindOpen($('apps'));
+}
+
+function bindOpen(root) {
+  for (const b of root.querySelectorAll('[data-path]')) {
+    b.onclick = () => invoke('open_path', { path: b.dataset.path }).catch((e) => toast(String(e)));
+  }
+}
+
+/** Bezpieczny kalkulator: + - * / ^ % i nawiasy, przecinek jako kropka. */
+function calc(text) {
+  const src = text.replace(/,/g, '.').replace(/\s+/g, '');
+  if (!/^[\d.+\-*/^%()]+$/.test(src) || !/[+\-*/^%]/.test(src)) return null;
+  let i = 0;
+  const peek = () => src[i];
+  const num = () => {
+    if (peek() === '(') { i++; const v = expr(); if (src[i++] !== ')') throw 0; return v; }
+    if (peek() === '-') { i++; return -num(); }
+    const m = /^\d*\.?\d+/.exec(src.slice(i));
+    if (!m) throw 0;
+    i += m[0].length;
+    let v = parseFloat(m[0]);
+    if (peek() === '%') { i++; v /= 100; }
+    return v;
+  };
+  const pow = () => { let v = num(); while (peek() === '^') { i++; v = v ** num(); } return v; };
+  const term = () => { let v = pow(); while (peek() === '*' || peek() === '/') { const op = src[i++]; const r = pow(); v = op === '*' ? v * r : v / r; } return v; };
+  const expr = () => { let v = term(); while (peek() === '+' || peek() === '-') { const op = src[i++]; const r = term(); v = op === '+' ? v + r : v - r; } return v; };
+  try {
+    const v = expr();
+    if (i !== src.length || !isFinite(v)) return null;
+    return Math.round(v * 1e10) / 1e10;
+  } catch { return null; }
+}
+
+let results = [];
+let sel = 0;
+function search() {
+  const q = $('search').value.trim();
+  const box = $('results');
+  if (!q) { box.style.display = 'none'; results = []; return; }
+  const ql = q.toLowerCase();
+  const pool = [
+    ...(snap?.pinned || []).map((p) => ({ name: p.name, path: p.path, kind: 'folder' })),
+    ...(snap?.recent || []).map((r) => ({ name: r.name, path: r.path, kind: 'plik' })),
+    ...index.map((e) => ({ ...e, kind: 'aplikacja' })),
+  ];
+  results = pool
+    .map((e) => ({ e, score: e.name.toLowerCase().startsWith(ql) ? 0 : e.name.toLowerCase().includes(ql) ? 1 : 9 }))
+    .filter((x) => x.score < 9)
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 7)
+    .map((x) => x.e);
+  sel = 0;
+  const value = calc(q);
+  const calcRow = value === null ? '' : `<div class="calc"><span class="mono" style="color:var(--text)">${esc(q)}</span> = <b class="mono" style="color:var(--text)">${value.toLocaleString('pl-PL')}</b> · Enter kopiuje</div>`;
+  box.innerHTML = calcRow + results.map((r, n) =>
+    `<button class="row ${n === sel && value === null ? 'sel' : ''}" data-path="${esc(r.path)}"><span class="ellipsis" style="flex:1">${esc(r.name)}</span><span style="font-size:11px;color:var(--muted)">${r.kind}</span></button>`).join('');
+  box.style.display = 'flex';
+  box.dataset.calc = value === null ? '' : String(value);
+  bindOpen(box);
+}
+$('search').addEventListener('input', search);
+$('search').addEventListener('keydown', (e) => {
+  const rows = $('results').querySelectorAll('.row');
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault();
+    sel = (sel + (e.key === 'ArrowDown' ? 1 : -1) + rows.length) % Math.max(1, rows.length);
+    rows.forEach((r, n) => r.classList.toggle('sel', n === sel));
+  } else if (e.key === 'Enter') {
+    const calcValue = $('results').dataset.calc;
+    if (calcValue) {
+      invoke('copy_text', { text: calcValue.replace('.', ',') }).then(() => toast('Skopiowano wynik'));
+    } else if (results[sel]) {
+      invoke('open_path', { path: results[sel].path }).catch((err) => toast(String(err)));
+      $('search').value = '';
+      search();
+    }
+  }
+});
+listen('focus-search', () => { showView('files'); $('search').focus(); $('search').select(); });
+
+// --- Półka: przeciągnij plik na szufladę ---
+const { getCurrentWebview } = window.__TAURI__.webview;
+getCurrentWebview().onDragDropEvent((event) => {
+  const shelf = $('shelf');
+  const t = event.payload.type;
+  if (t === 'enter' || t === 'over') shelf.classList.add('over');
+  else shelf.classList.remove('over');
+  if (t === 'drop' && event.payload.paths?.length) {
+    invoke('shelf_add', { paths: event.payload.paths });
+    toast('Na półce');
+  }
+});
+
+$('stashBtn').onclick = async () => {
+  try {
+    const n = await invoke('stash_create', { name: $('stashName').value });
+    $('stashName').value = '';
+    toast(`Odłożono ${n} okien`);
+  } catch (err) { toast(String(err)); }
+};
+
+const ago = (iso) => {
+  const mins = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (mins < 60) return `${mins} min temu`;
+  if (mins < 60 * 24) return `${Math.round(mins / 60)} h temu`;
+  const days = Math.round(mins / 1440);
+  return days <= 1 ? 'wczoraj' : `${days} dni temu`;
+};
+
+onSnapshot((s) => {
+  snap = s;
+  $('hk').textContent = s.hotkeys.drawer;
+
+  $('shelf').innerHTML = (s.shelf.length ? s.shelf.map((f) => `
+    <div class="shelf-item">
+      <button class="name ellipsis" data-path="${esc(f.path)}" title="${esc(f.path)}">${esc(f.name)}</button>
+      <button class="mini" data-reveal="${esc(f.path)}" aria-label="Pokaż w folderze">${icon('folder', 14)}</button>
+      <button class="mini" data-copy="${esc(f.path)}" aria-label="Kopiuj ścieżkę">${icon('clipboard', 14)}</button>
+      <button class="mini" data-remove="${esc(f.path)}" aria-label="Zdejmij z półki">${icon('close', 12, 2.2)}</button>
+    </div>`).join('') : '') +
+    '<span style="font-size:11px;color:var(--muted);text-align:center">Upuść tu plik — poczeka, aż znajdziesz mu miejsce</span>';
+  bindOpen($('shelf'));
+  for (const b of $('shelf').querySelectorAll('[data-reveal]')) b.onclick = () => invoke('reveal', { path: b.dataset.reveal });
+  for (const b of $('shelf').querySelectorAll('[data-copy]')) b.onclick = () => invoke('copy_text', { text: b.dataset.copy }).then(() => toast('Skopiowano ścieżkę'));
+  for (const b of $('shelf').querySelectorAll('[data-remove]')) b.onclick = () => invoke('shelf_remove', { path: b.dataset.remove });
+
+  $('pinned').innerHTML = s.pinned.map((p) =>
+    `<button class="tile" data-path="${esc(p.path)}"><span class="sq" style="background:${p.stripe};opacity:0.35"></span><span class="ellipsis">${esc(p.name)}</span></button>`).join('');
+  bindOpen($('pinned'));
+
+  $('recent').innerHTML = s.recent.length ? s.recent.map((r) => `
+    <button class="row" data-path="${esc(r.path)}">
+      <span class="bar3" style="background:#71717a"></span>
+      <span class="ellipsis" style="flex:1">${esc(r.name)}</span>
+      <span class="mono" style="font-size:11px;color:var(--muted)">${ago(new Date(r.modified).toISOString())}</span>
+    </button>`).join('') : '<div class="empty">Brak ostatnich plików.</div>';
+  bindOpen($('recent'));
+
+  $('clips').innerHTML = s.clipboard.length
+    ? s.clipboard.map((c, n) => `<button class="clip" data-n="${n}">${esc(c)}</button>`).join('')
+    : '<div class="empty">Skopiuj coś — pojawi się tutaj.</div>';
+  for (const b of $('clips').querySelectorAll('.clip')) {
+    b.onclick = () => invoke('copy_text', { text: s.clipboard[+b.dataset.n] }).then(() => toast('Skopiowano'));
+  }
+
+  $('stashes').innerHTML = s.stashes.length ? s.stashes.map((st) => `
+    <div class="stash">
+      <span class="count">${st.windows.length}</span>
+      <span style="flex:1;display:flex;flex-direction:column;gap:2px;min-width:0">
+        <span class="ellipsis" style="font-weight:500">${esc(st.name)}</span>
+        <span style="font-size:11px;color:var(--muted)">${st.windows.length} okien · ${ago(st.created)}</span>
+      </span>
+      <button class="btn" style="height:36px" data-restore="${esc(st.id)}">Przywróć</button>
+      <button class="mini" data-del="${esc(st.id)}" aria-label="Usuń kontekst">${icon('close', 12, 2.2)}</button>
+    </div>`).join('') : '<div class="empty">Nic nie czeka w garażu.</div>';
+  for (const b of $('stashes').querySelectorAll('[data-restore]')) b.onclick = () => invoke('stash_restore', { id: b.dataset.restore });
+  for (const b of $('stashes').querySelectorAll('[data-del]')) b.onclick = () => invoke('stash_delete', { id: b.dataset.del });
+
+  if ($('search').value) search();
+});
+</script>
+</body>
+</html>

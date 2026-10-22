@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "Uprawnienia okien Edge Shell. Okna rozmawiają z backendem przez własne komendy, więc wystarczają domyślne uprawnienia rdzenia.",
+  "windows": ["topbar", "dock", "drawer", "now", "radio", "friction", "bubbles", "capture", "glow"],
+  "permissions": ["core:default"]
+}
