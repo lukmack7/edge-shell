@@ -1,14 +1,16 @@
-//! Rozmieszczenie okien na ekranie i ich pokazywanie/chowanie: pasek u góry,
-//! dock na dole, szuflada z lewej, Teraz z prawej, radio obok Teraz.
+//! Rozmieszczenie okien na ekranie i ich pokazywanie/chowanie: pasek u góry
+//! (na każdym monitorze), stały pasek z lewej, dock na dole, szuflada obok
+//! lewego paska, Teraz z prawej, radio obok Teraz.
 //! Tu też żyje wątek, który wysuwa panele, gdy kursor dotknie krawędzi.
 
 use crate::platform::{self, Rect};
 use crate::state;
-use std::sync::atomic::{AtomicIsize, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 
-static TOPBAR_HWND: AtomicIsize = AtomicIsize::new(0);
+/// Okna zarejestrowane jako paski systemowe (do zwolnienia przy wyjściu).
+static APPBARS: Mutex<Vec<isize>> = Mutex::new(Vec::new());
 
 #[derive(Clone, Copy, Debug)]
 pub struct Screen {
@@ -19,33 +21,69 @@ pub struct Screen {
 
 pub const BAR_H: f64 = 36.0;
 pub const DOCK_H: f64 = 92.0;
+pub const RAIL_W: f64 = 56.0;
 const MARGIN: f64 = 12.0;
 const DRAWER_W: f64 = 380.0;
 const NOW_W: f64 = 400.0;
+const ABE_LEFT: u32 = 0;
+const ABE_TOP: u32 = 1;
 
 fn win(app: &AppHandle, label: &str) -> Option<WebviewWindow> {
     app.get_webview_window(label)
 }
 
+fn rect_of(m: &tauri::Monitor) -> Rect {
+    let p = m.position();
+    let s = m.size();
+    Rect { left: p.x, top: p.y, right: p.x + s.width as i32, bottom: p.y + s.height as i32 }
+}
+
 pub fn screen(app: &AppHandle) -> Screen {
     let (monitor, scale) = match app.primary_monitor().ok().flatten() {
-        Some(m) => {
-            let p = m.position();
-            let s = m.size();
-            (
-                Rect { left: p.x, top: p.y, right: p.x + s.width as i32, bottom: p.y + s.height as i32 },
-                m.scale_factor(),
-            )
-        }
+        Some(m) => (rect_of(&m), m.scale_factor()),
         None => (Rect { left: 0, top: 0, right: 1920, bottom: 1080 }, 1.0),
     };
     let mut work = platform::work_area().unwrap_or(monitor);
-    // Gdy pasek nie rezerwuje miejsca, i tak trzymamy panele pod nim.
+    // Gdy paski nie rezerwują miejsca, i tak trzymamy panele obok nich.
     let bar = (BAR_H * scale).round() as i32;
     if work.top < monitor.top + bar {
         work.top = monitor.top + bar;
     }
+    let cfg = state::cfg(app);
+    if cfg.shell.show_rail {
+        let rail = monitor.left + (RAIL_W * scale).round() as i32;
+        if work.left < rail {
+            work.left = rail;
+        }
+    }
     Screen { monitor, work, scale }
+}
+
+/// Monitory poza głównym, w stałej kolejności (po pozycji).
+fn secondary_monitors(app: &AppHandle) -> Vec<(Rect, f64)> {
+    let primary = app.primary_monitor().ok().flatten().map(|m| rect_of(&m));
+    let mut list: Vec<(Rect, f64)> = app
+        .available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .map(|m| (rect_of(m), m.scale_factor()))
+        .filter(|(r, _)| primary.map_or(true, |p| p.left != r.left || p.top != r.top))
+        .collect();
+    list.sort_by_key(|(r, _)| (r.left, r.top));
+    list
+}
+
+/// Podpis układu monitorów — do wykrywania podłączenia/odłączenia ekranu.
+pub fn monitors_signature(app: &AppHandle) -> String {
+    app.available_monitors()
+        .unwrap_or_default()
+        .iter()
+        .map(|m| {
+            let r = rect_of(m);
+            format!("{},{},{},{}", r.left, r.top, r.right, r.bottom)
+        })
+        .collect::<Vec<_>>()
+        .join(";")
 }
 
 fn px(v: f64, s: &Screen) -> i32 {
@@ -57,30 +95,120 @@ fn place(w: &WebviewWindow, x: i32, y: i32, width: i32, height: i32) {
     let _ = w.set_position(PhysicalPosition::new(x, y));
 }
 
-/// Ustawia wszystkie okna według aktualnego ekranu.
-pub fn arrange(app: &AppHandle) {
-    let s = screen(app);
-    let cfg = state::cfg(app);
+fn register_appbar(w: &WebviewWindow, rect: Rect, edge: u32) -> Rect {
+    let Some(raw) = hwnd_of(w) else { return rect };
+    if let Ok(mut list) = APPBARS.lock() {
+        if !list.contains(&raw) {
+            list.push(raw);
+        }
+    }
+    platform::appbar_register(raw, rect, edge)
+}
 
-    if let Some(bar) = win(app, "topbar") {
-        let h = px(BAR_H, &s);
-        let mut rect = Rect { left: s.monitor.left, top: s.monitor.top, right: s.monitor.right, bottom: s.monitor.top + h };
-        if cfg.shell.reserve_top_bar {
-            if let Some(raw) = hwnd_of(&bar) {
-                rect = platform::appbar_register(raw, rect);
-                TOPBAR_HWND.store(raw, Ordering::SeqCst);
+fn unregister_appbar(w: &WebviewWindow) {
+    let Some(raw) = hwnd_of(w) else { return };
+    if let Ok(mut list) = APPBARS.lock() {
+        if let Some(pos) = list.iter().position(|r| *r == raw) {
+            list.remove(pos);
+            platform::appbar_remove(raw);
+        }
+    }
+}
+
+fn place_topbar(w: &WebviewWindow, monitor: Rect, scale: f64, reserve: bool) {
+    let h = (BAR_H * scale).round() as i32;
+    let mut rect = Rect { left: monitor.left, top: monitor.top, right: monitor.right, bottom: monitor.top + h };
+    if reserve {
+        rect = register_appbar(w, rect, ABE_TOP);
+    } else {
+        unregister_appbar(w);
+    }
+    place(w, rect.left, rect.top, rect.right - rect.left, h);
+    let _ = w.show();
+}
+
+/// Paski na pozostałych monitorach: tworzy brakujące okna, zamyka zbędne.
+fn arrange_secondary_bars(app: &AppHandle, reserve: bool, enabled: bool) {
+    let monitors = if enabled { secondary_monitors(app) } else { Vec::new() };
+    let mut missing = false;
+    for (i, (rect, scale)) in monitors.iter().enumerate() {
+        let label = format!("topbar-{}", i + 1);
+        match win(app, &label) {
+            Some(w) => place_topbar(&w, *rect, *scale, reserve),
+            None => missing = true,
+        }
+    }
+    // Zbędne paski (odłączony monitor albo wyłączona opcja).
+    for (label, w) in app.webview_windows() {
+        if let Some(n) = label.strip_prefix("topbar-").and_then(|n| n.parse::<usize>().ok()) {
+            if n > monitors.len() {
+                unregister_appbar(&w);
+                let _ = w.destroy();
             }
         }
-        place(&bar, rect.left, rect.top, rect.right - rect.left, h);
-        let _ = bar.show();
     }
-    // Obszar roboczy mógł się zmienić po rezerwacji paska.
+    if missing {
+        // Okna tworzymy w wątku głównym (inaczej Windows potrafi się zawiesić).
+        let app2 = app.clone();
+        let count = monitors.len();
+        let _ = app.run_on_main_thread(move || {
+            for i in 1..=count {
+                let label = format!("topbar-{i}");
+                if app2.get_webview_window(&label).is_some() {
+                    continue;
+                }
+                let _ = tauri::WebviewWindowBuilder::new(&app2, &label, tauri::WebviewUrl::App("topbar.html".into()))
+                    .title("Edge Shell — pasek")
+                    .decorations(false)
+                    .transparent(true)
+                    .always_on_top(true)
+                    .skip_taskbar(true)
+                    .resizable(false)
+                    .shadow(false)
+                    .focused(false)
+                    .visible(false)
+                    .build();
+            }
+            let app3 = app2.clone();
+            std::thread::spawn(move || {
+                std::thread::sleep(Duration::from_millis(300));
+                arrange(&app3);
+            });
+        });
+    }
+}
+
+/// Ustawia wszystkie okna według aktualnych ekranów.
+pub fn arrange(app: &AppHandle) {
+    let cfg = state::cfg(app);
+    let s = screen(app);
+
+    if let Some(bar) = win(app, "topbar") {
+        place_topbar(&bar, s.monitor, s.scale, cfg.shell.reserve_top_bar);
+    }
+    arrange_secondary_bars(app, cfg.shell.reserve_top_bar, cfg.shell.bar_on_all_monitors);
+
+    if let Some(rail) = win(app, "rail") {
+        if cfg.shell.show_rail {
+            let w = px(RAIL_W, &s);
+            let top = s.monitor.top + px(BAR_H, &s);
+            let mut rect = Rect { left: s.monitor.left, top, right: s.monitor.left + w, bottom: s.monitor.bottom };
+            if cfg.shell.reserve_top_bar {
+                rect = register_appbar(&rail, rect, ABE_LEFT);
+            }
+            place(&rail, rect.left, top, w, s.monitor.bottom - top);
+            let _ = rail.show();
+        } else {
+            unregister_appbar(&rail);
+            let _ = rail.hide();
+        }
+    }
+
+    // Obszar roboczy mógł się zmienić po rezerwacji pasków.
     let s = screen(app);
 
     if let Some(dock) = win(app, "dock") {
-        if cfg.shell.show_dock {
-            let _ = dock.show();
-        }
+        let _ = if cfg.shell.show_dock { dock.show() } else { dock.hide() };
     }
     place_dock(app, None);
 
@@ -95,6 +223,14 @@ pub fn arrange(app: &AppHandle) {
     if let Some(w) = win(app, "friction") {
         let (fw, fh) = (px(480.0, &s), px(300.0, &s));
         place(&w, (s.work.left + s.work.right - fw) / 2, (s.work.top + s.work.bottom - fh) / 2, fw, fh);
+    }
+    if let Some(w) = win(app, "report") {
+        let (fw, fh) = (px(960.0, &s), px(660.0, &s));
+        place(&w, (s.work.left + s.work.right - fw) / 2, (s.work.top + s.work.bottom - fh) / 2, fw, fh);
+    }
+    if let Some(w) = win(app, "calendar") {
+        let (cw, ch) = (px(400.0, &s), px(600.0, &s));
+        place(&w, s.work.right - cw - px(MARGIN, &s), s.work.top + px(6.0, &s), cw, ch);
     }
     if let Some(w) = win(app, "capture") {
         let (cw, ch) = (px(640.0, &s), px(120.0, &s));
@@ -121,7 +257,7 @@ pub fn place_dock(app: &AppHandle, logical_width: Option<f64>) {
         None => dock.outer_size().map(|z| z.width as i32).unwrap_or(px(820.0, &s)),
     };
     let h = px(DOCK_H, &s);
-    let x = (s.monitor.left + s.monitor.right - width) / 2;
+    let x = (s.work.left + s.work.right - width) / 2;
     let y = s.work.bottom - h - px(6.0, &s);
     place(&dock, x, y, width, h);
 }
@@ -146,10 +282,12 @@ fn hwnd_of(_: &WebviewWindow) -> Option<isize> {
 }
 
 pub fn release(app: &AppHandle) {
-    let raw = TOPBAR_HWND.swap(0, Ordering::SeqCst);
-    if raw != 0 {
-        platform::appbar_remove(raw);
+    if let Ok(mut list) = APPBARS.lock() {
+        for raw in list.drain(..) {
+            platform::appbar_remove(raw);
+        }
     }
+    crate::tray::stop();
     if state::cfg(app).shell.hide_taskbar {
         let restore = state::read(app, |rt| rt.store.taskbar_state);
         crate::sys::hide_taskbar(false, restore);
@@ -253,10 +391,16 @@ pub fn start_edges(app: AppHandle) {
         let mut s = screen(&app);
         let mut delay = Duration::from_millis(state::cfg(&app).shell.edge_delay_ms);
         let mut refreshed = Instant::now();
+        let mut monitors = monitors_signature(&app);
         loop {
             std::thread::sleep(Duration::from_millis(40));
             // Ekran i opóźnienie odświeżamy co 2 s, nie przy każdym ruchu.
             if refreshed.elapsed() > Duration::from_secs(2) {
+                let sig = monitors_signature(&app);
+                if sig != monitors {
+                    monitors = sig;
+                    arrange(&app);
+                }
                 s = screen(&app);
                 delay = Duration::from_millis(state::cfg(&app).shell.edge_delay_ms);
                 refreshed = Instant::now();

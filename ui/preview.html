@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — podgląd okien</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { display: flex; align-items: flex-end; justify-content: center; }
+  .wrap { display: flex; gap: 12px; padding: 12px; margin-bottom: 4px; border-radius: 18px; background: rgba(18,18,21,0.96); border: 1px solid var(--line-strong); }
+  .card { position: relative; width: 224px; display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: 12px; border: 1px solid transparent; background: transparent; text-align: left; }
+  .card:hover { background: rgba(255,255,255,0.06); border-color: var(--line-strong); }
+  .card .top { display: flex; align-items: center; gap: 6px; height: 22px; }
+  .card .name { flex: 1; font-size: 12px; color: var(--text-2); }
+  .card .x { width: 22px; height: 22px; border-radius: 6px; border: 0; background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; opacity: 0; }
+  .card:hover .x { opacity: 1; }
+  .card .x:hover { background: #7f1d1d; color: #fff; }
+  .slot { height: 124px; border-radius: 8px; background: rgba(255,255,255,0.03); }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap"></div>
+<script type="module">
+import { invoke, listen, esc, icon } from './shared.js';
+
+const wrap = document.getElementById('wrap');
+let inside = false;
+let hideTimer = null;
+
+function scheduleHide(ms) {
+  clearTimeout(hideTimer);
+  hideTimer = setTimeout(() => { if (!inside) invoke('previews_hide'); }, ms);
+}
+
+document.body.addEventListener('mouseenter', () => { inside = true; clearTimeout(hideTimer); });
+document.body.addEventListener('mouseleave', () => { inside = false; scheduleHide(300); });
+listen('preview-leave', () => scheduleHide(450));
+listen('preview-enter', () => clearTimeout(hideTimer));
+
+listen('previews', (wins) => {
+  clearTimeout(hideTimer);
+  wrap.innerHTML = wins.map((w) => `
+    <div class="card" data-hwnd="${w.hwnd}" role="button" tabindex="0" aria-label="${esc(w.title)}">
+      <div class="top"><span class="name ellipsis">${esc(w.title)}</span><button class="x" data-close="${w.hwnd}" aria-label="Zamknij okno">${icon('close', 11, 2.4)}</button></div>
+      <div class="slot" data-slot="${w.hwnd}"></div>
+    </div>`).join('');
+  for (const c of wrap.querySelectorAll('.card')) {
+    c.onclick = () => invoke('window_activate', { hwnd: Number(c.dataset.hwnd) });
+  }
+  for (const b of wrap.querySelectorAll('[data-close]')) {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      invoke('window_close', { hwnd: Number(b.dataset.close) });
+      b.closest('.card').remove();
+      if (!wrap.children.length) invoke('previews_hide'); else layout();
+    };
+  }
+  requestAnimationFrame(layout);
+});
+
+/** Przekaż backendowi, gdzie leżą sloty — tam pojawią się żywe miniatury. */
+function layout() {
+  const slots = [...wrap.querySelectorAll('[data-slot]')].map((el) => {
+    const r = el.getBoundingClientRect();
+    return { hwnd: Number(el.dataset.slot), x: r.left, y: r.top, w: r.width, h: r.height };
+  });
+  invoke('previews_layout', { slots });
+}
+</script>
+</body>
+</html>

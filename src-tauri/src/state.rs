@@ -34,6 +34,20 @@ pub struct Mark {
     pub date: String,
 }
 
+/// Jeden rozegrany sektor (blok planu) — do raportu tygodnia.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HistEntry {
+    pub date: String,
+    pub title: String,
+    pub kind: String,
+    pub start: DateTime<Local>,
+    pub end: DateTime<Local>,
+    /// early | ontime | late | skipped
+    pub status: String,
+    pub delta_min: i64,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ShelfItem {
@@ -104,6 +118,8 @@ pub struct Store {
     /// Stan paska zadań Windows sprzed pierwszego uruchomienia (do przywrócenia).
     pub taskbar_state: usize,
     pub taskbar_saved: bool,
+    pub history: Vec<HistEntry>,
+    pub week_cache: Vec<DayItem>,
 }
 
 impl Store {
@@ -157,6 +173,7 @@ pub struct FileItem {
 pub struct Runtime {
     pub store: Store,
     pub plan: Vec<DayItem>,
+    pub week: Vec<DayItem>,
     pub connected: bool,
     pub horolog_error: String,
     pub last_sync: Option<DateTime<Local>>,
@@ -170,6 +187,7 @@ pub struct Runtime {
     pub drawer_open: bool,
     pub now_open: bool,
     pub running: HashSet<String>,
+    pub window_counts: HashMap<String, usize>,
     pub recent: Vec<FileItem>,
     pub fired: HashSet<String>,
     pub last_batch: String,
@@ -188,8 +206,9 @@ impl Shared {
         let store = Store::load();
         let mut rt = Runtime::default();
         rt.plan = store.plan_cache.clone();
+        rt.week = store.week_cache.clone();
         rt.store = store;
-        if rt.store.mode.is_empty() {
+        if rt.store.mode.is_empty() || rt.store.mode == "wieczor" {
             rt.store.mode = cfg.start_mode.clone();
         }
         Arc::new(Shared { cfg: RwLock::new(cfg), rt: Mutex::new(rt) })
@@ -265,12 +284,13 @@ pub fn snapshot(app: &AppHandle) -> Value {
         .map(|(n, a)| {
             let (bg, fg, stripe) = section_colors(&cfg.sections, &a.category);
             let running = !a.process.is_empty() && rt.running.contains(&a.process.to_lowercase());
+            let windows = rt.window_counts.get(&a.process.to_lowercase()).copied().unwrap_or(0);
             let separator = ordered.get(n + 1).is_some_and(|next| next.category != a.category);
             json!({
                 "id": a.id, "name": a.name, "icon": a.icon, "category": a.category,
                 "bg": bg, "fg": fg, "stripe": stripe,
                 "dim": mode.dim.iter().any(|d| d == &a.id),
-                "running": running, "separatorAfter": separator,
+                "running": running, "windows": windows, "separatorAfter": separator,
             })
         })
         .collect();
@@ -357,6 +377,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "hotkeys": cfg.hotkeys,
         "showBubbles": cfg.shell.show_bubbles,
         "barStats": cfg.bar.stats,
+        "showRail": cfg.shell.show_rail,
         "clock": format!("{:02}:{:02}", now.hour(), now.minute()),
     })
 }

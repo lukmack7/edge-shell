@@ -9,14 +9,17 @@ mod layout;
 mod notifications;
 mod platform;
 mod icons;
+mod insights;
+mod previews;
 mod radio;
 mod settings;
 mod spotify;
 mod state;
 mod stats;
 mod sys;
+mod tray;
 
-use tauri::{Manager, RunEvent, WindowEvent};
+use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
 fn main() {
     let cfg = config::Config::load();
@@ -62,6 +65,12 @@ fn main() {
             engine::start(handle.clone());
             notifications::start(handle.clone());
             stats::start(handle.clone());
+            if cfg.shell.tray_in_rail {
+                let h = handle.clone();
+                tray::start(Box::new(move || {
+                    let _ = h.emit_to("rail", "tray", tray::items());
+                }));
+            }
             layout::start_edges(handle.clone());
 
             // Szuflada i Teraz chowają się, gdy klikniesz gdzie indziej.
@@ -81,6 +90,14 @@ fn main() {
                     if let WindowEvent::CloseRequested { api, .. } = e {
                         api.prevent_close();
                         let _ = w2.hide();
+                    }
+                });
+            }
+            if let Some(w) = app.get_webview_window("calendar") {
+                let h = handle.clone();
+                w.on_window_event(move |e| {
+                    if let WindowEvent::Focused(false) = e {
+                        layout::hide_window(&h, "calendar");
                     }
                 });
             }
@@ -141,6 +158,18 @@ fn main() {
             settings::toggle_mute,
             icons::dock_icons,
             icons::app_icon,
+            commands::launch_new,
+            previews::previews_show,
+            previews::previews_layout,
+            previews::previews_hide,
+            previews::window_activate,
+            previews::window_close,
+            insights::get_week,
+            insights::toggle_calendar,
+            insights::open_report,
+            insights::get_report,
+            insights::tray_items,
+            insights::tray_click,
         ])
         .build(tauri::generate_context!())
         .expect("nie udało się uruchomić Edge Shell");

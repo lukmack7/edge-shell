@@ -15,7 +15,8 @@
   .stripe { width: 28px; height: 3px; border-radius: 2px; }
   .app.dim { opacity: 0.35; filter: grayscale(1); }
   .app.dim .stripe { background: transparent !important; }
-  .run { position: absolute; top: -3px; right: -3px; width: 8px; height: 8px; border-radius: 50%; background: #fff; border: 2px solid #18181b; }
+  .dots { position: absolute; top: -4px; right: -2px; display: flex; gap: 2px; }
+  .dots i { width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px #18181b; }
   .sep { width: 1px; height: 34px; margin-bottom: 14px; background: rgba(255,255,255,0.12); }
   .tip { position: absolute; bottom: 70px; left: 50%; transform: translateX(-50%); padding: 3px 8px; border-radius: 6px; background: #27272a; font-size: 11px; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity 0.1s; }
   .app:hover .tip { opacity: 1; }
@@ -30,6 +31,8 @@ const dock = document.getElementById('dock');
 let lastKey = '';
 let icons = {};
 let snap = null;
+let hoverTimer = null;
+const { emitTo } = window.__TAURI__.event;
 
 async function loadIcons() {
   icons = await invoke('dock_icons').catch(() => ({}));
@@ -57,11 +60,27 @@ function render(s) {
     <button class="app ${a.dim ? 'dim' : ''}" data-id="${esc(a.id)}" aria-label="${esc(a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}">
       ${tile(a)}
       <span class="stripe" style="background:${a.stripe}"></span>
-      ${a.running ? '<span class="run" aria-hidden="true"></span>' : ''}
+      ${a.windows || a.running ? `<span class="dots" aria-hidden="true">${'<i></i>'.repeat(Math.min(3, Math.max(1, a.windows || 1)))}</span>` : ''}
       <span class="tip">${esc(a.name)}</span>
     </button>${a.separatorAfter ? '<span class="sep" aria-hidden="true"></span>' : ''}`).join('');
   for (const b of dock.querySelectorAll('.app')) {
-    b.onclick = () => invoke('launch', { id: b.dataset.id }).catch((e) => console.warn(e));
+    const id = b.dataset.id;
+    b.onclick = (e) => {
+      if (e.shiftKey) invoke('launch_new', { id });
+      else invoke('launch', { id }).catch((err) => console.warn(err));
+      invoke('previews_hide');
+    };
+    b.onauxclick = (e) => { if (e.button === 1) invoke('launch_new', { id }); };
+    // Najechanie: po chwili żywe podglądy okien tej aplikacji.
+    b.onmouseenter = () => {
+      clearTimeout(hoverTimer);
+      emitTo('preview', 'preview-enter', null);
+      hoverTimer = setTimeout(() => {
+        const r = b.getBoundingClientRect();
+        invoke('previews_show', { id, anchor: r.left + r.width / 2 });
+      }, 450);
+    };
+    b.onmouseleave = () => { clearTimeout(hoverTimer); emitTo('preview', 'preview-leave', null); };
   }
   dock.oncontextmenu = (e) => { e.preventDefault(); invoke('open_settings'); };
   // Okno docka dopasowuje się do szerokości ikon (+ miejsce na podpowiedź).

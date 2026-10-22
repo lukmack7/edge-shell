@@ -138,6 +138,10 @@ pub struct Mode {
     pub quiet: bool,
     /// Playlista Spotify (URI `spotify:playlist:...`) dla tego trybu.
     pub playlist: String,
+    /// Tapeta dla trybu (pusta = bez zmiany).
+    pub wallpaper: String,
+    /// Jasność ekranów 0–100 (None = bez zmiany).
+    pub brightness: Option<u8>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -230,6 +234,12 @@ pub struct ShellCfg {
     pub edge_glow_minutes: i64,
     /// Uruchamiaj Edge Shell razem z Windows.
     pub autostart: bool,
+    /// Stały pasek przy lewej krawędzi (rezerwuje miejsce jak górny pasek).
+    pub show_rail: bool,
+    /// Ikony zasobnika systemowego na lewym pasku.
+    pub tray_in_rail: bool,
+    /// Pasek na każdym monitorze (dock i panele zostają na głównym).
+    pub bar_on_all_monitors: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -237,6 +247,9 @@ pub struct ShellCfg {
 pub struct FocusCfg {
     pub adhoc_minutes: i64,
     pub weekly_goal_hours: f64,
+    /// Dzień raportu tygodnia: 1 = poniedziałek … 7 = niedziela (0 = wyłączony).
+    pub report_weekday: u32,
+    pub report_time: String,
 }
 
 impl Default for HorologCfg {
@@ -257,6 +270,8 @@ impl Default for Mode {
             dim: vec![],
             quiet: true,
             playlist: String::new(),
+            wallpaper: String::new(),
+            brightness: None,
         }
     }
 }
@@ -336,13 +351,16 @@ impl Default for ShellCfg {
             edge_delay_ms: 150,
             edge_glow_minutes: 15,
             autostart: true,
+            show_rail: true,
+            tray_in_rail: true,
+            bar_on_all_monitors: true,
         }
     }
 }
 
 impl Default for FocusCfg {
     fn default() -> Self {
-        Self { adhoc_minutes: 25, weekly_goal_hours: 15.0 }
+        Self { adhoc_minutes: 25, weekly_goal_hours: 15.0, report_weekday: 5, report_time: "16:00".into() }
     }
 }
 
@@ -374,24 +392,22 @@ impl Default for Config {
                     label: "Praca".into(),
                     accent: "#D42E25".into(),
                     dim: vec!["discord".into(), "youtube".into(), "steam".into()],
-                    quiet: true,
-                    playlist: String::new(),
+                    ..Mode::default()
                 },
                 Mode {
                     id: "nauka".into(),
                     label: "Nauka".into(),
                     accent: "#2563EB".into(),
                     dim: vec!["discord".into(), "youtube".into(), "steam".into(), "outlook".into()],
-                    quiet: true,
-                    playlist: String::new(),
+                    ..Mode::default()
                 },
                 Mode {
-                    id: "wieczor".into(),
-                    label: "Wieczór".into(),
+                    id: "rozrywka".into(),
+                    label: "Rozrywka".into(),
                     accent: "#7C3AED".into(),
                     dim: vec!["excel".into(), "outlook".into(), "terminal".into()],
                     quiet: false,
-                    playlist: String::new(),
+                    ..Mode::default()
                 },
             ],
             dock: vec![
@@ -448,6 +464,20 @@ impl Config {
                                 a.icon = "auto".into();
                             }
                         }
+                        cfg.save();
+                    }
+                    // Tryb „Wieczór” zastąpiony przez „Rozrywka”.
+                    let mut renamed = false;
+                    for m in cfg.modes.iter_mut().filter(|m| m.id == "wieczor") {
+                        m.id = "rozrywka".into();
+                        m.label = "Rozrywka".into();
+                        renamed = true;
+                    }
+                    if cfg.start_mode == "wieczor" {
+                        cfg.start_mode = "rozrywka".into();
+                        renamed = true;
+                    }
+                    if renamed {
                         cfg.save();
                     }
                     cfg

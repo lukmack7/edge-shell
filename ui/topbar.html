@@ -60,8 +60,7 @@
     <span class="chip" id="horolog" style="background:transparent;padding:0"></span>
     <button class="chip" id="music" aria-label="Muzyka" style="display:none"></button>
     <span class="stats" id="stats"></span>
-    <span id="date"></span>
-    <span class="clock mono" id="clock"></span>
+    <button class="st" id="clockBtn" aria-label="Kalendarz" style="gap:10px"><span id="date"></span><span class="clock mono" id="clock"></span></button>
   </div>
 </div>
 <script type="module">
@@ -71,6 +70,7 @@ const $ = (id) => document.getElementById(id);
 $('logo').onclick = () => invoke('toggle_panel', { label: 'drawer' });
 $('center').onclick = () => invoke('toggle_panel', { label: 'now' });
 $('radio').onclick = () => invoke('radio_show_waiting');
+$('clockBtn').onclick = () => invoke('toggle_calendar');
 $('music').onclick = (e) => {
   const playing = e.currentTarget.dataset.playing === '1';
   invoke('spotify_control', { action: playing ? 'pause' : 'play' }).catch(() => {});

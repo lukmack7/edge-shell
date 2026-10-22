@@ -77,11 +77,12 @@ pub async fn fetch_plan(app: &AppHandle) -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?;
 
+    let horizon = Local::now() + chrono::Duration::days(8);
     let mut items: Vec<DayItem> = Vec::new();
     for b in plan.blocks {
         let start = b.start.with_timezone(&Local);
         let end = b.end.with_timezone(&Local);
-        if !is_today(&start) && !is_today(&end) {
+        if end < Local::now() - chrono::Duration::hours(24) || start > horizon {
             continue;
         }
         items.push(DayItem {
@@ -98,7 +99,7 @@ pub async fn fetch_plan(app: &AppHandle) -> Result<(), String> {
     for (n, e) in plan.busy.into_iter().enumerate() {
         let start = e.start.with_timezone(&Local);
         let end = e.end.with_timezone(&Local);
-        if !is_today(&start) && !is_today(&end) {
+        if end < Local::now() - chrono::Duration::hours(24) || start > horizon {
             continue;
         }
         let buffer = e.source == "buffer";
@@ -121,9 +122,13 @@ pub async fn fetch_plan(app: &AppHandle) -> Result<(), String> {
         });
     }
     items.sort_by_key(|i| i.start);
+    let week = items.clone();
+    let items: Vec<DayItem> = items.into_iter().filter(|i| is_today(&i.start) || is_today(&i.end)).collect();
 
     state::update(app, true, |rt| {
         rt.plan = items.clone();
+        rt.week = week.clone();
+        rt.store.week_cache = week;
         rt.store.plan_cache = items;
         rt.store.plan_cached_at = Some(Local::now());
         rt.connected = true;
@@ -179,7 +184,28 @@ pub fn start(app: AppHandle) {
             let today = Local::now().ordinal();
             if today != last_day {
                 last_day = today;
-                state::update(&app2, true, |rt| rt.store.marks.clear());
+                // Zamknięcie dnia: niezaznaczone bloki trafiają do historii jako pominięte.
+                state::update(&app2, true, |rt| {
+                    let date = rt.plan.first().map(|i| i.start.format("%Y-%m-%d").to_string()).unwrap_or_default();
+                    for i in rt.plan.iter().filter(|i| matches!(i.kind.as_str(), "task" | "focus" | "habit")) {
+                        if !rt.store.marks.contains_key(&i.key) {
+                            rt.store.history.push(crate::state::HistEntry {
+                                date: date.clone(),
+                                title: i.title.clone(),
+                                kind: i.kind.clone(),
+                                start: i.start,
+                                end: i.end,
+                                status: "skipped".into(),
+                                delta_min: 0,
+                            });
+                        }
+                    }
+                    rt.store.marks.clear();
+                    let len = rt.store.history.len();
+                    if len > 600 {
+                        rt.store.history.drain(..len - 600);
+                    }
+                });
             }
             let _ = fetch_plan(&app2).await;
         }

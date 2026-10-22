@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — raport tygodnia</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .panel { display: flex; flex-direction: column; gap: 20px; padding: 28px 32px; background: repeating-linear-gradient(45deg, #0c0c0d 0 6px, #0f0f11 6px 12px); border-color: rgba(255,255,255,0.12); }
+  .head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+  .kicker { font-size: 12px; font-weight: 700; letter-spacing: 0.18em; color: var(--accent); }
+  h1 { margin: 4px 0 0; font-size: 40px; font-weight: 800; font-style: italic; letter-spacing: -0.02em; }
+  .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .kpi { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 14px; background: #141416; border: 1px solid var(--line); }
+  .kpi .v { font-family: var(--mono); font-size: 28px; font-weight: 700; }
+  .kpi .l { font-size: 11px; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; }
+  .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; flex: 1; min-height: 0; }
+  .day { display: flex; flex-direction: column; gap: 6px; padding: 12px; border-radius: 14px; background: #141416; border: 1px solid var(--line); min-height: 0; }
+  .day.today { border-color: var(--accent); }
+  .day h3 { margin: 0; font-size: 13px; font-weight: 700; font-style: italic; text-transform: uppercase; display: flex; justify-content: space-between; }
+  .sectors { display: flex; flex-direction: column; gap: 4px; overflow-y: auto; scrollbar-width: none; }
+  .sec { padding: 6px 8px; border-radius: 7px; font-size: 11px; font-weight: 600; line-height: 1.25; }
+  .sec span { display: block; font-family: var(--mono); font-weight: 500; opacity: 0.85; }
+  .bottom { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .note { display: flex; flex-direction: column; gap: 6px; padding: 14px 16px; border-radius: 14px; background: #141416; border: 1px solid var(--line); }
+  .note b { font-size: 15px; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--text-2); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+</style>
+</head>
+<body>
+<div class="panel" role="dialog" aria-labelledby="title">
+  <div class="head">
+    <div>
+      <span class="kicker">RAPORT TYGODNIA</span>
+      <h1 id="title">PIT WALL</h1>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <div class="legend">
+        <span><i style="background:var(--purple)"></i>przed czasem</span>
+        <span><i style="background:var(--green)"></i>w czasie</span>
+        <span><i style="background:var(--yellow)"></i>po czasie</span>
+        <span><i style="background:#3f3f46"></i>pominięte</span>
+      </div>
+      <button class="icon-btn" id="close" aria-label="Zamknij raport"></button>
+    </div>
+  </div>
+  <div class="kpis" id="kpis"></div>
+  <div class="days" id="days"></div>
+  <div class="bottom" id="notes"></div>
+</div>
+<script type="module">
+import { invoke, esc, icon } from './shared.js';
+
+const $ = (id) => document.getElementById(id);
+$('close').innerHTML = icon('close', 16, 2.2);
+$('close').onclick = () => invoke('hide_window', { label: 'report' });
+
+const COLORS = { early: ['var(--purple)', '#fff'], ontime: ['var(--green)', '#052e16'], late: ['var(--yellow)', '#1c1400'], skipped: ['#3f3f46', '#e4e4e7'] };
+const h = (min) => `${Math.floor(min / 60)}:${String(Math.round(min % 60)).padStart(2, '0')}`;
+
+async function load() {
+  const r = await invoke('get_report');
+  $('title').textContent = `${r.from} – ${r.to}`;
+  const done = r.counts.early + r.counts.ontime + r.counts.late;
+  const all = done + r.counts.skipped;
+  $('kpis').innerHTML = [
+    [h(r.focusDoneMin), 'fokus zrobiony (h:mm)'],
+    [`${done}/${all}`, 'sektory ukończone'],
+    [r.counts.early, 'fioletowe sektory'],
+    [`${Math.round((r.focusDoneMin / 60 / (r.goalHours || 1)) * 100)}%`, `celu ${r.goalHours} h`],
+  ].map(([v, l]) => `<div class="kpi"><span class="v">${esc(v)}</span><span class="l">${esc(l)}</span></div>`).join('');
+
+  $('days').innerHTML = r.days.map((d) => `
+    <section class="day ${d.today ? 'today' : ''}">
+      <h3><span>${esc(d.label)}</span><span class="mono" style="color:var(--muted);font-style:normal">${d.day}</span></h3>
+      <div class="sectors">${d.sectors.length ? d.sectors.map((s) => {
+        const [bg, fg] = COLORS[s.status] || COLORS.skipped;
+        const delta = s.status === 'skipped' ? 'pominięte' : s.deltaMin > 0 ? `+${s.deltaMin} min` : s.deltaMin < 0 ? `${s.deltaMin} min` : 'w czasie';
+        return `<div class="sec" style="background:${bg};color:${fg}" title="${esc(s.title)}">${esc(s.title)}<span>${delta}</span></div>`;
+      }).join('') : '<span class="empty">—</span>'}</div>
+    </section>`).join('');
+
+  $('notes').innerHTML = `
+    <div class="note"><span class="label">Najszybszy sektor</span><b>${r.bestSector ? esc(r.bestSector.title) : '—'}</b><span class="hint mono" style="color:var(--purple)">${r.bestSector ? r.bestSector.deltaMin + ' min' : ''}</span></div>
+    <div class="note"><span class="label">Najbardziej przeciągnięty</span><b>${r.worstSector ? esc(r.worstSector.title) : '—'}</b><span class="hint mono" style="color:var(--yellow)">${r.worstSector ? '+' + r.worstSector.deltaMin + ' min' : ''}</span></div>
+    <div class="note"><span class="label">Twoje najlepsze godziny</span><b>${r.bestHours.length ? r.bestHours.map(esc).join(', ') : 'Za mało danych'}</b><span class="hint">Tu planuj najtrudniejsze zadania P1</span></div>`;
+}
+window.addEventListener('focus', load);
+load();
+</script>
+</body>
+</html>

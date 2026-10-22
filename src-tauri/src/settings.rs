@@ -72,11 +72,13 @@ pub fn open_settings(app: AppHandle) {
 
 /// Okno wyboru pliku (programu) albo folderu.
 #[tauri::command]
-pub async fn pick_path(app: AppHandle, folder: bool) -> Option<String> {
+pub async fn pick_path(app: AppHandle, folder: bool, images: Option<bool>) -> Option<String> {
     tauri::async_runtime::spawn_blocking(move || {
         let dialog = app.dialog().file();
         let picked = if folder {
             dialog.blocking_pick_folder()
+        } else if images.unwrap_or(false) {
+            dialog.add_filter("Obrazy", &["jpg", "jpeg", "png", "bmp", "webp"]).blocking_pick_file()
         } else {
             dialog.add_filter("Programy i skróty", &["exe", "lnk", "url", "bat", "cmd"]).blocking_pick_file()
         };

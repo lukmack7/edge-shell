@@ -65,12 +65,12 @@ mod imp {
         Some(Rect { left: r.left, top: r.top, right: r.right, bottom: r.bottom })
     }
 
-    fn appbar_data(raw: isize, rect: Rect) -> APPBARDATA {
+    fn appbar_data(raw: isize, rect: Rect, edge: u32) -> APPBARDATA {
         APPBARDATA {
             cbSize: std::mem::size_of::<APPBARDATA>() as u32,
             hWnd: hwnd(raw),
             uCallbackMessage: WM_USER + 0x1E5,
-            uEdge: ABE_TOP,
+            uEdge: edge,
             rc: RECT { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom },
             lParam: LPARAM(0),
         }
@@ -78,20 +78,25 @@ mod imp {
 
     /// Rejestruje okno jako pasek systemowy u góry ekranu. Zwraca prostokąt,
     /// który Windows faktycznie przydzielił.
-    pub fn appbar_register(raw: isize, rect: Rect) -> Rect {
+    pub fn appbar_register(raw: isize, rect: Rect, edge: u32) -> Rect {
         let height = rect.bottom - rect.top;
-        let mut abd = appbar_data(raw, rect);
+        let width = rect.right - rect.left;
+        let mut abd = appbar_data(raw, rect, edge);
         unsafe {
             SHAppBarMessage(ABM_NEW, &mut abd);
             SHAppBarMessage(ABM_QUERYPOS, &mut abd);
-            abd.rc.bottom = abd.rc.top + height;
+            if edge == ABE_TOP {
+                abd.rc.bottom = abd.rc.top + height;
+            } else {
+                abd.rc.right = abd.rc.left + width;
+            }
             SHAppBarMessage(ABM_SETPOS, &mut abd);
         }
         Rect { left: abd.rc.left, top: abd.rc.top, right: abd.rc.right, bottom: abd.rc.bottom }
     }
 
     pub fn appbar_remove(raw: isize) {
-        let mut abd = appbar_data(raw, Rect::default());
+        let mut abd = appbar_data(raw, Rect::default(), ABE_TOP);
         unsafe {
             SHAppBarMessage(ABM_REMOVE, &mut abd);
         }
@@ -135,6 +140,10 @@ mod imp {
         let mut buf = [0u16; 256];
         let n = unsafe { GetClassNameW(h, &mut buf) };
         String::from_utf16_lossy(&buf[..n.max(0) as usize])
+    }
+
+    pub fn foreground_hwnd() -> isize {
+        unsafe { GetForegroundWindow().0 as isize }
     }
 
     pub fn foreground_exe() -> Option<String> {
@@ -246,9 +255,14 @@ mod imp {
     use super::{AppWindow, Rect};
     pub fn cursor() -> Option<(i32, i32)> { None }
     pub fn work_area() -> Option<Rect> { None }
-    pub fn appbar_register(_: isize, rect: Rect) -> Rect { rect }
+    pub fn appbar_register(_: isize, rect: Rect, _: u32) -> Rect { rect }
     pub fn appbar_remove(_: isize) {}
+    pub fn foreground_hwnd() -> isize {
+        unsafe { GetForegroundWindow().0 as isize }
+    }
+
     pub fn foreground_exe() -> Option<String> { None }
+    pub fn foreground_hwnd() -> isize { 0 }
     pub fn app_windows() -> Vec<AppWindow> { Vec::new() }
     pub fn minimize(_: isize) {}
     pub fn restore(_: isize) -> bool { false }

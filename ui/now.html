@@ -59,7 +59,7 @@
 
   <div class="foot">
     <span id="status" class="ellipsis"></span>
-    <span style="display:flex;flex:none"><button id="cfg">Ustawienia</button><button id="reload">Wczytaj ponownie</button></span>
+    <span style="display:flex;flex:none"><button id="reportBtn">Raport tygodnia</button><button id="cfg">Ustawienia</button></span>
   </div>
 </aside>
 <script type="module">
@@ -69,7 +69,7 @@ const $ = (id) => document.getElementById(id);
 $('close').innerHTML = icon('right', 18, 2);
 $('close').onclick = () => invoke('hide_window', { label: 'now' });
 $('cfg').onclick = () => invoke('open_settings');
-$('reload').onclick = () => invoke('reload_config').then(() => toast('Konfiguracja wczytana'));
+$('reportBtn').onclick = () => invoke('open_report');
 
 $('capture').addEventListener('keydown', async (e) => {
   if (e.key !== 'Enter') return;

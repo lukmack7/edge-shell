@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — kalendarz</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  .panel { display: flex; flex-direction: column; gap: 14px; padding: 18px; background: rgba(18,18,21,0.97); }
+  .head { display: flex; align-items: center; justify-content: space-between; }
+  .head h2 { margin: 0; font-size: 17px; font-weight: 600; text-transform: capitalize; }
+  .grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+  .dow { text-align: center; font-size: 11px; color: var(--muted); padding: 4px 0; }
+  .day { position: relative; height: 40px; border-radius: 10px; border: 0; background: transparent; font-size: 13px; color: var(--text-2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; }
+  .day:hover { background: var(--fill); }
+  .day.other { color: #52525b; }
+  .day.today { color: #fff; font-weight: 700; }
+  .day.today::before { content: ''; position: absolute; inset: 3px; border-radius: 9px; border: 1.5px solid var(--accent); }
+  .day.sel { background: var(--fill-strong); }
+  .dots { display: flex; gap: 2px; height: 4px; }
+  .dots i { width: 4px; height: 4px; border-radius: 50%; }
+  .list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+  .item { flex: none; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 10px; background: rgba(255,255,255,0.03); }
+  .item .t { width: 82px; flex: none; font-size: 12px; color: var(--muted); }
+  .item .b { width: 4px; height: 22px; flex: none; border-radius: 2px; }
+  .foot { display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="panel">
+  <div class="head">
+    <button class="icon-btn" id="prev" aria-label="Poprzedni miesiąc"></button>
+    <h2 id="month"></h2>
+    <button class="icon-btn" id="next" aria-label="Następny miesiąc"></button>
+  </div>
+  <div class="grid" id="grid"></div>
+  <span class="label" id="dayTitle"></span>
+  <div class="list scroll" id="list"></div>
+  <div class="foot">
+    <button class="btn" style="flex:1" id="horolog">Otwórz Horologa</button>
+    <button class="btn" style="flex:1" id="report">Raport tygodnia</button>
+  </div>
+</div>
+<script type="module">
+import { invoke, onSnapshot, esc, icon, hhmm, KIND_LABEL } from './shared.js';
+
+const $ = (id) => document.getElementById(id);
+let week = [];
+let accent = '#D42E25';
+const today = new Date();
+let view = new Date(today.getFullYear(), today.getMonth(), 1);
+let selected = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+$('prev').innerHTML = icon('left', 18, 2);
+$('next').innerHTML = icon('right', 18, 2);
+$('prev').onclick = () => { view = new Date(view.getFullYear(), view.getMonth() - 1, 1); render(); };
+$('next').onclick = () => { view = new Date(view.getFullYear(), view.getMonth() + 1, 1); render(); };
+$('horolog').onclick = () => invoke('open_horolog');
+$('report').onclick = () => { invoke('open_report'); invoke('hide_window', { label: 'calendar' }); };
+
+const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+const kindColor = (k) => (k === 'meeting' || k === 'busy') ? '#fbbf24' : k === 'buffer' ? '#71717a' : k === 'habit' ? '#4ade80' : accent;
+const itemsOn = (d) => week.filter((i) => sameDay(new Date(i.start), d)).sort((a, b) => new Date(a.start) - new Date(b.start));
+
+function render() {
+  $('month').textContent = view.toLocaleDateString('pl-PL', { month: 'long', year: 'numeric' });
+  const first = new Date(view);
+  const offset = (first.getDay() + 6) % 7;
+  const start = new Date(first.getFullYear(), first.getMonth(), 1 - offset);
+  let html = ['pn', 'wt', 'śr', 'cz', 'pt', 'sb', 'nd'].map((d) => `<span class="dow">${d}</span>`).join('');
+  for (let n = 0; n < 42; n++) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + n);
+    const items = itemsOn(d);
+    const kinds = [...new Set(items.map((i) => i.kind))].slice(0, 4);
+    const cls = [d.getMonth() !== view.getMonth() && 'other', sameDay(d, today) && 'today', sameDay(d, selected) && 'sel'].filter(Boolean).join(' ');
+    html += `<button class="day ${cls}" data-t="${d.getTime()}" aria-label="${d.toLocaleDateString('pl-PL')}${items.length ? `, ${items.length} bloków` : ''}">
+      <span>${d.getDate()}</span><span class="dots">${kinds.map((k) => `<i style="background:${kindColor(k)}"></i>`).join('')}</span></button>`;
+  }
+  $('grid').innerHTML = html;
+  for (const b of $('grid').querySelectorAll('.day')) b.onclick = () => { selected = new Date(+b.dataset.t); render(); };
+
+  $('dayTitle').textContent = sameDay(selected, today) ? 'Dziś' : selected.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
+  const items = itemsOn(selected);
+  const inRange = (selected - today) / 86400000 < 8 && (selected - today) / 86400000 > -2;
+  $('list').innerHTML = items.length
+    ? items.map((i) => `<div class="item"><span class="t mono">${hhmm(i.start)}–${hhmm(i.end)}</span><span class="b" style="background:${kindColor(i.kind)}"></span><span class="ellipsis" style="flex:1">${esc(i.title)}</span><span style="font-size:11px;color:var(--muted)">${KIND_LABEL[i.kind] || ''}</span></div>`).join('')
+    : `<div class="empty">${inRange ? 'Nic w planie.' : 'Horolog planuje tylko najbliższe dni.'}</div>`;
+}
+
+async function load() {
+  week = await invoke('get_week').catch(() => []);
+  render();
+}
+window.addEventListener('focus', load);
+let lastSync = '';
+onSnapshot((s) => {
+  accent = s.mode.accent;
+  if (s.horolog.lastSync !== lastSync) { lastSync = s.horolog.lastSync; load(); }
+});
+load();
+</script>
+</body>
+</html>

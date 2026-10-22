@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — lewy pasek</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { background: rgba(12, 12, 14, 0.92); border-right: 1px solid var(--line); }
+  .rail { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0; }
+  .nav, .tray-btn, .tool { width: 40px; height: 40px; flex: none; border-radius: 11px; border: 0; background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+  .nav:hover, .tool:hover, .tray-btn:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+  .nav.on { background: rgba(255,255,255,0.12); color: var(--text); }
+  .line { width: 26px; height: 1px; flex: none; background: rgba(255,255,255,0.1); margin: 4px 0; }
+  .tray { flex: 1; min-height: 0; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 2px; overflow-y: auto; scrollbar-width: none; }
+  .tray::-webkit-scrollbar { display: none; }
+  .tray-btn img { width: 20px; height: 20px; image-rendering: auto; }
+  .tip { position: fixed; left: 52px; padding: 4px 8px; border-radius: 6px; background: #27272a; font-size: 11px; white-space: nowrap; pointer-events: none; opacity: 0; }
+</style>
+</head>
+<body>
+<div class="rail">
+  <button class="nav" data-view="files" aria-label="Pliki"></button>
+  <button class="nav" data-view="apps" aria-label="Aplikacje"></button>
+  <button class="nav" data-view="clip" aria-label="Schowek"></button>
+  <button class="nav" data-view="garage" aria-label="Odłożone konteksty"></button>
+  <span class="line" aria-hidden="true"></span>
+  <div class="tray" id="tray" aria-label="Zasobnik systemowy"></div>
+  <span class="line" aria-hidden="true"></span>
+  <button class="tool" id="capture" aria-label="Wrzuć myśl"></button>
+  <button class="tool" id="settings" aria-label="Ustawienia"></button>
+</div>
+<script type="module">
+import { invoke, listen, onSnapshot, esc, icon } from './shared.js';
+
+const { emitTo } = window.__TAURI__.event;
+const VIEW_ICONS = { files: 'folder', apps: 'apps', clip: 'clipboard', garage: 'stack' };
+const tray = document.getElementById('tray');
+let current = 'files';
+let drawerOpen = false;
+
+for (const b of document.querySelectorAll('.nav')) {
+  b.innerHTML = icon(VIEW_ICONS[b.dataset.view], 20);
+  b.title = b.getAttribute('aria-label');
+  b.onclick = async () => {
+    if (drawerOpen && current === b.dataset.view) {
+      invoke('set_panel', { label: 'drawer', open: false });
+      return;
+    }
+    current = b.dataset.view;
+    await invoke('set_panel', { label: 'drawer', open: true });
+    emitTo('drawer', 'drawer-view', current);
+  };
+}
+document.getElementById('capture').innerHTML = icon('note', 19);
+document.getElementById('capture').onclick = () => invoke('show_capture');
+document.getElementById('settings').innerHTML = icon('settings', 19);
+document.getElementById('settings').onclick = () => invoke('open_settings');
+
+function renderTray(items) {
+  tray.innerHTML = items.map((t) => `
+    <button class="tray-btn" data-key="${esc(t.key)}" title="${esc(t.tip)}" aria-label="${esc(t.tip || 'Ikona zasobnika')}">
+      ${t.icon ? `<img src="${t.icon}" alt="">` : icon('apps', 16)}
+    </button>`).join('');
+  for (const b of tray.querySelectorAll('.tray-btn')) {
+    const key = b.dataset.key;
+    b.onclick = () => invoke('tray_click', { key, action: 'left' });
+    b.ondblclick = () => invoke('tray_click', { key, action: 'double' });
+    b.oncontextmenu = (e) => { e.preventDefault(); invoke('tray_click', { key, action: 'right' }); };
+  }
+}
+listen('tray', renderTray);
+invoke('tray_items').then(renderTray);
+
+onSnapshot((s) => {
+  drawerOpen = s.panels.drawer;
+  for (const b of document.querySelectorAll('.nav')) b.classList.toggle('on', drawerOpen && b.dataset.view === current);
+});
+listen('drawer-view', (v) => { current = v; });
+</script>
+</body>
+</html>

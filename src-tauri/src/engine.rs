@@ -19,6 +19,7 @@ pub fn start(app: AppHandle) {
             n += 1;
             plan_rules(&app_tick).await;
             radio::tick(&app_tick);
+            report_tick(&app_tick);
             if n % 30 == 0 {
                 // Raz na pół minuty: odśwież zegar w pasku i zakończ sesję ad hoc.
                 finish_expired_adhoc(&app_tick);
@@ -109,6 +110,24 @@ async fn plan_rules(app: &AppHandle) {
     }
 }
 
+/// Raport tygodnia o ustawionej porze (domyślnie piątek 16:00).
+fn report_tick(app: &AppHandle) {
+    use chrono::{Datelike, Timelike};
+    let cfg = state::cfg(app);
+    let now = Local::now();
+    if cfg.focus.report_weekday == 0 || now.weekday().number_from_monday() != cfg.focus.report_weekday {
+        return;
+    }
+    let Some(at) = state::parse_hhmm(&cfg.focus.report_time) else { return };
+    if now.hour() * 60 + now.minute() != at {
+        return;
+    }
+    if fire_once(app, format!("report:{}", state::today_key())) {
+        layout::show_window(app, "report", true);
+        radio::pit_wall(app, "Raport tygodnia gotowy. Zobacz, jak poszły sektory.".into(), None);
+    }
+}
+
 fn finish_expired_adhoc(app: &AppHandle) {
     let expired = state::read(app, |rt| {
         rt.adhoc.as_ref().and_then(|a| a.end).is_some_and(|e| e <= Local::now())
@@ -127,8 +146,19 @@ pub fn mark_done(app: &AppHandle, item: &DayItem) -> Mark {
     let mark = Mark { status: status.into(), delta_min: delta, date: state::today_key() };
     let key = item.key.clone();
     let m = mark.clone();
+    let entry = crate::state::HistEntry {
+        date: state::today_key(),
+        title: item.title.clone(),
+        kind: item.kind.clone(),
+        start: item.start,
+        end: item.end,
+        status: mark.status.clone(),
+        delta_min: delta,
+    };
     state::update(app, true, |rt| {
         rt.store.marks.insert(key, m);
+        rt.store.history.retain(|h| !(h.date == entry.date && h.title == entry.title && h.start == entry.start));
+        rt.store.history.push(entry);
         rt.paused_since = None;
     });
     mark
@@ -178,10 +208,16 @@ fn foreground(app: &AppHandle) {
 }
 
 fn running(app: &AppHandle) {
-    let set: std::collections::HashSet<String> =
-        platform::app_windows().iter().map(|w| platform::exe_name(&w.exe)).collect();
-    if state::read(app, |rt| rt.running != set) {
-        state::update(app, false, |rt| rt.running = set);
+    let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    for w in platform::app_windows() {
+        *counts.entry(platform::exe_name(&w.exe)).or_insert(0) += 1;
+    }
+    let set: std::collections::HashSet<String> = counts.keys().cloned().collect();
+    if state::read(app, |rt| rt.window_counts != counts) {
+        state::update(app, false, |rt| {
+            rt.running = set;
+            rt.window_counts = counts;
+        });
     }
 }
 

@@ -50,7 +50,7 @@ mod imp {
         SHAppBarMessage, SHGetFileInfoW, ABM_GETSTATE, ABM_SETSTATE, APPBARDATA, SHFILEINFOW, SHGFI_ICON, SHGFI_LARGEICON,
     };
     use windows::Win32::UI::WindowsAndMessaging::{
-        DestroyIcon, FindWindowW, GetIconInfo, IsWindowVisible, PrivateExtractIconsW, ShowWindow, HICON, ICONINFO,
+        DestroyIcon, GetIconInfo, IsWindowVisible, PrivateExtractIconsW, ShowWindow, HICON, ICONINFO,
         SW_HIDE, SW_SHOW,
     };
 
@@ -210,18 +210,35 @@ mod imp {
 
     // ---------------- Pasek zadań Windows ----------------
 
+    /// Paski zadań Eksploratora (bez naszego okna zasobnika o tej samej klasie).
     fn taskbars() -> Vec<HWND> {
+        use windows::Win32::System::Threading::GetCurrentProcessId;
+        use windows::Win32::UI::WindowsAndMessaging::{FindWindowExW, GetWindowThreadProcessId};
+        let me = unsafe { GetCurrentProcessId() };
         let mut out = Vec::new();
         unsafe {
             for class in [windows::core::w!("Shell_TrayWnd"), windows::core::w!("Shell_SecondaryTrayWnd")] {
-                if let Ok(h) = FindWindowW(class, PCWSTR::null()) {
-                    if !h.0.is_null() {
+                let mut after = HWND::default();
+                for _ in 0..16 {
+                    let Ok(h) = FindWindowExW(HWND::default(), after, class, PCWSTR::null()) else { break };
+                    if h.0.is_null() {
+                        break;
+                    }
+                    let mut pid = 0u32;
+                    GetWindowThreadProcessId(h, Some(&mut pid as *mut u32));
+                    if pid != me {
                         out.push(h);
                     }
+                    after = h;
                 }
             }
         }
         out
+    }
+
+    /// Okno zasobnika Eksploratora — tam przekazujemy wiadomości, których nie obsługujemy.
+    pub fn explorer_tray() -> Option<isize> {
+        taskbars().into_iter().next().map(|h| h.0 as isize)
     }
 
     fn appbar(h: HWND, state: isize) -> APPBARDATA {
@@ -354,7 +371,23 @@ mod imp {
     /// PNG (RGBA) z ikony pliku/aplikacji.
     pub fn icon_png(file: &str, index: i32, size: i32) -> Option<Vec<u8>> {
         let hicon = extract_hicon(file, index, size)?;
-        let result = (|| unsafe {
+        let result = hicon_png(hicon);
+        unsafe {
+            let _ = DestroyIcon(hicon);
+        }
+        result
+    }
+
+    /// PNG z uchwytu ikony (nie niszczy ikony — może należeć do innej aplikacji).
+    pub fn hicon_raw_png(raw: isize) -> Option<Vec<u8>> {
+        if raw == 0 {
+            return None;
+        }
+        hicon_png(HICON(raw as *mut c_void))
+    }
+
+    fn hicon_png(hicon: HICON) -> Option<Vec<u8>> {
+        (|| unsafe {
             let mut ii = ICONINFO::default();
             GetIconInfo(hicon, &mut ii).ok()?;
             let mut bm = BITMAP::default();
@@ -400,11 +433,136 @@ mod imp {
                 wr.write_image_data(&px).ok()?;
             }
             Some(out)
-        })();
+        })()
+    }
+
+    // ---------------- Tapeta i jasność ----------------
+
+    pub fn set_wallpaper(path: &str) -> bool {
+        use windows::Win32::UI::WindowsAndMessaging::{SystemParametersInfoW, SPIF_SENDCHANGE, SPIF_UPDATEINIFILE, SPI_SETDESKWALLPAPER};
+        let mut wide: Vec<u16> = path.encode_utf16().chain(std::iter::once(0)).collect();
         unsafe {
-            let _ = DestroyIcon(hicon);
+            SystemParametersInfoW(SPI_SETDESKWALLPAPER, 0, Some(wide.as_mut_ptr() as *mut c_void), SPIF_UPDATEINIFILE | SPIF_SENDCHANGE).is_ok()
         }
-        result
+    }
+
+    unsafe extern "system" fn collect_monitor(
+        m: windows::Win32::Graphics::Gdi::HMONITOR,
+        _: windows::Win32::Graphics::Gdi::HDC,
+        _: *mut windows::Win32::Foundation::RECT,
+        data: LPARAM,
+    ) -> BOOL {
+        let out = &mut *(data.0 as *mut Vec<isize>);
+        out.push(m.0 as isize);
+        BOOL(1)
+    }
+
+    /// Jasność 0–100: monitory zewnętrzne przez DDC/CI, ekran laptopa przez WMI.
+    pub fn set_brightness(percent: u8) {
+        use windows::Win32::Devices::Display::{
+            DestroyPhysicalMonitors, GetMonitorBrightness, GetNumberOfPhysicalMonitorsFromHMONITOR,
+            GetPhysicalMonitorsFromHMONITOR, SetMonitorBrightness, PHYSICAL_MONITOR,
+        };
+        use windows::Win32::Graphics::Gdi::{EnumDisplayMonitors, HMONITOR};
+        let percent = percent.min(100) as u32;
+        let mut mons: Vec<isize> = Vec::new();
+        unsafe {
+            let _ = EnumDisplayMonitors(HDC::default(), None, Some(collect_monitor), LPARAM(&mut mons as *mut Vec<isize> as isize));
+            for raw in mons {
+                let hm = HMONITOR(raw as *mut c_void);
+                let mut n = 0u32;
+                if GetNumberOfPhysicalMonitorsFromHMONITOR(hm, &mut n).is_err() || n == 0 {
+                    continue;
+                }
+                let mut phys = vec![PHYSICAL_MONITOR::default(); n as usize];
+                if GetPhysicalMonitorsFromHMONITOR(hm, &mut phys).is_err() {
+                    continue;
+                }
+                for p in &phys {
+                    let (mut min, mut cur, mut max) = (0u32, 0u32, 100u32);
+                    if GetMonitorBrightness(p.hPhysicalMonitor, &mut min, &mut cur, &mut max) != 0 && max > min {
+                        let _ = SetMonitorBrightness(p.hPhysicalMonitor, min + (max - min) * percent / 100);
+                    }
+                }
+                let _ = DestroyPhysicalMonitors(&phys);
+            }
+        }
+        // Wbudowany ekran laptopa (nie obsługuje DDC/CI).
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let _ = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                &format!("(Get-CimInstance -Namespace root/WMI -ClassName WmiMonitorBrightnessMethods -ErrorAction SilentlyContinue) | Invoke-CimMethod -MethodName WmiSetBrightness -Arguments @{{Timeout=1;Brightness={percent}}} -ErrorAction SilentlyContinue"),
+            ])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn();
+    }
+
+    // ---------------- Okna i miniatury DWM ----------------
+
+    pub fn activate(raw: isize) {
+        use windows::Win32::UI::WindowsAndMessaging::{IsIconic, SetForegroundWindow, SW_RESTORE};
+        let h = HWND(raw as *mut c_void);
+        unsafe {
+            if IsIconic(h).as_bool() {
+                let _ = ShowWindow(h, SW_RESTORE);
+            }
+            let _ = SetForegroundWindow(h);
+        }
+    }
+
+    pub fn close_window(raw: isize) {
+        use windows::Win32::Foundation::WPARAM;
+        use windows::Win32::UI::WindowsAndMessaging::{PostMessageW, WM_CLOSE};
+        unsafe {
+            let _ = PostMessageW(HWND(raw as *mut c_void), WM_CLOSE, WPARAM(0), LPARAM(0));
+        }
+    }
+
+    pub fn thumb_register(dest: isize, src: isize) -> Option<isize> {
+        use windows::Win32::Graphics::Dwm::DwmRegisterThumbnail;
+        unsafe { DwmRegisterThumbnail(HWND(dest as *mut c_void), HWND(src as *mut c_void)).ok() }
+    }
+
+    /// Ustawia miniaturę w prostokącie (piksele fizyczne, względem okna),
+    /// zachowując proporcje źródła.
+    pub fn thumb_place(thumb: isize, left: i32, top: i32, right: i32, bottom: i32) {
+        use windows::Win32::Foundation::{RECT, SIZE};
+        use windows::Win32::Graphics::Dwm::{
+            DwmQueryThumbnailSourceSize, DwmUpdateThumbnailProperties, DWM_THUMBNAIL_PROPERTIES, DWM_TNP_OPACITY,
+            DWM_TNP_RECTDESTINATION, DWM_TNP_SOURCECLIENTAREAONLY, DWM_TNP_VISIBLE,
+        };
+        unsafe {
+            let mut size = SIZE::default();
+            let (bw, bh) = (right - left, bottom - top);
+            let (mut l, mut t, mut r, mut b) = (left, top, right, bottom);
+            if DwmQueryThumbnailSourceSize(thumb, &mut size).is_ok() && size.cx > 0 && size.cy > 0 {
+                let scale = (bw as f64 / size.cx as f64).min(bh as f64 / size.cy as f64);
+                let (w, h) = ((size.cx as f64 * scale) as i32, (size.cy as f64 * scale) as i32);
+                l = left + (bw - w) / 2;
+                t = top + (bh - h) / 2;
+                r = l + w;
+                b = t + h;
+            }
+            let props = DWM_THUMBNAIL_PROPERTIES {
+                dwFlags: DWM_TNP_RECTDESTINATION | DWM_TNP_VISIBLE | DWM_TNP_OPACITY | DWM_TNP_SOURCECLIENTAREAONLY,
+                rcDestination: RECT { left: l, top: t, right: r, bottom: b },
+                opacity: 255,
+                fVisible: BOOL(1),
+                fSourceClientAreaOnly: BOOL(0),
+                ..Default::default()
+            };
+            let _ = DwmUpdateThumbnailProperties(thumb, &props);
+        }
+    }
+
+    pub fn thumb_unregister(thumb: isize) {
+        use windows::Win32::Graphics::Dwm::DwmUnregisterThumbnail;
+        unsafe {
+            let _ = DwmUnregisterThumbnail(thumb);
+        }
     }
 }
 
@@ -423,6 +581,15 @@ mod imp {
     pub fn taskbar_visible() -> bool { false }
     pub fn resolve_icon_source(_: &str) -> Option<(String, i32)> { None }
     pub fn icon_png(_: &str, _: i32, _: i32) -> Option<Vec<u8>> { None }
+    pub fn hicon_raw_png(_: isize) -> Option<Vec<u8>> { None }
+    pub fn set_wallpaper(_: &str) -> bool { false }
+    pub fn set_brightness(_: u8) {}
+    pub fn activate(_: isize) {}
+    pub fn close_window(_: isize) {}
+    pub fn thumb_register(_: isize, _: isize) -> Option<isize> { None }
+    pub fn thumb_place(_: isize, _: i32, _: i32, _: i32, _: i32) {}
+    pub fn thumb_unregister(_: isize) {}
+    pub fn explorer_tray() -> Option<isize> { None }
 }
 
 pub use imp::*;

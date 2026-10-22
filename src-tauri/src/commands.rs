@@ -27,6 +27,16 @@ pub async fn set_mode(app: AppHandle, id: String) -> Res<()> {
     if !mode.quiet {
         radio::release_batch(&app);
     }
+    // Tapeta i jasność trybu — wolne wywołania, więc w tle.
+    let (wallpaper, brightness) = (expand_env(&mode.wallpaper), mode.brightness);
+    std::thread::spawn(move || {
+        if !wallpaper.trim().is_empty() {
+            crate::sys::set_wallpaper(&wallpaper);
+        }
+        if let Some(b) = brightness {
+            crate::sys::set_brightness(b);
+        }
+    });
     let spotify_on = !cfg.spotify.client_id.is_empty() && state::read(&app, |rt| rt.store.spotify.is_some());
     if spotify_on && cfg.spotify.play_on_mode_change && !mode.playlist.is_empty() {
         spotify::play_playlist(&app, &mode.playlist, None).await;
@@ -90,8 +100,28 @@ pub fn launch(app: AppHandle, id: String) -> Res<String> {
         layout::show_window(&app, "friction", true);
         return Ok("friction".into());
     }
+    // Aplikacja już działa: przełącz do jej okna (kolejne kliknięcia przechodzą
+    // po oknach), zamiast otwierać nową instancję.
+    let wins = crate::previews::windows_of(&app, &id);
+    if !wins.is_empty() {
+        let fg = platform::foreground_hwnd();
+        let next = match wins.iter().position(|w| w.hwnd == fg) {
+            Some(i) => &wins[(i + 1) % wins.len()],
+            None => &wins[0],
+        };
+        crate::sys::activate(next.hwnd);
+        return Ok("activated".into());
+    }
     open_target(&app, &entry.path, &entry.args)?;
     Ok("ok".into())
+}
+
+/// Nowe okno aplikacji (środkowy klik albo Shift+klik w docku).
+#[tauri::command]
+pub fn launch_new(app: AppHandle, id: String) -> Res<()> {
+    let cfg = state::cfg(&app);
+    let Some(entry) = cfg.dock.iter().find(|a| a.id == id) else { return Err("nie ma takiej aplikacji".into()) };
+    open_target(&app, &entry.path, &entry.args)
 }
 
 #[tauri::command]

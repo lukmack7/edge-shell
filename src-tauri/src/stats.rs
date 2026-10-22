@@ -83,7 +83,7 @@ pub fn start(app: AppHandle) {
             if let Ok(mut g) = LATEST.lock() {
                 *g = Some(stats.clone());
             }
-            let _ = app.emit_to("topbar", "stats", &stats);
+            let _ = app.emit("stats", &stats);
         }
     });
 }
@@ -101,6 +101,6 @@ pub fn refresh_volume(app: &AppHandle) {
             s.muted = m;
             s.clone()
         };
-        let _ = app.emit_to("topbar", "stats", &snapshot);
+        let _ = app.emit("stats", &snapshot);
     }
 }

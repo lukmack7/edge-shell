@@ -240,6 +240,19 @@ const render = {
         <div class="row"><div class="txt"><b>Dymki przy prawej krawędzi</b><span>Timer i muzyka, gdy panel Teraz jest schowany.</span></div>${sw(cfg.shell.showBubbles, 'shell.showBubbles')}</div>
       </div>
       <div class="card">
+        <h3>Lewy pasek i monitory</h3>
+        <div class="row"><div class="txt"><b>Stały lewy pasek</b><span>Szuflada, zasobnik systemowy i szybkie akcje zawsze pod ręką.</span></div>${sw(cfg.shell.showRail, 'shell.showRail')}</div>
+        <div class="row"><div class="txt"><b>Zasobnik systemowy na lewym pasku</b><span>Ikony programów działających w tle. Zmiana działa po ponownym uruchomieniu Edge Shell.</span></div>${sw(cfg.shell.trayInRail, 'shell.trayInRail')}</div>
+        <div class="row"><div class="txt"><b>Pasek na każdym monitorze</b><span>Dock i panele zostają na głównym ekranie.</span></div>${sw(cfg.shell.barOnAllMonitors, 'shell.barOnAllMonitors')}</div>
+      </div>
+      <div class="card">
+        <h3>Raport tygodnia</h3>
+        <div class="row"><div class="txt"><b>Kiedy pokazać raport</b><span>Karta z sektorami tygodnia i Twoimi najlepszymi godzinami.</span></div>
+          <select class="in" id="repDay">${['wyłączony', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek', 'sobota', 'niedziela'].map((d, i) => `<option value="${i}" ${cfg.focus.reportWeekday === i ? 'selected' : ''}>${d}</option>`).join('')}</select>
+          <input type="time" class="in" data-bind="focus.reportTime" style="width:120px">
+        </div>
+      </div>
+      <div class="card">
         <h3>Krawędzie i fokus</h3>
         <div class="row"><div class="txt"><b>Wysuwanie paneli po dotknięciu krawędzi</b><span>Ile kursor musi stać przy krawędzi: <span data-out="shell.edgeDelayMs">${cfg.shell.edgeDelayMs}</span> ms</span></div><input type="range" min="50" max="800" step="10" data-num="shell.edgeDelayMs" style="width:240px"></div>
         <div class="row"><div class="txt"><b>Świecąca krawędź przed spotkaniem</b><span><span data-out="shell.edgeGlowMinutes">${cfg.shell.edgeGlowMinutes}</span> minut wcześniej</span></div><input type="range" min="0" max="60" step="5" data-num="shell.edgeGlowMinutes" style="width:240px"></div>
@@ -325,13 +338,21 @@ const render = {
         </div>
         <div class="row"><div class="txt"><b>Cisza</b><span>Zwykłe powiadomienia czekają na paczkę.</span></div>${sw(m.quiet, `modes.${n}.quiet`)}</div>
         <label class="field-l">Playlista Spotify (spotify:playlist:…)<input class="in" value="${esc(m.playlist)}" data-mode="${n}.playlist" placeholder="spotify:playlist:…"></label>
+        <div class="grid2">
+          <label class="field-l">Tapeta trybu
+            <span style="display:flex;gap:6px"><input class="in" style="flex:1" value="${esc(m.wallpaper || '')}" data-mode="${n}.wallpaper" placeholder="bez zmiany"><button class="mini" data-wp="${n}" aria-label="Wybierz tapetę">${icon('image', 16)}</button></span>
+          </label>
+          <div class="field-l">Jasność ekranu: <span>${m.brightness == null ? 'bez zmiany' : m.brightness + '%'}</span>
+            <span style="display:flex;align-items:center;gap:10px">${sw(m.brightness != null, `modebr:${n}`)}<input type="range" min="5" max="100" step="5" value="${m.brightness ?? 70}" data-br="${n}" ${m.brightness == null ? 'disabled' : ''} style="flex:1"></span>
+          </div>
+        </div>
         <div class="field-l">Wyciszone aplikacje w tym trybie — kliknięcie pokaże żółtą flagę
           <div class="chips">${cfg.dock.map((a) => `<button class="chip ${m.dim.includes(a.id) ? 'on' : ''}" data-dim="${n}:${esc(a.id)}">${esc(a.name)}</button>`).join('')}</div>
         </div>
       </div>`).join('');
     return `
       <h2>Tryby</h2>
-      <p class="lead">Tryb zmienia kolor akcentu, wycisza wybrane aplikacje w docku, decyduje o powiadomieniach i włącza swoją playlistę.</p>
+      <p class="lead">Tryb zmienia kolor akcentu, tapetę i jasność, wycisza wybrane aplikacje w docku, decyduje o powiadomieniach i włącza swoją playlistę.</p>
       <div class="card"><div class="row"><div class="txt"><b>Tryb na start</b><span>Z jakim trybem uruchamia się Edge Shell.</span></div>
         <select class="in" data-bind="startMode">${cfg.modes.map((m) => `<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('')}</select></div></div>
       ${cards}
@@ -434,6 +455,7 @@ const render = {
 
 const after = {
   general(root) {
+    $('repDay').onchange = (e) => { cfg.focus.reportWeekday = Number(e.target.value); markDirty(); };
     $('testHorolog').onclick = async () => {
       $('testResult').textContent = 'Sprawdzam…';
       try { $('testResult').textContent = await invoke('horolog_test', { url: cfg.horolog.url }); }
@@ -540,8 +562,24 @@ const after = {
         markDirty();
       };
     }
+    for (const b of root.querySelectorAll('[data-wp]')) {
+      b.onclick = async () => {
+        const p = await invoke('pick_path', { folder: false, images: true });
+        if (p) { cfg.modes[+b.dataset.wp].wallpaper = p; markDirty(); show(page); }
+      };
+    }
+    for (const el of root.querySelectorAll('[data-sw^="modebr:"]')) {
+      el.onclick = () => {
+        const m = cfg.modes[+el.dataset.sw.slice(7)];
+        m.brightness = m.brightness == null ? 70 : null;
+        markDirty(); show(page);
+      };
+    }
+    for (const el of root.querySelectorAll('[data-br]')) {
+      el.onchange = () => { cfg.modes[+el.dataset.br].brightness = Number(el.value); markDirty(); show(page); };
+    }
     for (const b of root.querySelectorAll('[data-modedel]')) b.onclick = () => { cfg.modes.splice(+b.dataset.modedel, 1); markDirty(); show(page); };
-    $('modeAdd').onclick = () => { cfg.modes.push({ id: uid('tryb'), label: 'Nowy tryb', accent: '#0EA5E9', dim: [], quiet: true, playlist: '' }); markDirty(); show(page); };
+    $('modeAdd').onclick = () => { cfg.modes.push({ id: uid('tryb'), label: 'Nowy tryb', accent: '#0EA5E9', dim: [], quiet: true, playlist: '', wallpaper: '', brightness: null }); markDirty(); show(page); };
   },
   radio(root) {
     for (const el of root.querySelectorAll('[data-ct]')) {

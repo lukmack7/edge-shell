@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="shared.css">
 <style>
   .panel { display: flex; }
+  .rail.hidden { display: none; }
   .rail { width: 60px; flex: none; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 14px 0; border-right: 1px solid rgba(255,255,255,0.06); background: rgba(0,0,0,0.25); }
   .rail button { width: 44px; height: 44px; border-radius: 12px; border: 0; background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; }
   .rail button.on { background: var(--fill-strong); color: var(--text); }
@@ -228,6 +229,7 @@ $('search').addEventListener('keydown', (e) => {
   }
 });
 listen('focus-search', () => { showView('files'); $('search').focus(); $('search').select(); });
+listen('drawer-view', (v) => showView(v));
 
 // --- Półka: przeciągnij plik na szufladę ---
 const { getCurrentWebview } = window.__TAURI__.webview;
@@ -260,6 +262,8 @@ const ago = (iso) => {
 
 onSnapshot((s) => {
   snap = s;
+  // Gdy jest stały lewy pasek, nawigacja szuflady jest na nim.
+  document.querySelector('.rail').classList.toggle('hidden', !!s.showRail);
   $('hk').textContent = s.hotkeys.drawer;
 
   $('shelf').innerHTML = (s.shelf.length ? s.shelf.map((f) => `
