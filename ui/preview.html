@@ -15,6 +15,7 @@
   .card:hover .x { opacity: 1; }
   .card .x:hover { background: #7f1d1d; color: #fff; }
   .slot { height: 124px; border-radius: 8px; background: rgba(255,255,255,0.03); }
+  .tip { margin-bottom: 4px; padding: 5px 10px; border-radius: 8px; background: #27272a; border: 1px solid var(--line-strong); font-size: 12px; white-space: nowrap; }
 </style>
 </head>
 <body>
@@ -33,10 +34,19 @@ function scheduleHide(ms) {
 
 document.body.addEventListener('mouseenter', () => { inside = true; clearTimeout(hideTimer); });
 document.body.addEventListener('mouseleave', () => { inside = false; scheduleHide(300); });
-listen('preview-leave', () => scheduleHide(450));
+let tipMode = false;
+listen('preview-leave', () => scheduleHide(tipMode ? 80 : 450));
+listen('preview-tip', (text) => {
+  tipMode = true;
+  clearTimeout(hideTimer);
+  wrap.className = '';
+  wrap.innerHTML = `<span class="tip">${esc(text)}</span>`;
+});
 listen('preview-enter', () => clearTimeout(hideTimer));
 
 listen('previews', (wins) => {
+  tipMode = false;
+  wrap.className = 'wrap';
   clearTimeout(hideTimer);
   wrap.innerHTML = wins.map((w) => `
     <div class="card" data-hwnd="${w.hwnd}" role="button" tabindex="0" aria-label="${esc(w.title)}">

@@ -58,7 +58,7 @@ pub fn previews_show(app: AppHandle, id: String, anchor: f64) -> usize {
     let wins = windows_of(&app, &id);
     let (Some(pv), Some(dock)) = (app.get_webview_window("preview"), app.get_webview_window("dock")) else { return 0 };
     if wins.is_empty() {
-        let _ = pv.hide();
+        // Brak okien: zostaje sama podpowiedź z nazwą.
         return 0;
     }
     let scale = dock.scale_factor().unwrap_or(1.0);
@@ -100,6 +100,23 @@ pub fn previews_layout(app: AppHandle, slots: Vec<Slot>) {
     if let Ok(mut t) = THUMBS.lock() {
         *t = made;
     }
+}
+
+/// Podpowiedź z nazwą aplikacji nad ikoną docka (w oknie podglądów, bo okno
+/// docka ma wysokość ikon i dymek by się w nim nie zmieścił).
+#[tauri::command]
+pub fn previews_tip(app: AppHandle, text: String, anchor: f64) {
+    let (Some(pv), Some(dock)) = (app.get_webview_window("preview"), app.get_webview_window("dock")) else { return };
+    clear_thumbs();
+    let scale = dock.scale_factor().unwrap_or(1.0);
+    let (w, h) = (320.0 * scale, 40.0 * scale);
+    let dpos = dock.outer_position().unwrap_or(PhysicalPosition::new(0, 0));
+    let x = dpos.x as f64 + anchor * scale - w / 2.0;
+    let y = dpos.y as f64 - h + 8.0 * scale;
+    let _ = pv.set_size(PhysicalSize::new(w as u32, h as u32));
+    let _ = pv.set_position(PhysicalPosition::new(x.max(0.0) as i32, y as i32));
+    let _ = app.emit_to("preview", "preview-tip", text);
+    let _ = pv.show();
 }
 
 #[tauri::command]

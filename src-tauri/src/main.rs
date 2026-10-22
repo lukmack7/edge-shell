@@ -162,6 +162,7 @@ fn main() {
             previews::previews_show,
             previews::previews_layout,
             previews::previews_hide,
+            previews::previews_tip,
             previews::window_activate,
             previews::window_close,
             insights::get_week,
