@@ -535,10 +535,10 @@ mod imp {
             DWM_TNP_RECTDESTINATION, DWM_TNP_SOURCECLIENTAREAONLY, DWM_TNP_VISIBLE,
         };
         unsafe {
-            let mut size = SIZE::default();
             let (bw, bh) = (right - left, bottom - top);
             let (mut l, mut t, mut r, mut b) = (left, top, right, bottom);
-            if DwmQueryThumbnailSourceSize(thumb, &mut size).is_ok() && size.cx > 0 && size.cy > 0 {
+            let size: SIZE = DwmQueryThumbnailSourceSize(thumb).unwrap_or_default();
+            if size.cx > 0 && size.cy > 0 {
                 let scale = (bw as f64 / size.cx as f64).min(bh as f64 / size.cy as f64);
                 let (w, h) = ((size.cx as f64 * scale) as i32, (size.cy as f64 * scale) as i32);
                 l = left + (bw - w) / 2;
