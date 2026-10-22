@@ -17,6 +17,11 @@ fn cache_dir() -> std::path::PathBuf {
     d
 }
 
+/// v2: ikony skrótów .lnk z celu (bez strzałki skrótu).
+fn cache_file(key: &str) -> std::path::PathBuf {
+    cache_dir().join(format!("v2-{:x}.png", sha2::Sha256::digest(key.as_bytes())))
+}
+
 /// Ikona dla ścieżki/URI jako `data:image/png;base64,...` (albo None).
 pub fn icon_for(path: &str) -> Option<String> {
     let key = expand_env(path.trim());
@@ -28,7 +33,7 @@ pub fn icon_for(path: &str) -> Option<String> {
             return hit.clone();
         }
     }
-    let file = cache_dir().join(format!("{:x}.png", sha2::Sha256::digest(key.as_bytes())));
+    let file = cache_file(&key);
     let png = std::fs::read(&file).ok().or_else(|| {
         let (src, idx) = sys::resolve_icon_source(&key)?;
         let bytes = sys::icon_png(&src, idx, 64)?;
@@ -74,5 +79,5 @@ pub fn forget(path: &str) {
             m.remove(&key);
         }
     }
-    let _ = std::fs::remove_file(cache_dir().join(format!("{:x}.png", sha2::Sha256::digest(key.as_bytes()))));
+    let _ = std::fs::remove_file(cache_file(&key));
 }

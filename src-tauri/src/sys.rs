@@ -308,6 +308,17 @@ mod imp {
             }
         }
         if std::path::Path::new(p).is_absolute() {
+            // Skrót: ikona z celu (bez strzałki skrótu nałożonej przez powłokę).
+            if p.to_lowercase().ends_with(".lnk") {
+                if let Some((target, icon, idx)) = shortcut(p) {
+                    if !icon.is_empty() && std::path::Path::new(&icon).exists() {
+                        return Some((icon, idx));
+                    }
+                    if !target.is_empty() {
+                        return Some((target, 0));
+                    }
+                }
+            }
             return Some((p.to_string(), 0));
         }
         let key = format!("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\{p}");
@@ -448,6 +459,47 @@ mod imp {
             return Vec::new();
         };
         String::from_utf8_lossy(&out.stdout).lines().map(|l| l.trim().to_string()).filter(|l| !l.is_empty()).collect()
+    }
+
+    /// Cel skrótu .lnk i jego ikona: (plik docelowy, plik ikony, indeks ikony).
+    fn read_shortcut(path: &str) -> Option<(String, String, i32)> {
+        use windows::Win32::System::Com::{IPersistFile, CLSCTX_INPROC_SERVER, STGM_READ};
+        use windows::Win32::UI::Shell::{IShellLinkW, ShellLink};
+        use windows::core::Interface;
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_MULTITHREADED);
+            let link: IShellLinkW = CoCreateInstance(&ShellLink, None, CLSCTX_INPROC_SERVER).ok()?;
+            let file: IPersistFile = link.cast().ok()?;
+            file.Load(&HSTRING::from(path), STGM_READ).ok()?;
+            let mut target = [0u16; 1024];
+            let _ = link.GetPath(&mut target, std::ptr::null_mut(), 0);
+            let target = String::from_utf16_lossy(&target[..target.iter().position(|c| *c == 0).unwrap_or(0)]);
+            let mut icon = [0u16; 1024];
+            let mut idx = 0i32;
+            let _ = link.GetIconLocation(&mut icon, &mut idx);
+            let icon = String::from_utf16_lossy(&icon[..icon.iter().position(|c| *c == 0).unwrap_or(0)]);
+            Some((target, crate::config::expand_env(&icon), idx))
+        }
+    }
+
+    static SHORTCUTS: std::sync::Mutex<Option<std::collections::HashMap<String, Option<(String, String, i32)>>>> = std::sync::Mutex::new(None);
+
+    fn shortcut(path: &str) -> Option<(String, String, i32)> {
+        if let Ok(g) = SHORTCUTS.lock() {
+            if let Some(hit) = g.as_ref().and_then(|m| m.get(path)) {
+                return hit.clone();
+            }
+        }
+        let r = read_shortcut(path);
+        if let Ok(mut g) = SHORTCUTS.lock() {
+            g.get_or_insert_with(std::collections::HashMap::new).insert(path.to_string(), r.clone());
+        }
+        r
+    }
+
+    /// Plik, na który wskazuje skrót .lnk (np. `...\vivaldi.exe`).
+    pub fn shortcut_target(path: &str) -> Option<String> {
+        shortcut(path).map(|s| s.0).filter(|t| !t.is_empty())
     }
 
     /// Opis pliku z zasobów wersji (np. „Microsoft Edge”) — ładna nazwa aplikacji.
@@ -656,6 +708,7 @@ mod imp {
     pub fn monitor_names() -> Vec<String> { Vec::new() }
     pub fn close_windows_of(_: &str) {}
     pub fn file_description(_: &str) -> Option<String> { None }
+    pub fn shortcut_target(_: &str) -> Option<String> { None }
 }
 
 pub use imp::*;

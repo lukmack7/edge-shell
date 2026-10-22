@@ -312,8 +312,9 @@ pub fn snapshot(app: &AppHandle) -> Value {
         .enumerate()
         .map(|(n, a)| {
             let (bg, fg, stripe) = section_colors(&cfg.sections, &a.category);
-            let running = !a.process.is_empty() && rt.running.contains(&a.process.to_lowercase());
-            let windows = rt.window_counts.get(&a.process.to_lowercase()).copied().unwrap_or(0);
+            let exes = a.exe_names();
+            let running = exes.iter().any(|e| rt.running.contains(e));
+            let windows = exes.iter().filter_map(|e| rt.window_counts.get(e)).sum::<usize>();
             let separator = ordered.get(n + 1).is_some_and(|next| next.category != a.category);
             let badge = rt.badges.get(&a.id).copied().unwrap_or(0);
             let stack = crate::stacks::is_folder(&a.path);

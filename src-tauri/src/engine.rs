@@ -190,7 +190,7 @@ fn foreground(app: &AppHandle) {
     let file = platform::exe_name(&exe);
     let cfg = state::cfg(app);
     // Przejście do aplikacji zdejmuje jej plakietkę.
-    if let Some(a) = cfg.dock.iter().find(|a| !a.process.is_empty() && a.process.to_lowercase() == file) {
+    if let Some(a) = cfg.dock.iter().find(|a| a.exe_names().contains(&file)) {
         if state::read(app, |rt| rt.badges.contains_key(&a.id)) {
             let id = a.id.clone();
             state::update(app, false, |rt| rt.badges.remove(&id));
@@ -199,7 +199,7 @@ fn foreground(app: &AppHandle) {
     let name = cfg
         .dock
         .iter()
-        .find(|a| !a.process.is_empty() && a.process.to_lowercase() == file)
+        .find(|a| a.exe_names().contains(&file))
         .map(|a| a.name.clone())
         .unwrap_or_else(|| {
             let stem = file.trim_end_matches(".exe");
@@ -256,16 +256,7 @@ fn running(app: &AppHandle) {
     let pinned: std::collections::HashSet<String> = cfg
         .dock
         .iter()
-        .flat_map(|a| {
-            let mut v = Vec::new();
-            if !a.process.trim().is_empty() {
-                v.push(a.process.trim().to_lowercase());
-            }
-            if a.path.to_lowercase().ends_with(".exe") {
-                v.push(platform::exe_name(&a.path));
-            }
-            v
-        })
+        .flat_map(|a| a.exe_names())
         .collect();
     let mut open: Vec<state::OpenApp> = state::read(app, |rt| rt.open_apps.clone());
     open.retain(|o| counts.contains_key(&o.exe) && !pinned.contains(&o.exe));

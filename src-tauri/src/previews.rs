@@ -31,13 +31,7 @@ pub fn windows_of(app: &AppHandle, id: &str) -> Vec<AppWindow> {
     }
     let cfg = state::cfg(app);
     let Some(a) = cfg.dock.iter().find(|a| a.id == id) else { return Vec::new() };
-    let mut names: Vec<String> = Vec::new();
-    if !a.process.trim().is_empty() {
-        names.push(a.process.trim().to_lowercase());
-    }
-    if a.path.to_lowercase().ends_with(".exe") {
-        names.push(platform::exe_name(&a.path));
-    }
+    let names = a.exe_names();
     if names.is_empty() {
         return Vec::new();
     }

@@ -481,6 +481,32 @@ impl Default for Mode {
     }
 }
 
+impl DockApp {
+    /// Nazwy plików .exe tej aplikacji (małymi literami): z pola „proces”,
+    /// ze ścieżki .exe albo z celu skrótu .lnk — do kropek, podglądów i
+    /// odróżnienia od otwartych aplikacji spoza docka.
+    pub fn exe_names(&self) -> Vec<String> {
+        let mut v = Vec::new();
+        let name = |p: &str| p.rsplit(['\\', '/']).next().unwrap_or(p).to_lowercase();
+        if !self.process.trim().is_empty() {
+            v.push(self.process.trim().to_lowercase());
+        }
+        let path = expand_env(self.path.trim());
+        let lower = path.to_lowercase();
+        if lower.ends_with(".exe") {
+            v.push(name(&path));
+        } else if lower.ends_with(".lnk") {
+            if let Some(t) = crate::sys::shortcut_target(&path) {
+                if t.to_lowercase().ends_with(".exe") {
+                    v.push(name(&t));
+                }
+            }
+        }
+        v.dedup();
+        v
+    }
+}
+
 impl Default for DockApp {
     fn default() -> Self {
         Self {

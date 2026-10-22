@@ -170,7 +170,8 @@ fn dock_app_for(app: &AppHandle, aumid: &str, source: &str) -> Option<String> {
     cfg.dock
         .iter()
         .find(|a| {
-            let stem = a.process.to_lowercase().trim_end_matches(".exe").trim_start_matches("ms-").to_string();
+            let exe = a.exe_names().into_iter().next().unwrap_or_default();
+            let stem = exe.trim_end_matches(".exe").trim_start_matches("ms-").to_string();
             [stem, a.name.to_lowercase(), a.id.to_lowercase()]
                 .iter()
                 .any(|k| k.len() >= 3 && (aumid.contains(k.as_str()) || source == *k))
