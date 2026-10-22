@@ -270,7 +270,14 @@ pub async fn queue(app: &AppHandle) -> Result<Vec<serde_json::Value>, String> {
 
 /// Playlisty użytkownika (do 50) + czy trzeba połączyć ponownie, żeby widzieć prywatne.
 pub async fn playlists(app: &AppHandle) -> Result<serde_json::Value, String> {
-    let v = get_json(app, "https://api.spotify.com/v1/me/playlists?limit=50").await?;
+    let scope = state::read(app, |rt| rt.store.spotify.as_ref().map(|t| t.scope.clone()).unwrap_or_default());
+    let needs_login = !scope.contains("playlist-read-private");
+    let v = match get_json(app, "https://api.spotify.com/v1/me/playlists?limit=50").await {
+        Ok(v) => v,
+        // Token bez uprawnienia do playlist (logowanie sprzed tej funkcji) → poproś o ponowne połączenie.
+        Err(e) if e.contains("403") || e.contains("401") => return Ok(serde_json::json!({ "items": [], "needsLogin": true })),
+        Err(e) => return Err(e),
+    };
     let items: Vec<serde_json::Value> = v["items"]
         .as_array()
         .map(|a| {
@@ -278,13 +285,14 @@ pub async fn playlists(app: &AppHandle) -> Result<serde_json::Value, String> {
                 .filter(|p| p.is_object())
                 .map(|p| serde_json::json!({
                     "name": p["name"], "uri": p["uri"], "art": small_image(&p["images"]),
-                    "owner": p["owner"]["display_name"], "tracks": p["tracks"]["total"],
+                    "owner": p["owner"]["display_name"],
+                    // Od lutego 2026 Spotify zmienia nazwę pola `tracks` na `items`.
+                    "tracks": if p["items"]["total"].is_number() { p["items"]["total"].clone() } else { p["tracks"]["total"].clone() },
                 }))
                 .collect()
         })
         .unwrap_or_default();
-    let scope = state::read(app, |rt| rt.store.spotify.as_ref().map(|t| t.scope.clone()).unwrap_or_default());
-    Ok(serde_json::json!({ "items": items, "needsLogin": !scope.contains("playlist-read-private") }))
+    Ok(serde_json::json!({ "items": items, "needsLogin": needs_login }))
 }
 
 pub fn start(app: AppHandle) {

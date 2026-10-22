@@ -29,9 +29,9 @@
   .tab { height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: transparent; color: rgba(255,255,255,0.75); font-size: 12px; display: flex; align-items: center; gap: 6px; }
   .tab:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
   .tab.on { background: var(--p-accent); border-color: var(--p-accent); color: var(--p-on); font-weight: 600; }
-  .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 0 12px 12px; border-top: 1px solid rgba(255,255,255,0.08); }
-  .panel .find { height: 34px; margin-top: 10px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.25); color: #fff; font-size: 13px; outline: none; user-select: text; }
-  .panel .find:focus { border-color: var(--p-accent); }
+  .pnl { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 0 12px 12px; border-top: 1px solid rgba(255,255,255,0.08); }
+  .pnl .find { height: 34px; margin-top: 10px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.25); color: #fff; font-size: 13px; outline: none; user-select: text; }
+  .pnl .find:focus { border-color: var(--p-accent); }
   .list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-top: 6px; scrollbar-width: thin; }
   .li { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 4px 8px; border: 0; border-radius: 10px; background: transparent; text-align: left; color: #fff; }
   .li:hover { background: rgba(255,255,255,0.08); }
@@ -197,7 +197,7 @@ function render() {
             <button class="tab ${panel === 'queue' ? 'on' : ''}" data-panel="queue">${icon('layers', 13)}Kolejka</button>
             <button class="tab ${panel === 'playlists' ? 'on' : ''}" data-panel="playlists">${icon('music', 13)}Playlisty</button>
           </div>
-          ${panel ? `<div class="panel">${panel === 'playlists' ? '<input class="find" id="find" placeholder="Szukaj playlisty…" autocomplete="off" spellcheck="false">' : ''}<div class="list" id="list"><div class="note">Wczytuję…</div></div></div>` : ''}
+          ${panel ? `<div class="pnl">${panel === 'playlists' ? '<input class="find" id="find" placeholder="Szukaj playlisty…" autocomplete="off" spellcheck="false">' : ''}<div class="list" id="list"><div class="note">Wczytuję…</div></div></div>` : ''}
         </div>`;
     }
     wire();
@@ -305,7 +305,7 @@ function renderPlaylists() {
   const q = (document.getElementById('find')?.value || '').trim().toLowerCase();
   const items = playlistCache.items.filter((p) => !q || String(p.name || '').toLowerCase().includes(q));
   list.innerHTML = (playlistCache.needsLogin
-    ? '<div class="note">Widać tylko publiczne playlisty. Połącz Spotify jeszcze raz, żeby zobaczyć wszystkie.<br><button class="btn light" id="relogin">Połącz ponownie</button></div>' : '')
+    ? `<div class="note">${playlistCache.items.length ? 'Widać tylko część playlist.' : 'Spotify nie pozwala jeszcze czytać Twoich playlist.'} Połącz Spotify jeszcze raz i zatwierdź nowe uprawnienie.<br><button class="btn light" id="relogin">Połącz ponownie</button></div>` : '')
     + (items.map((p) => `<button class="li" data-uri="${esc(p.uri)}">
         ${p.art ? `<img src="${esc(p.art)}" alt="">` : '<span class="ph2"></span>'}
         <span class="t"><b>${esc(p.name)}</b><span>${esc(p.owner || '')}${p.tracks != null ? ` · ${p.tracks} utw.` : ''}</span></span></button>`).join('')
