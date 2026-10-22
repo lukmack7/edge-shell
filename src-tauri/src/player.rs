@@ -5,12 +5,21 @@ use crate::{layout, spotify, state};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize};
 
 /// Rozmiary okna (px logiczne, z marginesem na cień).
-const CARD: (f64, f64) = (424.0, 468.0);
-const BAR: (f64, f64) = (404.0, 72.0);
+const CARD: (f64, f64) = (444.0, 488.0);
+const BAR: (f64, f64) = (424.0, 92.0);
 const SNAP: i32 = 40;
 
-fn size(compact: bool) -> (f64, f64) {
-    if compact { BAR } else { CARD }
+/// Wysokość rozwiniętego panelu kolejki / playlist.
+const PANEL_H: f64 = 300.0;
+
+fn size_of(p: &state::PlayerState) -> (f64, f64) {
+    if p.compact {
+        BAR
+    } else if p.panel.is_empty() {
+        CARD
+    } else {
+        (CARD.0, CARD.1 + PANEL_H)
+    }
 }
 
 /// Ustawia okno według zapamiętanego stanu (rozmiar, pozycja, widoczność).
@@ -22,7 +31,7 @@ pub fn sync(app: &AppHandle) {
         return;
     }
     let s = layout::screen(app);
-    let (lw, lh) = size(st.compact);
+    let (lw, lh) = size_of(&st);
     let (pw, ph) = ((lw * s.scale) as i32, (lh * s.scale) as i32);
     // Domyślnie: prawy dolny róg nad dockiem.
     let mut x = st.x.unwrap_or(s.work.right - pw - (16.0 * s.scale) as i32);
@@ -40,6 +49,10 @@ pub fn sync(app: &AppHandle) {
     if !on_screen {
         x = s.work.right - pw - (16.0 * s.scale) as i32;
         y = s.work.bottom - ph - (120.0 * s.scale) as i32;
+    }
+    // Rozwinięty panel nie może wyjechać pod dolną krawędź.
+    if y + ph > s.work.bottom && st.y.map_or(false, |sy| sy >= s.work.top) {
+        y = (s.work.bottom - ph).max(s.work.top);
     }
     let _ = w.set_size(PhysicalSize::new(pw as u32, ph as u32));
     let _ = w.set_position(PhysicalPosition::new(x, y));
@@ -80,8 +93,9 @@ pub fn player_hide(app: AppHandle) {
 pub fn player_mode(app: AppHandle, compact: bool) {
     let Some(w) = app.get_webview_window("player") else { return };
     let s = layout::screen(&app);
-    let (old_w, old_h) = size(state::read(&app, |rt| rt.store.player.compact));
-    let (new_w, new_h) = size(compact);
+    let cur = state::read(&app, |rt| rt.store.player.clone());
+    let (old_w, old_h) = size_of(&cur);
+    let (new_w, new_h) = size_of(&state::PlayerState { compact, ..cur.clone() });
     if let Ok(pos) = w.outer_position() {
         let mut x = pos.x + ((old_w - new_w) * s.scale / 2.0) as i32;
         let mut y = pos.y + ((old_h - new_h) * s.scale) as i32;
@@ -142,6 +156,38 @@ pub fn player_drag_end(app: AppHandle) {
         p.x = Some(x);
         p.y = Some(y);
     });
+}
+
+/// Panel pod kartą: kolejka albo playlisty ("" = zwinięty). Karta rośnie w dół.
+#[tauri::command]
+pub fn player_panel(app: AppHandle, panel: String) {
+    let panel = if matches!(panel.as_str(), "queue" | "playlists") { panel } else { String::new() };
+    set(&app, |p| p.panel = panel);
+}
+
+#[tauri::command]
+pub async fn player_queue(app: AppHandle) -> Result<Vec<serde_json::Value>, String> {
+    spotify::queue(&app).await
+}
+
+#[tauri::command]
+pub async fn player_playlists(app: AppHandle) -> Result<serde_json::Value, String> {
+    spotify::playlists(&app).await
+}
+
+/// Graj playlistę od początku (albo kontekst `spotify:...`).
+#[tauri::command]
+pub async fn player_play(app: AppHandle, uri: String) -> Result<(), String> {
+    spotify::control(&app, "play", Some(serde_json::json!({ "context_uri": uri }))).await
+}
+
+/// Przeskocz do n-tego utworu z kolejki (n razy „następny”).
+#[tauri::command]
+pub async fn player_skip(app: AppHandle, count: u32) -> Result<(), String> {
+    for _ in 0..count.clamp(1, 20) {
+        spotify::control(&app, "next", None).await?;
+    }
+    Ok(())
 }
 
 /// Głośność Spotify z kółka myszy.

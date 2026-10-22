@@ -109,6 +109,9 @@ pub struct SpotifyTokens {
     pub access_token: String,
     pub refresh_token: String,
     pub expires_at: i64,
+    /// Uprawnienia nadane przy logowaniu (do sprawdzenia, czy trzeba połączyć ponownie).
+    #[serde(default)]
+    pub scope: String,
 }
 
 /// To, co przeżywa restart: zapisywane w `%APPDATA%\EdgeShell\store.json`.
@@ -147,11 +150,13 @@ pub struct PlayerState {
     pub y: Option<i32>,
     pub compact: bool,
     pub pinned: bool,
+    /// Rozwinięty panel pod kartą: "" | "queue" | "playlists".
+    pub panel: String,
 }
 
 impl Default for PlayerState {
     fn default() -> Self {
-        Self { visible: false, x: None, y: None, compact: false, pinned: true }
+        Self { visible: false, x: None, y: None, compact: false, pinned: true, panel: String::new() }
     }
 }
 

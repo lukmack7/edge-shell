@@ -6,9 +6,9 @@
 <link rel="stylesheet" href="shared.css">
 <style>
   :root { --p-bg: #17171c; --p-accent: #e4e4e7; --p-on: #111; }
-  body { padding: 12px; transition: opacity 0.4s ease; }
+  body { padding: 22px; transition: opacity 0.4s ease; }
   body.dim { opacity: 0.6; }
-  .card, .bar { background: var(--p-bg); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 18px 44px rgba(0,0,0,0.5); transition: background 0.5s ease; }
+  .card, .bar { background: var(--p-bg); border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 8px 20px -6px rgba(0,0,0,0.6), 0 1px 4px rgba(0,0,0,0.3); transition: background 0.5s ease; }
   .card { height: 100%; display: flex; flex-direction: column; border-radius: 26px; overflow: hidden; }
   .art { position: relative; height: 216px; flex: none; background: #26262c center/cover no-repeat; cursor: grab; }
   .art::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 80px; background: linear-gradient(to bottom, transparent, var(--p-bg)); transition: background 0.5s ease; pointer-events: none; }
@@ -24,7 +24,24 @@
   .prog { display: flex; align-items: center; gap: 12px; padding: 16px 24px 4px; font-family: var(--mono); font-size: 12px; color: rgba(255,255,255,0.75); }
   .track { flex: 1; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.15); overflow: hidden; }
   .track i { display: block; height: 100%; width: 0; background: var(--p-accent); border-radius: 3px; transition: background 0.5s ease; }
-  .ctl { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 10px 0 18px; }
+  .ctl { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 8px 0 6px; }
+  .tabs { display: flex; justify-content: center; gap: 6px; padding: 0 0 12px; flex: none; }
+  .tab { height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: transparent; color: rgba(255,255,255,0.75); font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .tab:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
+  .tab.on { background: var(--p-accent); border-color: var(--p-accent); color: var(--p-on); font-weight: 600; }
+  .panel { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; padding: 0 12px 12px; border-top: 1px solid rgba(255,255,255,0.08); }
+  .panel .find { height: 34px; margin-top: 10px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.25); color: #fff; font-size: 13px; outline: none; user-select: text; }
+  .panel .find:focus { border-color: var(--p-accent); }
+  .list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; padding-top: 6px; scrollbar-width: thin; }
+  .li { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 4px 8px; border: 0; border-radius: 10px; background: transparent; text-align: left; color: #fff; }
+  .li:hover { background: rgba(255,255,255,0.08); }
+  .li img, .li .ph2 { width: 38px; height: 38px; flex: none; border-radius: 6px; object-fit: cover; background: rgba(255,255,255,0.08); }
+  .li .t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .li .t b { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .li .t span { font-size: 11px; color: rgba(255,255,255,0.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .li .n { font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,0.45); width: 18px; text-align: right; }
+  .note { padding: 14px 6px; font-size: 12px; color: rgba(255,255,255,0.65); line-height: 1.5; }
+  .note button { margin-top: 8px; }
   .ctl .sk { width: 40px; height: 40px; border-radius: 50%; border: 0; background: transparent; color: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; }
   .ctl .sk:hover { background: rgba(255,255,255,0.08); color: #fff; }
   .pp { width: 54px; height: 54px; border-radius: 50%; border: 0; background: var(--p-accent); color: var(--p-on); display: flex; align-items: center; justify-content: center; transition: background 0.5s ease, transform 0.1s; }
@@ -146,8 +163,9 @@ function render() {
   if (!s) return;
   const m = s.music;
   const compact = !!s.player?.compact;
+  const panel = s.player?.panel || '';
   const ok = s.spotifyEnabled && m.connected && m.title;
-  const key = `${compact}|${ok}|${m.title}|${m.artist}|${m.art}|${m.playing}|${s.player?.pinned}|${m.error}|${s.spotifyEnabled}`;
+  const key = `${compact}|${panel}|${ok}|${m.title}|${m.artist}|${m.art}|${m.playing}|${s.player?.pinned}|${m.error}|${s.spotifyEnabled}`;
   if (key !== shape) {
     shape = key;
     if (!ok) {
@@ -175,9 +193,19 @@ function render() {
             <button class="pp" id="pp" aria-label="${m.playing ? 'Pauza' : 'Graj'}">${icon(m.playing ? 'pause' : 'play', 22)}</button>
             <button class="sk" id="next" aria-label="Następny">${icon('next', 20)}</button>
           </div>
+          <div class="tabs">
+            <button class="tab ${panel === 'queue' ? 'on' : ''}" data-panel="queue">${icon('layers', 13)}Kolejka</button>
+            <button class="tab ${panel === 'playlists' ? 'on' : ''}" data-panel="playlists">${icon('music', 13)}Playlisty</button>
+          </div>
+          ${panel ? `<div class="panel">${panel === 'playlists' ? '<input class="find" id="find" placeholder="Szukaj playlisty…" autocomplete="off" spellcheck="false">' : ''}<div class="list" id="list"><div class="note">Wczytuję…</div></div></div>` : ''}
         </div>`;
     }
     wire();
+    const opened = panel !== lastPanel;
+    lastPanel = panel;
+    if (ok && !compact && panel) loadPanel(panel, opened);
+  } else if (ok && !compact && panel === 'queue' && m.title !== queueFor) {
+    loadPanel('queue', false);
   }
   if (ok && m.art !== artUrl) {
     artUrl = m.art;
@@ -214,6 +242,9 @@ function wire() {
   if ($('prev')) $('prev').onclick = () => ctl('previous');
   if ($('next')) $('next').onclick = () => ctl('next');
   if ($('login')) $('login').onclick = () => invoke('spotify_login').catch((e) => flash(String(e)));
+  for (const t of document.querySelectorAll('[data-panel]')) {
+    t.onclick = () => invoke('player_panel', { panel: s.player?.panel === t.dataset.panel ? '' : t.dataset.panel });
+  }
   $('pin').onclick = (e) => { e.stopPropagation(); invoke('player_pin', { pinned: s.player?.pinned === false }); };
   $('mode').onclick = (e) => { e.stopPropagation(); autoCompact = false; invoke('player_mode', { compact: !s.player?.compact }); };
   $('close').onclick = (e) => { e.stopPropagation(); invoke('player_hide'); };
@@ -228,6 +259,62 @@ function wire() {
     }
     win.startDragging().catch(() => {});
   };
+}
+
+// ------------------------------------------------------------------ kolejka i playlisty
+
+let queueFor = '';
+let playlistCache = null;
+let lastPanel = '';
+let findText = '';
+
+async function loadPanel(panel, fresh) {
+  const list = document.getElementById('list');
+  if (!list) return;
+  try {
+    if (panel === 'queue') {
+      queueFor = s.music.title;
+      const q = await invoke('player_queue');
+      if (!document.getElementById('list')) return;
+      list.innerHTML = q.length
+        ? q.map((t, i) => `<button class="li" data-skip="${i + 1}" title="Przejdź do tego utworu">
+            <span class="n">${i + 1}</span>
+            ${t.art ? `<img src="${esc(t.art)}" alt="">` : '<span class="ph2"></span>'}
+            <span class="t"><b>${esc(t.title)}</b><span>${esc(t.artist)}</span></span></button>`).join('')
+        : '<div class="note">Kolejka jest pusta.</div>';
+      for (const b of list.querySelectorAll('[data-skip]')) {
+        b.onclick = () => invoke('player_skip', { count: +b.dataset.skip }).catch((e) => flash(String(e)));
+      }
+    } else {
+      if (fresh || !playlistCache) playlistCache = await invoke('player_playlists');
+      renderPlaylists();
+      const find = document.getElementById('find');
+      if (find) {
+        find.value = findText;
+        find.oninput = () => { findText = find.value; renderPlaylists(); };
+      }
+    }
+  } catch (e) {
+    list.innerHTML = `<div class="note">${esc(String(e))}</div>`;
+  }
+}
+
+function renderPlaylists() {
+  const list = document.getElementById('list');
+  if (!list || !playlistCache) return;
+  const q = (document.getElementById('find')?.value || '').trim().toLowerCase();
+  const items = playlistCache.items.filter((p) => !q || String(p.name || '').toLowerCase().includes(q));
+  list.innerHTML = (playlistCache.needsLogin
+    ? '<div class="note">Widać tylko publiczne playlisty. Połącz Spotify jeszcze raz, żeby zobaczyć wszystkie.<br><button class="btn light" id="relogin">Połącz ponownie</button></div>' : '')
+    + (items.map((p) => `<button class="li" data-uri="${esc(p.uri)}">
+        ${p.art ? `<img src="${esc(p.art)}" alt="">` : '<span class="ph2"></span>'}
+        <span class="t"><b>${esc(p.name)}</b><span>${esc(p.owner || '')}${p.tracks != null ? ` · ${p.tracks} utw.` : ''}</span></span></button>`).join('')
+      || '<div class="note">Brak playlist.</div>');
+  for (const b of list.querySelectorAll('[data-uri]')) {
+    b.onclick = () => invoke('player_play', { uri: b.dataset.uri }).catch((e) => flash(String(e)));
+  }
+  const re = document.getElementById('relogin');
+  if (re) re.onclick = () => invoke('spotify_login').catch((e) => flash(String(e)));
 }
 
 // Po przeciągnięciu: przyciągnij do rogu i zapamiętaj pozycję.

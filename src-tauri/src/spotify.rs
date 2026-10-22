@@ -10,7 +10,7 @@ use sha2::Digest;
 use std::time::Duration;
 use tauri::AppHandle;
 
-const SCOPES: &str = "user-read-playback-state user-modify-playback-state user-read-currently-playing";
+const SCOPES: &str = "user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative";
 
 fn redirect_uri(port: u16) -> String {
     format!("http://127.0.0.1:{port}/callback")
@@ -113,12 +113,15 @@ async fn token_request(app: &AppHandle, params: &[(&str, String)]) -> Result<(),
     })?;
     let expires = resp["expires_in"].as_i64().unwrap_or(3600);
     let refresh = resp["refresh_token"].as_str().map(|s| s.to_string());
+    let scope = resp["scope"].as_str().map(|s| s.to_string());
     state::update(app, true, |rt| {
         let old_refresh = rt.store.spotify.as_ref().map(|t| t.refresh_token.clone()).unwrap_or_default();
+        let old_scope = rt.store.spotify.as_ref().map(|t| t.scope.clone()).unwrap_or_default();
         rt.store.spotify = Some(SpotifyTokens {
             access_token: access.to_string(),
             refresh_token: refresh.unwrap_or(old_refresh),
             expires_at: Local::now().timestamp() + expires - 60,
+            scope: scope.unwrap_or(old_scope),
         });
         rt.music.connected = true;
         rt.music.error.clear();
@@ -227,6 +230,61 @@ async fn poll_once(app: &AppHandle) {
         rt.music.device = v["device"]["name"].as_str().unwrap_or("").to_string();
         rt.music.album = item["album"]["name"].as_str().unwrap_or("").to_string();
     });
+}
+
+async fn get_json(app: &AppHandle, url: &str) -> Result<serde_json::Value, String> {
+    let Some(tok) = token(app).await else { return Err("Spotify nie jest połączone".into()) };
+    let resp = reqwest::Client::new().get(url).bearer_auth(tok).timeout(Duration::from_secs(10)).send().await.map_err(|e| e.to_string())?;
+    if !resp.status().is_success() {
+        return Err(format!("Spotify: {}", resp.status()));
+    }
+    resp.json().await.map_err(|e| e.to_string())
+}
+
+fn small_image(images: &serde_json::Value) -> String {
+    images
+        .as_array()
+        .and_then(|a| a.iter().min_by_key(|i| i["width"].as_i64().unwrap_or(9999).abs_diff(64)))
+        .and_then(|i| i["url"].as_str())
+        .unwrap_or("")
+        .to_string()
+}
+
+/// Kolejka: następne utwory (do 20).
+pub async fn queue(app: &AppHandle) -> Result<Vec<serde_json::Value>, String> {
+    let v = get_json(app, "https://api.spotify.com/v1/me/player/queue").await?;
+    Ok(v["queue"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .take(20)
+                .map(|t| {
+                    let artist = t["artists"].as_array().map(|x| x.iter().filter_map(|y| y["name"].as_str()).collect::<Vec<_>>().join(", ")).unwrap_or_else(|| t["show"]["name"].as_str().unwrap_or("").to_string());
+                    let art = if t["album"].is_object() { small_image(&t["album"]["images"]) } else { small_image(&t["images"]) };
+                    serde_json::json!({ "title": t["name"], "artist": artist, "art": art, "uri": t["uri"], "ms": t["duration_ms"] })
+                })
+                .collect()
+        })
+        .unwrap_or_default())
+}
+
+/// Playlisty użytkownika (do 50) + czy trzeba połączyć ponownie, żeby widzieć prywatne.
+pub async fn playlists(app: &AppHandle) -> Result<serde_json::Value, String> {
+    let v = get_json(app, "https://api.spotify.com/v1/me/playlists?limit=50").await?;
+    let items: Vec<serde_json::Value> = v["items"]
+        .as_array()
+        .map(|a| {
+            a.iter()
+                .filter(|p| p.is_object())
+                .map(|p| serde_json::json!({
+                    "name": p["name"], "uri": p["uri"], "art": small_image(&p["images"]),
+                    "owner": p["owner"]["display_name"], "tracks": p["tracks"]["total"],
+                }))
+                .collect()
+        })
+        .unwrap_or_default();
+    let scope = state::read(app, |rt| rt.store.spotify.as_ref().map(|t| t.scope.clone()).unwrap_or_default());
+    Ok(serde_json::json!({ "items": items, "needsLogin": !scope.contains("playlist-read-private") }))
 }
 
 pub fn start(app: AppHandle) {
