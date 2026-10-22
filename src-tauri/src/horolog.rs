@@ -153,6 +153,7 @@ async fn fetch_analytics(app: &AppHandle) -> Result<Analytics, String> {
 
 /// Pętla połączenia: pobierz plan, słuchaj strumienia, przy zerwaniu ponów.
 pub fn start(app: AppHandle) {
+    let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
         let mut backoff = 2u64;
         loop {
@@ -171,7 +172,6 @@ pub fn start(app: AppHandle) {
     });
 
     // Odświeżanie co 5 minut i o północy — na wypadek zgubionych zdarzeń.
-    let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
         let mut last_day = Local::now().ordinal();
         loop {
