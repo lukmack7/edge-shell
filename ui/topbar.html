@@ -49,6 +49,8 @@
   /* Notch zastępuje pasek: zostaje pusty, przezroczysty pas, który tylko rezerwuje miejsce. */
   html:has(body.notch), body.notch { background: transparent !important; border: 0 !important; }
   body.notch .bar, body.notch .exit1 { display: none !important; }
+  /* Do pierwszej migawki nic nie rysujemy — inaczej przy notchu prześwituje stary pasek (np. kółko szuflady). */
+  body:not(.ready) .bar, body:not(.ready) .exit1 { visibility: hidden; }
   body.one .side > * { visibility: hidden; }
   body.one .bar { background: rgba(8,8,10,0.96); }
   .exit1 { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.18); background: transparent; color: var(--text-2); font-size: 12px; display: none; }
@@ -251,6 +253,8 @@ onSnapshot((s) => {
   // Notch tylko na głównym monitorze — na pozostałych pasek zostaje pełny.
   const on = !!s.notch && windowLabel === 'topbar';
   if (on !== notchOn) { notchOn = on; document.body.classList.toggle('notch', on); renderStats(); }
+  document.body.classList.add('ready');
+  if (on) return;
   renderPeople(s);
   document.body.classList.toggle('one', !!s.oneThing);
   if (s.barStats) statsOrder = s.barStats;
