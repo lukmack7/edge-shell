@@ -257,8 +257,8 @@ function midHtml(st) {
   if (s.focus) { text = esc(s.focus.title); clock = t ? (s.paused ? 'pauza' : mmss(t.left)) : ''; }
   else if (s.next) { text = `<span class="dim">Dalej:</span> ${esc(s.next.title)}`; clock = hhmm(s.next.start); }
   else text = '<span class="dim">Wolne</span>';
-  const waiting = s.radio.waiting ? `<button class="n-cnt" id="waitBtn" title="Wiadomości czekają na paczkę — pokaż teraz">${s.radio.waiting}</button>` : '';
-  return `<span class="t">${text}</span>${clock ? `<span class="c" id="cd">${esc(clock)}</span>` : ''}${waiting}`;
+  // Liczba odłożonych wiadomości jest tylko na dzwonku (bez duplikatu w środku).
+  return `<span class="t">${text}</span>${clock ? `<span class="c" id="cd">${esc(clock)}</span>` : ''}`;
 }
 
 // ------------------------------------------------------------------ rysowanie
@@ -308,7 +308,7 @@ function render() {
 
 function midKey(st) {
   if (st === 'music') return [s.music.title, s.music.artist, s.music.art];
-  if (st === 'rest' || st === 'open') return [s.focus?.title, !!focusTiming(s), s.paused, s.next?.title, s.radio.waiting];
+  if (st === 'rest' || st === 'open') return [s.focus?.title, !!focusTiming(s), s.paused, s.next?.title];
   if (st === 'meet') return meetingSoon()?.mins;
   if (st === 'hot') return [Math.round(stats?.cpu || 0), Math.round(stats?.mem || 0)];
   return '';
