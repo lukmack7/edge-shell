@@ -113,6 +113,42 @@ Panele wysuwają się też same, gdy kursor dotknie lewej albo prawej krawędzi 
 
 Pływająca karta Spotify z okładką; tło, tytuł, pasek postępu i przycisk play biorą kolory z okładki. Wyciągasz ją klikiem w tytuł w górnym pasku (klik w korektor = play/pauza), przytrzymaniem dymka muzyki, `sp` w palecie albo `Ctrl+Alt+M`. Przeciągasz za okładkę (przy krawędzi przyciąga się do rogu), podwójny klik zwija kartę do paska, kółko myszy zmienia głośność, 📌 odpina z wierzchu. Bez kursora przygasa, w grach się chowa, na początku fokusu sam zwija się do paska. Pozycja i rozmiar są zapamiętywane.
 
+## Pasek i lewy pasek — karty
+
+- **CPU / RAM** → co najbardziej obciąża (procesy pogrupowane po programie) z przyciskiem *Zakończ* (dwa kliknięcia; procesów systemowych nie da się zakończyć).
+- **Wi‑Fi** → lista sieci; zapisane łączą się od razu, nowe pytają o hasło.
+- **Bluetooth** → sparowane urządzenia z poziomem baterii (gdy Windows go zna).
+- **Dźwięk** → głośność, wybór wyjścia (głośniki / słuchawki) i głośność każdej aplikacji osobno. Środkowy klik wycisza, kółko zmienia głośność.
+- **Zasilanie** (na dole lewego paska) → zablokuj, uśpij, hibernuj, uruchom ponownie, wyłącz, wyloguj. Restart / wyłączenie / wylogowanie wymagają drugiego kliknięcia.
+
+## Dock — więcej
+
+Kółko myszy nad ikoną przełącza okna tej aplikacji. Ikony przeciągasz bezpośrednio na docku (przeniesiona ikona przejmuje sekcję sąsiada). Plik upuszczony z Eksploratora na ikonę otwiera się w tej aplikacji (na stosie — kopiuje się do folderu); upuszczony na pusty fragment docka zostaje przypięty.
+
+## Fokus i ludzie
+
+- **Jedna rzecz** (`Ctrl+Alt+J`, `jr` w palecie): wszystko poza aktywnym oknem przygasa, dock się chowa, pasek pokazuje tylko zadanie.
+- **Rozproszenia**: kilka minut w YouTube / Discordzie w trakcie fokusu → karta „Wracamy do …?” (*Wracam* przełącza do okna pracy). Bez blokowania.
+- **Start bloku z pierwszym krokiem**: karta „Zielone światło” pokazuje 2‑minutowy pierwszy krok (ustawiasz go w panelu Teraz), z przyciskami *Jadę* / *Za 5 min*.
+- **Zamknięcie dnia** (pon–pt o ustawionej porze albo `kd`): co zrobione, niedokończone jednym kliknięciem na jutro, jedno zdanie o dniu.
+- **Prawdziwe czasy**: gdy nawyk trzy razy z rzędu trwa wyraźnie dłużej/krócej niż w planie, karta proponuje poprawkę czasu w Horologu.
+- **Praca razem**: serwer obecności w `server/presence` (Python bez zależności, `docker compose up -d` na home serwerze). Osoby z tym samym adresem i tokenem widzą się w górnym pasku (kto w fokusie, do kiedy).
+
+## Kalendarz pod zegarem
+
+Dzień jest osią czasu — blok przeciągasz na inną godzinę albo na dzień w kalendarzu. Edge Shell ustawia w Horologu preferowaną godzinę i dzień, a Horolog dobiera najbliższe wolne miejsce.
+
+## Pliki, schowek, zrzuty
+
+- **Podgląd**: `Shift+Spacja` na pliku w palecie, `Spacja` w stosie — obrazy, tekst, a PDF / Office / wideo jako miniatura z Eksploratora.
+- **Historia schowka**: `cb` w palecie (+ tekst do wyszukania). Enter wkleja w okno, w którym byłeś; Tab: przypnij, usuń. Hasła z menedżerów haseł są pomijane.
+- **Zrzut z adnotacją**: `Ctrl+Alt+S` albo `zr` — zaznacz obszar (klik = cały ekran), dorysuj strzałkę / ramkę / pisak / zakreślacz, Enter zapisuje do *Obrazy\Screenshots*, kopiuje obraz do schowka i kładzie plik na półce.
+
+## Okna: strefy i układy
+
+- **Strefy** pod ultrawide (trzy kolumny, szeroki środek, połowy, szeroka lewa, ćwiartki): `Ctrl+Alt+1…6` albo przeciąganie okna z wciśniętym Shift.
+- **Układy**: `uz` zapisuje położenie wszystkich okien (domyślnie jako tryb + monitory), `ul` przywraca i uruchamia brakujące aplikacje. Automatyzacja „Układ okien” zrobi to sama, np. po podłączeniu monitora.
+
 ## Horolog
 
 Edge Shell korzysta z tych tras API Horologa (bez logowania, więc trzymaj Horologa w sieci domowej albo za VPN):
