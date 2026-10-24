@@ -535,6 +535,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "oneThing": rt.one_thing,
         "missed": rt.store.missed,
         "notch": cfg.shell.notch,
+        "dayRail": cfg.shell.notch && cfg.shell.day_rail,
         "windowTitles": rt.window_titles,
         "fgExe": rt.foreground_exe,
         "presence": rt.presence,

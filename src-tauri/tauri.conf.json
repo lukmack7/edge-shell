@@ -177,6 +177,21 @@
         "visible": false
       },
       {
+        "label": "dayrail",
+        "url": "dayrail.html",
+        "title": "Edge Shell — plan dnia",
+        "width": 56,
+        "height": 900,
+        "focus": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "visible": false
+      },
+      {
         "label": "calendar",
         "url": "calendar.html",
         "title": "Edge Shell — kalendarz",

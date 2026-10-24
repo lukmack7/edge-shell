@@ -502,6 +502,8 @@ pub struct ShellCfg {
     pub hide_in_fullscreen: bool,
     /// Notch na środku górnego paska: plan dnia, muzyka, radio i panel w jednym miejscu.
     pub notch: bool,
+    /// Prawa szyna z planem dnia (gdy notch zastępuje górny pasek).
+    pub day_rail: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -661,6 +663,7 @@ impl Default for ShellCfg {
             dock_autohide: true,
             hide_in_fullscreen: true,
             notch: true,
+            day_rail: true,
         }
     }
 }

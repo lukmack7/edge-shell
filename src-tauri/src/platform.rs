@@ -90,6 +90,9 @@ mod imp {
             } else if edge == 3 {
                 // ABE_BOTTOM: pasek przy dolnej krawędzi (dock).
                 abd.rc.top = abd.rc.bottom - height;
+            } else if edge == 2 {
+                // ABE_RIGHT: prawa szyna z planem dnia.
+                abd.rc.left = abd.rc.right - width;
             } else {
                 abd.rc.right = abd.rc.left + width;
             }

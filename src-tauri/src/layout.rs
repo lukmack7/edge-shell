@@ -33,11 +33,14 @@ pub struct Screen {
 pub const BAR_H: f64 = 36.0;
 pub const DOCK_H: f64 = 92.0;
 pub const RAIL_W: f64 = 56.0;
+/// Z notchem górny pasek znika, a pas pod notchem ma 40 px (okna zaczynają się niżej).
+pub const NOTCH_BAR_H: f64 = 40.0;
 const MARGIN: f64 = 12.0;
 const DRAWER_W: f64 = 380.0;
 const NOW_W: f64 = 400.0;
 const ABE_LEFT: u32 = 0;
 const ABE_TOP: u32 = 1;
+const ABE_RIGHT: u32 = 2;
 const ABE_BOTTOM: u32 = 3;
 /// Dock zarezerwował dół ekranu — zmaksymalizowane okna kończą się nad nim.
 pub static DOCK_RESERVED: AtomicBool = AtomicBool::new(false);
@@ -58,12 +61,18 @@ pub fn screen(app: &AppHandle) -> Screen {
         None => (Rect { left: 0, top: 0, right: 1920, bottom: 1080 }, 1.0),
     };
     let mut work = platform::work_area().unwrap_or(monitor);
+    let cfg = state::cfg(app);
     // Gdy paski nie rezerwują miejsca, i tak trzymamy panele obok nich.
-    let bar = (BAR_H * scale).round() as i32;
+    let bar = (bar_h(&cfg) * scale).round() as i32;
     if work.top < monitor.top + bar {
         work.top = monitor.top + bar;
     }
-    let cfg = state::cfg(app);
+    if day_rail_on(&cfg) {
+        let right = monitor.right - (RAIL_W * scale).round() as i32;
+        if work.right > right {
+            work.right = right;
+        }
+    }
     if cfg.shell.show_rail {
         let rail = monitor.left + (RAIL_W * scale).round() as i32;
         if work.left < rail {
@@ -71,6 +80,16 @@ pub fn screen(app: &AppHandle) -> Screen {
         }
     }
     Screen { monitor, work, scale }
+}
+
+/// Wysokość górnego pasa na głównym monitorze.
+pub fn bar_h(cfg: &crate::config::Config) -> f64 {
+    if cfg.shell.notch { NOTCH_BAR_H } else { BAR_H }
+}
+
+/// Prawa szyna z planem dnia jest tylko razem z notchem.
+pub fn day_rail_on(cfg: &crate::config::Config) -> bool {
+    cfg.shell.notch && cfg.shell.day_rail
 }
 
 /// Monitory poza głównym, w stałej kolejności (po pozycji).
@@ -129,8 +148,11 @@ fn unregister_appbar(w: &WebviewWindow) {
     }
 }
 
-fn place_topbar(w: &WebviewWindow, monitor: Rect, scale: f64, reserve: bool) {
-    let h = (BAR_H * scale).round() as i32;
+/// `ghost`: z notchem pasek jest pustym, przezroczystym pasem, który tylko
+/// rezerwuje miejsce (kliknięcia przechodzą do tapety, widać tylko notch).
+fn place_topbar(w: &WebviewWindow, monitor: Rect, scale: f64, reserve: bool, bar: f64, ghost: bool) {
+    let h = (bar * scale).round() as i32;
+    let _ = w.set_ignore_cursor_events(ghost);
     let mut rect = Rect { left: monitor.left, top: monitor.top, right: monitor.right, bottom: monitor.top + h };
     if reserve {
         rect = register_appbar(w, rect, ABE_TOP);
@@ -148,7 +170,7 @@ fn arrange_secondary_bars(app: &AppHandle, reserve: bool, enabled: bool) {
     for (i, (rect, scale)) in monitors.iter().enumerate() {
         let label = format!("topbar-{}", i + 1);
         match win(app, &label) {
-            Some(w) => place_topbar(&w, *rect, *scale, reserve),
+            Some(w) => place_topbar(&w, *rect, *scale, reserve, BAR_H, false),
             None => missing = true,
         }
     }
@@ -198,14 +220,14 @@ pub fn arrange(app: &AppHandle) {
     let s = screen(app);
 
     if let Some(bar) = win(app, "topbar") {
-        place_topbar(&bar, s.monitor, s.scale, cfg.shell.reserve_top_bar);
+        place_topbar(&bar, s.monitor, s.scale, cfg.shell.reserve_top_bar, bar_h(&cfg), cfg.shell.notch);
     }
     arrange_secondary_bars(app, cfg.shell.reserve_top_bar, cfg.shell.bar_on_all_monitors);
 
     if let Some(rail) = win(app, "rail") {
         if cfg.shell.show_rail {
             let w = px(RAIL_W, &s);
-            let top = s.monitor.top + px(BAR_H, &s);
+            let top = s.monitor.top + px(bar_h(&cfg), &s);
             let mut rect = Rect { left: s.monitor.left, top, right: s.monitor.left + w, bottom: s.monitor.bottom };
             if cfg.shell.reserve_top_bar {
                 rect = register_appbar(&rail, rect, ABE_LEFT);
@@ -215,6 +237,23 @@ pub fn arrange(app: &AppHandle) {
         } else {
             unregister_appbar(&rail);
             let _ = rail.hide();
+        }
+    }
+
+    // Prawa szyna: plan dnia z Horologa (lustro lewej szyny).
+    if let Some(dr) = win(app, "dayrail") {
+        if day_rail_on(&cfg) {
+            let w = px(RAIL_W, &s);
+            let top = s.monitor.top + px(bar_h(&cfg), &s);
+            let mut rect = Rect { left: s.monitor.right - w, top, right: s.monitor.right, bottom: s.monitor.bottom };
+            if cfg.shell.reserve_top_bar {
+                rect = register_appbar(&dr, rect, ABE_RIGHT);
+            }
+            place(&dr, rect.right - w, top, w, s.monitor.bottom - top);
+            let _ = dr.show();
+        } else {
+            unregister_appbar(&dr);
+            let _ = dr.hide();
         }
     }
 
@@ -274,7 +313,7 @@ pub fn arrange(app: &AppHandle) {
         place(&w, s.work.right - bw, (s.work.top + s.work.bottom - bh) / 2, bw, bh);
     }
     if let Some(w) = win(app, "glow") {
-        place(&w, s.monitor.right - px(12.0, &s), s.work.top, px(12.0, &s), s.work.bottom - s.work.top);
+        place(&w, s.work.right - px(12.0, &s), s.work.top, px(12.0, &s), s.work.bottom - s.work.top);
         let _ = w.set_ignore_cursor_events(true);
     }
     place_radio(app);
@@ -294,7 +333,7 @@ fn inside(r: Rect, x: i32, y: i32) -> bool {
 /// Chowa nasze okna leżące na monitorze zajętym przez pełny ekran.
 fn hide_covered(app: &AppHandle, fs: Rect) {
     for (label, w) in app.webview_windows() {
-        let ours = label == "topbar" || label.starts_with("topbar-") || matches!(label.as_str(), "rail" | "dock" | "bubbles" | "preview" | "stack" | "player" | "notch");
+        let ours = label == "topbar" || label.starts_with("topbar-") || matches!(label.as_str(), "rail" | "dayrail" | "dock" | "bubbles" | "preview" | "stack" | "player" | "notch");
         if !ours {
             continue;
         }

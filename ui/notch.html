@@ -5,92 +5,112 @@
 <title>Edge Shell — notch</title>
 <link rel="stylesheet" href="shared.css">
 <style>
+  /* Klasy z prefiksem n- — shared.css ma własne .panel/.btn i to one rozjechały poprzedni panel. */
   html, body { background: transparent; overflow: hidden; }
-  .wrap { position: absolute; left: 0; top: 0; display: flex; align-items: flex-start; }
-  .sh { width: 12px; height: 12px; flex: none; }
-  .sh.l { background: radial-gradient(circle at 0 100%, transparent 11.5px, #000 12px); }
-  .sh.r { background: radial-gradient(circle at 100% 100%, transparent 11.5px, #000 12px); }
-  .n { position: relative; background: #000; border-radius: 0 0 16px 16px; overflow: hidden;
-       box-shadow: 0 0 0 1px var(--edge, rgba(255,255,255,0.06));
-       transition: width 0.45s cubic-bezier(.2,1.2,.35,1), height 0.45s cubic-bezier(.2,1.2,.35,1), border-radius 0.45s, box-shadow 0.4s; }
-  .row { height: 34px; display: grid; align-items: center; transition: grid-template-columns 0.45s cubic-bezier(.2,1.2,.35,1); }
-  .ear { display: flex; align-items: center; justify-content: center; overflow: hidden; min-width: 0; }
-  .ear .art { width: 22px; height: 22px; border-radius: 7px; background: #222 center/cover; }
-  .eq { display: flex; gap: 2px; align-items: flex-end; height: 13px; }
-  .eq i { width: 3px; border-radius: 2px; background: var(--eq, #f9a8d4); animation: eq 0.9s ease-in-out infinite alternate; }
-  .eq i:nth-child(2) { animation-delay: -0.3s; } .eq i:nth-child(3) { animation-delay: -0.6s; } .eq i:nth-child(4) { animation-delay: -0.15s; }
-  .eq.stop i { animation: none; height: 3px !important; }
+  #n { position: absolute; left: 50%; top: 0; transform: translateX(-50%); box-sizing: border-box; overflow: hidden;
+       background: var(--bg, rgba(16,16,19,0.96)); border: 1px solid var(--edge, rgba(255,255,255,0.08)); border-top: 0;
+       border-radius: 0 0 18px 18px; box-shadow: 0 14px 30px -14px rgba(0,0,0,0.85);
+       transition: width 0.45s cubic-bezier(.2,1.2,.35,1), height 0.45s cubic-bezier(.2,1.2,.35,1), border-radius 0.45s, background 0.35s, border-color 0.35s; }
+  .n-row { width: max-content; height: 39px; margin: 0 auto; display: flex; align-items: center; gap: 10px; padding: 0 12px 0 7px; white-space: nowrap; font-size: 12.5px; }
+  .n-lead { display: flex; align-items: center; gap: 10px; min-width: 0; height: 100%; }
+  .n-mode { display: flex; align-items: center; gap: 7px; height: 26px; padding: 0 10px; border-radius: 999px; border: 0; background: var(--modeBg, rgba(212,46,37,0.18)); color: var(--modeFg, #fca5a5); font-weight: 600; font-size: 12px; flex: none; }
+  .n-mode i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+  .n-mid { display: flex; align-items: center; gap: 10px; max-width: 470px; min-width: 0; cursor: default; }
+  .n-mid .t { overflow: hidden; text-overflow: ellipsis; min-width: 0; color: #e4e4e7; }
+  .n-mid .t b { font-weight: 700; }
+  .n-mid .t .dim { color: rgba(255,255,255,0.72); }
+  .n-mid .c { font-family: var(--mono); font-weight: 600; flex: none; font-variant-numeric: tabular-nums; }
+  .n-ic { width: 22px; height: 22px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; }
+  .n-art { width: 22px; height: 22px; flex: none; border-radius: 7px; background: #222 center/cover; }
+  .n-eq { display: flex; gap: 2px; align-items: flex-end; height: 13px; flex: none; }
+  .n-eq i { width: 3px; border-radius: 2px; background: #f9a8d4; animation: eq 0.9s ease-in-out infinite alternate; }
+  .n-eq i:nth-child(2) { animation-delay: -0.3s; } .n-eq i:nth-child(3) { animation-delay: -0.6s; } .n-eq i:nth-child(4) { animation-delay: -0.15s; }
+  .n-eq.stop i { animation: none; height: 3px !important; }
   @keyframes eq { from { height: 3px; } to { height: 13px; } }
-  .mid { display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 0; white-space: nowrap; font-size: 12.5px; padding: 0 12px; }
-  .mid .t { overflow: hidden; text-overflow: ellipsis; color: #d4d4d8; }
-  .mid .c { font-family: var(--mono); font-weight: 600; flex: none; }
-  .join { height: 22px; padding: 0 10px; border-radius: 999px; background: #3b82f6; color: #fff; font-size: 11.5px; font-weight: 700; border: 0; white-space: nowrap; }
-  .cnt { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #fbbf24; color: #1c1917; font-size: 11px; font-weight: 700; border: 0; }
-  .num { font-size: 17px; font-weight: 800; font-style: italic; }
-  .chk { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #0b0a0b; }
-  .line { position: absolute; transition: all 0.45s cubic-bezier(.2,1.2,.35,1); }
-  .line i { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
-  .line .nowmark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #fff; border-radius: 1px; }
-  .msg { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px 0 18px; }
-  .msg .tx { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pill { height: 26px; padding: 0 12px; border-radius: 999px; border: 0; font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.1); color: #fff; white-space: nowrap; }
-  .pill.main { background: var(--btn, #fbbf24); color: #1c1917; }
-  .reply { display: flex; gap: 8px; padding: 0 12px 10px 18px; }
-  .reply input { flex: 1; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.18); background: #0b0b0d; color: #fff; font-size: 13px; outline: none; user-select: text; }
-  .reply input:focus { border-color: #fbbf24; }
-  .panel { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; padding: 8px 18px 0; }
-  .card { height: 196px; box-sizing: border-box; border-radius: 20px; padding: 18px 20px; display: flex; gap: 18px; align-items: center; }
-  .ring { width: 120px; height: 120px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
-  .ring span { width: 100px; height: 100px; border-radius: 50%; background: #0b0607; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 21px; font-weight: 600; }
-  .kick { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; }
-  .side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
-  .box { border-radius: 16px; background: #0f0f14; border: 1px solid rgba(255,255,255,0.06); padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
-  .box .lbl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; color: #6b6b76; }
-  .it { display: flex; gap: 8px; align-items: center; min-width: 0; border: 0; background: transparent; padding: 2px 0; text-align: left; color: #e4e4e7; font-size: 12.5px; }
-  .it .tm { font-family: var(--mono); color: #6b6b76; flex: none; }
-  .it .tx { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .it b { font-weight: 600; flex: none; }
-  .it .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
-  .quick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-  .q { height: 40px; border-radius: 13px; background: #0f0f14; border: 1px solid rgba(255,255,255,0.06); color: #d4d4d8; display: flex; align-items: center; justify-content: center; }
-  .q:hover, .deep button:hover, .box button.it:hover { background: rgba(255,255,255,0.08); }
-  .deep { display: flex; gap: 6px; padding: 12px 18px 0; align-items: center; }
-  .deep button { height: 28px; padding: 0 12px; border-radius: 999px; border: 0; background: rgba(255,255,255,0.06); color: #d4d4d8; font-size: 12px; display: flex; align-items: center; gap: 6px; }
-  .btn2 { height: 30px; padding: 0 12px; border-radius: 999px; border: 0; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.1); color: #fff; }
-  .btn2.w { background: #fff; color: #000; }
-  .hours { position: absolute; left: 18px; right: 18px; bottom: 6px; display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: #6b6b76; }
-  .fade { animation: fade 0.25s ease-out 0.2s both; }
+  .n-tb { width: 24px; height: 24px; flex: none; border-radius: 50%; border: 0; background: transparent; color: rgba(255,255,255,0.85); display: flex; align-items: center; justify-content: center; }
+  .n-tb:hover { background: rgba(255,255,255,0.14); }
+  .n-tb.w { background: #fff; color: #000; }
+  .n-act { height: 24px; padding: 0 11px; border-radius: 999px; border: 0; background: #fff; color: #000; font-size: 11.5px; font-weight: 700; flex: none; }
+  .n-act.g { background: rgba(255,255,255,0.16); color: #fff; }
+  .n-cnt { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; border: 0; background: #fbbf24; color: #1c1917; font-size: 11px; font-weight: 800; flex: none; }
+  .n-st { display: flex; align-items: center; gap: 2px; color: #d4d4d8; flex: none; }
+  .n-sb { height: 28px; padding: 0 6px; border-radius: 8px; border: 0; background: transparent; color: inherit; display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .n-sb:hover { background: rgba(255,255,255,0.1); }
+  .n-clock { height: 28px; padding: 0 8px; border-radius: 8px; border: 0; background: transparent; color: #e4e4e7; display: flex; align-items: center; gap: 9px; font-size: 12.5px; flex: none; }
+  .n-clock:hover { background: rgba(255,255,255,0.1); }
+  .n-clock .sep { width: 1px; height: 14px; background: rgba(255,255,255,0.28); }
+  .n-clock .tm { font-variant-numeric: tabular-nums; }
+  .n-reply { display: flex; gap: 8px; padding: 2px 12px 10px 14px; }
+  .n-reply input { flex: 1; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.35); color: #fff; font-size: 13px; outline: none; user-select: text; }
+  .n-reply input:focus { border-color: #fff; }
+  /* panel */
+  .n-pn { width: 940px; box-sizing: border-box; padding: 4px 18px 18px; margin: 0 auto; }
+  .n-modes { display: flex; align-items: center; gap: 6px; }
+  .n-modes button { height: 26px; padding: 0 11px; border-radius: 999px; border: 0; background: rgba(255,255,255,0.05); color: #d4d4d8; font-size: 12px; font-weight: 600; }
+  .n-modes button:hover { background: rgba(255,255,255,0.1); }
+  .n-people { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #8b8b98; }
+  .n-pp { width: 22px; height: 22px; border-radius: 50%; background: #27272a; box-shadow: 0 0 0 2px var(--st); font-size: 10px; font-weight: 700; color: #e5e7eb; display: flex; align-items: center; justify-content: center; }
+  .n-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
+  .n-card { min-height: 190px; box-sizing: border-box; border-radius: 18px; padding: 16px 18px; display: flex; gap: 16px; align-items: center; border: 1px solid rgba(255,255,255,0.08); }
+  .n-ring { width: 108px; height: 108px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .n-ring span { width: 90px; height: 90px; border-radius: 50%; background: #141416; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 19px; font-weight: 600; }
+  .n-kick { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; }
+  .n-side { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .n-box { border-radius: 15px; background: rgba(255,255,255,0.05); padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+  .n-box .lbl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; color: #71717a; display: flex; }
+  .n-it { display: flex; gap: 8px; align-items: center; min-width: 0; border: 0; background: transparent; padding: 2px 0; text-align: left; color: #e4e4e7; font-size: 12.5px; border-radius: 6px; }
+  button.n-it:hover { background: rgba(255,255,255,0.06); }
+  .n-it .tm { font-family: var(--mono); color: #71717a; flex: none; }
+  .n-it .tx { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-it b { font-weight: 600; flex: none; }
+  .n-it .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .n-quick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .n-q { height: 40px; border-radius: 13px; border: 0; background: rgba(255,255,255,0.05); color: #d4d4d8; display: flex; align-items: center; justify-content: center; }
+  .n-q:hover, .n-deep button:hover { background: rgba(255,255,255,0.1); }
+  .n-deep { display: flex; flex-wrap: wrap; gap: 6px; }
+  .n-deep button { height: 28px; padding: 0 11px; border-radius: 999px; border: 0; background: rgba(255,255,255,0.05); color: #d4d4d8; font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .n-b2 { height: 30px; padding: 0 12px; border-radius: 999px; border: 0; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.1); color: #fff; }
+  .n-b2.w { background: #fff; color: #000; }
+  .fade { animation: fade 0.25s ease-out 0.15s both; }
   @keyframes fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
-  .measure { position: absolute; visibility: hidden; white-space: nowrap; font-size: 12.5px; font-family: var(--font); }
 </style>
 </head>
 <body>
-<div class="wrap" id="wrap"><span class="sh l"></span><div class="n" id="n"></div><span class="sh r"></span></div>
-<span class="measure" id="measure"></span>
+<div id="n"></div>
 <script type="module">
-import { invoke, listen, onSnapshot, onTick, esc, icon, focusTiming, mmss, hhmm, blockColor } from './shared.js';
+import { invoke, listen, onSnapshot, onTick, esc, icon, focusTiming, mmss, hhmm } from './shared.js';
 
 const $ = (id) => document.getElementById(id);
 const notch = $('n');
 let s = null;
-let hover = false;
+let stats = null;
+let hotCount = 0;
 let openState = false;
+let hover = false;
 let hoverTimer = null;
 let leaveTimer = null;
 let replying = false;
 let msgShownId = '';
 let msgTimer = null;
-let msgHidden = '';         // id wiadomości, którą notch już schował
-let doneUntil = 0;
-let doneColor = '#22c55e';
-let doneLabel = '';
+let msgHidden = '';          // wiadomość, którą notch już schował
+let done = null;             // { until, kind, title }
 const prevStatus = new Map();
 let size = { w: 0, h: 0 };
 let shrinkTimer = null;
 let firstStep = { title: '', step: '' };
 let lastKey = '';
 
-const STATUS = { early: ['#a855f7', 'Fioletowy sektor'], ontime: ['#22c55e', 'Zielony sektor'], late: ['#eab308', 'Żółty sektor'] };
+const MAT = { bg: 'rgba(16,16,19,0.96)', edge: 'rgba(255,255,255,0.08)' };
+const TINT = {
+  music: { bg: 'linear-gradient(90deg, #4c1d95, #9d174d)', edge: 'rgba(244,114,182,0.4)' },
+  msg: { bg: 'linear-gradient(90deg, #78350f, #a16207)', edge: 'rgba(251,191,36,0.45)' },
+  meet: { bg: 'linear-gradient(90deg, #1e3a8a, #1d4ed8)', edge: 'rgba(96,165,250,0.5)' },
+  hot: { bg: 'linear-gradient(90deg, #7f1d1d, #b91c1c)', edge: 'rgba(248,113,113,0.5)' },
+  ontime: { bg: 'linear-gradient(90deg, #14532d, #15803d)', edge: 'rgba(74,222,128,0.45)' },
+  early: { bg: 'linear-gradient(90deg, #3b0764, #7e22ce)', edge: 'rgba(192,132,252,0.45)' },
+  late: { bg: 'linear-gradient(90deg, #713f12, #a16207)', edge: 'rgba(250,204,21,0.45)' },
+};
+const DONE = { early: ['#c084fc', 'Fioletowy sektor', 'ponad plan'], ontime: ['#4ade80', 'Zielony sektor', 'w czasie'], late: ['#facc15', 'Żółty sektor', 'po czasie'] };
 
 // ------------------------------------------------------------------ stan
 
@@ -103,235 +123,302 @@ function meetingSoon() {
 
 function currentMsg() {
   const m = s?.radio?.current;
-  if (!m || m.id === msgHidden) return null;
-  return m;
+  return m && m.id !== msgHidden ? m : null;
 }
+
+const musicOn = () => s.spotifyEnabled && s.music.connected && s.music.title && s.music.playing;
+const isHot = () => hotCount >= 2;
 
 function stateOf() {
   if (!s) return 'rest';
   if (openState) return 'open';
   if (currentMsg()) return 'msg';
-  if (Date.now() < doneUntil) return 'done';
+  if (done && Date.now() < done.until) return 'done';
   if (s.oneThing) return 'focus';
+  if (meetingSoon()) return 'meet';
+  if (isHot()) return 'hot';
+  if (musicOn()) return 'music';
   return 'rest';
 }
 
-// ------------------------------------------------------------------ linia dnia
+// ------------------------------------------------------------------ prawa strona: status + data
 
-function dayRange() {
-  const items = (s?.day || []).filter((i) => i.kind !== 'buffer');
-  const d = new Date();
-  let from = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 8).getTime();
-  let to = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 20).getTime();
-  for (const i of items) {
-    from = Math.min(from, new Date(i.start).getTime());
-    to = Math.max(to, new Date(i.end).getTime());
+function wifiIcon(signal) {
+  const on = (min) => (signal != null && signal >= min ? 1 : 0.3);
+  return `<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <path d="M2 9a15 15 0 0 1 20 0" opacity="${on(75)}"></path><path d="M5 12.5a10 10 0 0 1 14 0" opacity="${on(45)}"></path>
+    <path d="M8.5 16a5 5 0 0 1 7 0" opacity="${on(15)}"></path><path d="M12 19.5h.01" opacity="${signal == null ? 0.3 : 1}"></path></svg>`;
+}
+
+// Bateria jak w zasobniku Windows: „100%” i poziomy akumulator, z wtyczką przy ładowaniu.
+function batteryIcon(pct, charging) {
+  const p = Math.max(0, Math.min(100, pct)) / 100;
+  const fill = !charging && pct <= 20 ? '#f87171' : 'currentColor';
+  const plug = charging ? '<path d="M12.6 3.2 L9.2 7 H11.4 L10.6 9.8 L14 6 H11.8 Z" fill="#101013" stroke="#101013" stroke-width="0.6" stroke-linejoin="round"></path>' : '';
+  return `<svg aria-hidden="true" width="26" height="13" viewBox="0 0 26 13" style="display:block">
+    <rect x="0.75" y="0.75" width="21.5" height="11.5" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"></rect>
+    <rect x="23.2" y="4" width="2" height="5" rx="1" fill="currentColor"></rect>
+    <rect x="2.6" y="2.6" width="${(17.8 * p).toFixed(1)}" height="7.8" rx="1.6" fill="${fill}"></rect>${plug}</svg>`;
+}
+
+function statusHtml() {
+  const st = stats || {};
+  const parts = [];
+  parts.push(`<button class="n-sb" data-pop="wifi" title="${st.wifiSsid ? esc(st.wifiSsid) + ' · ' + st.wifiSignal + '%' : 'Wi‑Fi: brak połączenia'}">${wifiIcon(st.wifiSignal)}</button>`);
+  if (st.volume != null) parts.push(`<button class="n-sb" id="vol" data-pop="sound" title="Dźwięk ${st.muted ? '— wyciszony' : st.volume + '%'} · kółko: głośność · środkowy klik: wycisz">${icon(st.muted ? 'mute' : 'volume', 16)}</button>`);
+  if (st.btPresent && st.btConnected) parts.push(`<button class="n-sb" data-pop="bt" title="Bluetooth: ${st.btConnected} połączonych">${icon('bluetooth', 15)}</button>`);
+  const bat = st.battery ?? s?.battery?.percent;
+  const chg = st.battery != null ? st.charging : s?.battery?.charging;
+  if (bat != null) parts.push(`<button class="n-sb" data-open="ms-settings:batterysaver" title="Bateria${chg ? ' · ładuje' : ''}">${bat}%${batteryIcon(bat, chg)}</button>`);
+  return `<span class="n-st">${parts.join('')}</span>`;
+}
+
+function dateText() {
+  return new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(',', '');
+}
+const timeText = () => new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+
+// ------------------------------------------------------------------ środek
+
+function midHtml(st) {
+  const t = focusTiming(s);
+  if (st === 'msg') {
+    const m = currentMsg();
+    const canReply = !m.ask && (m.openTarget || m.replyUrl || m.reply);
+    const btns = m.ask
+      ? `<button class="n-act" id="mYes">${esc(m.yesLabel || 'Tak')}</button><button class="n-act g" id="mNo">${esc(m.noLabel || 'Nie')}</button>`
+      : `${canReply ? '<button class="n-act" id="mReply">Odpowiedz</button>' : ''}${m.openTarget ? '<button class="n-act g" id="mOpen">Otwórz</button>' : ''}<button class="n-act g" id="mOk">OK</button>`;
+    return `<span class="n-ic" style="background:#fbbf24;color:#1c1917">${esc(m.number || '!')}</span>
+      <span class="t"><b style="color:#fde68a">${esc(m.name)}</b> <span class="dim">„${esc(m.message)}”</span></span>${btns}`;
   }
-  return [from, to];
-}
-
-function segColor(i) {
-  if (STATUS[i.status]) return STATUS[i.status][0];
-  if (i.kind === 'meeting' || i.kind === 'busy') return '#3b82f6';
-  if (i.status === 'past') return 'rgba(255,255,255,0.22)';
-  return blockColor(i, s.mode.accent);
-}
-
-function lineHtml(big) {
-  const [from, to] = dayRange();
-  const span = Math.max(1, to - from);
-  const now = Date.now();
-  const pct = (t) => ((t - from) / span) * 100;
-  const segs = (s?.day || []).filter((i) => i.kind !== 'buffer').map((i) => {
-    const a = new Date(i.start).getTime();
-    const b = new Date(i.end).getTime();
-    const left = pct(a);
-    const w = Math.max(0.6, pct(b) - left);
-    const col = segColor(i);
-    const isNow = a <= now && now < b && !STATUS[i.status];
-    const bg = isNow ? `linear-gradient(90deg, ${col} ${((now - a) / (b - a)) * 100}%, ${col}55 0)` : (i.status === 'next' ? `${col}aa` : col);
-    return `<i style="left:${left}%;width:${w}%;background:${bg}" title="${esc(i.title)} · ${hhmm(i.start)}–${hhmm(i.end)}"></i>`;
-  }).join('');
-  const nowMark = now > from && now < to ? `<span class="nowmark" style="left:${pct(now)}%"></span>` : '';
-  return segs + (big ? nowMark : '');
+  if (st === 'done') {
+    const [col, label, how] = DONE[done.kind];
+    return `<span class="n-ic" style="background:${col};color:#0b0a0b">${icon('check', 12, 3)}</span>
+      <span class="t"><b style="color:${col}">${label}</b> <span class="dim">· ${esc(done.title)} ${how}</span></span>`;
+  }
+  if (st === 'meet') {
+    const m = meetingSoon();
+    return `<span class="n-ic" style="background:#3b82f6;color:#fff">${icon('calendar', 12, 2.4)}</span>
+      <span class="t"><b>${esc(m.title)}</b> <span class="dim">za ${m.mins} min</span></span>
+      <button class="n-act" id="meetBtn">Kalendarz</button>`;
+  }
+  if (st === 'hot') {
+    const st2 = stats || {};
+    const what = st2.cpu >= 85 ? `CPU ${Math.round(st2.cpu)}%` : `RAM ${Math.round(st2.mem)}%`;
+    const view = st2.cpu >= 85 ? 'cpu' : 'mem';
+    return `<span class="n-ic" style="background:#ef4444;color:#fff">!</span>
+      <span class="t"><b>${what}</b> <span class="dim">· system jest przeciążony</span></span>
+      <button class="n-act" id="hotBtn" data-view="${view}">Pokaż</button>`;
+  }
+  if (st === 'music') {
+    const m = s.music;
+    return `<span class="n-art" style="background-image:url('${esc(m.art)}')"></span>
+      <span class="t" id="mTitle" title="Klik: odtwarzacz na wierzchu"><b>${esc(m.title)}</b> <span class="dim">${esc(m.artist)}</span></span>
+      <span class="n-eq"><i style="height:6px"></i><i style="height:13px"></i><i style="height:4px"></i><i style="height:10px"></i></span>
+      <button class="n-tb" id="mPrev" title="Poprzedni">${icon('prev', 11)}</button>
+      <button class="n-tb w" id="mPlay" title="Pauza">${icon('pause', 11)}</button>
+      <button class="n-tb" id="mNext" title="Następny">${icon('next', 11)}</button>`;
+  }
+  if (st === 'focus') {
+    return `<span class="c" id="cd">${t ? (s.paused ? 'pauza' : mmss(t.left)) : ''}</span>`;
+  }
+  // spoczynek / panel
+  let text;
+  let clock = '';
+  if (s.focus) { text = esc(s.focus.title); clock = t ? (s.paused ? 'pauza' : mmss(t.left)) : ''; }
+  else if (s.next) { text = `<span class="dim">Dalej:</span> ${esc(s.next.title)}`; clock = hhmm(s.next.start); }
+  else text = '<span class="dim">Wolne</span>';
+  const waiting = s.radio.waiting ? `<button class="n-cnt" id="waitBtn" title="Wiadomości czekają na paczkę — pokaż teraz">${s.radio.waiting}</button>` : '';
+  return `<span class="t">${text}</span>${clock ? `<span class="c" id="cd">${esc(clock)}</span>` : ''}${waiting}`;
 }
 
 // ------------------------------------------------------------------ rysowanie
 
-function textWidth(text) {
-  const m = $('measure');
-  m.textContent = text;
-  return m.getBoundingClientRect().width;
-}
-
 function render() {
   if (!s) return;
   const st = stateOf();
-  const music = s.spotifyEnabled && s.music.connected && s.music.title && s.music.playing;
-  const meet = meetingSoon();
-  const t = focusTiming(s);
+  const focus = st === 'focus';
+  const tint = st === 'done' ? TINT[done.kind] : TINT[st] || MAT;
+  notch.style.setProperty('--bg', tint.bg);
+  notch.style.setProperty('--edge', tint.edge);
+  notch.style.setProperty('--accent', s.mode.accent);
+  notch.style.setProperty('--modeBg', tint === MAT ? `${s.mode.accent}2e` : 'rgba(0,0,0,0.25)');
+  notch.style.setProperty('--modeFg', tint === MAT ? '#fca5a5' : '#fff');
+
   const msg = st === 'msg' ? currentMsg() : null;
-
-  // Środek: co trwa / co dalej
-  let mid = '';
-  let clock = '';
-  let midColor = '#d4d4d8';
-  if (st === 'focus') {
-    clock = t ? mmss(t.left) : hhmm(new Date().toISOString());
-  } else if (st === 'msg') {
-    mid = `${msg.name} · ${msg.source}`;
-    midColor = msg.color;
-  } else if (st === 'done') {
-    mid = doneLabel;
-    midColor = doneColor;
-  } else if (meet) {
-    mid = `${meet.title} za ${meet.mins} min`;
-    midColor = '#bfdbfe';
-  } else if (s.focus) {
-    mid = s.focus.title;
-    clock = t ? (s.paused ? 'pauza' : mmss(t.left)) : '';
-  } else if (s.next) {
-    mid = `Dalej: ${s.next.title}`;
-    clock = hhmm(s.next.start);
-  } else {
-    mid = 'Wolne';
-  }
-
-  // Uszy
-  let left = '';
-  let right = '';
-  if (st === 'msg') left = `<span class="num" style="color:${esc(msg.color)}">${esc(msg.number)}</span>`;
-  else if (st === 'done') left = `<span class="chk" style="background:${doneColor}">${icon('check', 12, 3)}</span>`;
-  else if (st !== 'focus' && music) left = `<span class="art" style="background-image:url('${esc(s.music.art)}')"></span>`;
-  if (st === 'open' || st === 'rest') {
-    if (meet) right = `<button class="join" id="joinBtn">${meet.mins} min</button>`;
-    else if (music) right = `<span class="eq"><i style="height:6px"></i><i style="height:13px"></i><i style="height:4px"></i><i style="height:10px"></i></span>`;
-    else if (s.radio.waiting) right = `<button class="cnt" id="waitBtn" title="Wiadomości czekają na paczkę — pokaż teraz">${s.radio.waiting}</button>`;
-  }
-  const earL = left ? 44 : 0;
-  const earR = right ? (meet && st !== 'msg' ? 70 : 44) : 0;
-
-  // Rozmiar (px CSS, bez ramion)
-  const textW = textWidth(mid) + (clock ? textWidth(clock) + 10 : 0);
-  let w = Math.min(560, Math.max(st === 'focus' ? 110 : 220, Math.ceil(textW) + 34 + earL + earR));
-  let h = 38;
-  let r = 16;
-  if (st === 'msg') { w = 540; h = replying ? 120 : 80; r = 22; }
-  if (st === 'open') { w = 860; h = 360; r = 30; }
-
-  const edge = st === 'msg' ? `${msg.color}80` : st === 'done' ? `${doneColor}90` : meet ? 'rgba(59,130,246,0.55)' : music ? 'rgba(244,114,182,0.25)' : 'rgba(255,255,255,0.06)';
-  notch.style.setProperty('--edge', edge);
-  notch.style.borderRadius = `0 0 ${r}px ${r}px`;
-
-  const key = JSON.stringify([st, mid, !!clock, left, right, replying, msg?.id, st === 'open' ? openKey() : '']);
+  const key = JSON.stringify([st, midKey(st), focus, replying, msg?.id, statusKey(), st === 'open' ? openKey() : '']);
   if (key !== lastKey) {
     lastKey = key;
     notch.innerHTML = `
-      <div class="row" style="grid-template-columns:${earL}px minmax(0,1fr) ${earR}px">
-        <span class="ear">${left}</span>
-        <span class="mid">${mid ? `<span class="t" style="color:${midColor}">${esc(mid)}</span>` : ''}${clock ? `<span class="c" id="clock">${esc(clock)}</span>` : ''}</span>
-        <span class="ear">${right}</span>
+      <div class="n-row" id="row">
+        <span class="n-lead" id="lead">
+          <button class="n-mode" id="modeBtn" title="Tryb: ${esc(s.mode.label)}"><i></i>${focus ? '' : esc(s.mode.label)}</button>
+          <span class="n-mid" id="mid">${midHtml(st)}</span>
+        </span>
+        ${focus ? '' : statusHtml()}
+        <button class="n-clock" id="clockBtn" title="Kalendarz">${focus ? '' : `<span id="date">${esc(dateText())}</span><span class="sep"></span>`}<span class="tm" id="time">${timeText()}</span></button>
       </div>
-      ${st === 'msg' ? msgHtml(msg) : ''}
-      ${st === 'open' ? panelHtml(music) : ''}
-      <div class="line" id="line"></div>
-      ${st === 'open' ? hoursHtml() : ''}`;
-    wire(st, msg, meet);
-  } else if (clock && $('clock')) {
-    $('clock').textContent = clock;
+      ${msg && replying ? replyHtml(msg) : ''}
+      ${st === 'open' ? panelHtml() : ''}`;
+    wire(st, msg);
+  } else {
+    tickText(st);
   }
-  const line = $('line');
-  if (line) {
-    const big = st === 'open';
-    Object.assign(line.style, big
-      ? { left: '18px', right: '18px', bottom: '24px', height: '24px' }
-      : { left: '14px', right: '14px', bottom: '3px', height: '3px' });
-    line.innerHTML = lineHtml(big);
+  const row = $('row');
+  let w = Math.max(focus ? 150 : 260, Math.ceil(row.scrollWidth) + 2);
+  let h = 40;
+  if (msg && replying) h = 86;
+  const r = st === 'open' ? 26 : 18;
+  if (st === 'open') {
+    w = Math.max(w, 942);
+    h = 40 + ($('pn')?.offsetHeight || 300);
   }
+  notch.style.borderRadius = `0 0 ${r}px ${r}px`;
   resize(w, h);
 }
 
-function msgHtml(m) {
-  const canReply = !m.ask && (m.openTarget || m.replyUrl || m.reply);
-  const btns = m.ask
-    ? `<button class="pill main" id="mYes">${esc(m.yesLabel || 'Tak')}</button><button class="pill" id="mNo">${esc(m.noLabel || 'Nie')}</button>`
-    : `${canReply ? '<button class="pill main" id="mReply">Odpowiedz</button>' : ''}${m.openTarget ? '<button class="pill" id="mOpen">Otwórz</button>' : ''}<button class="pill" id="mOk">OK</button>`;
-  return `<div class="msg fade" style="--btn:${esc(m.color)}"><span class="tx">„${esc(m.message)}”</span>${btns}</div>
-    ${replying ? `<div class="reply"><input id="rIn" placeholder="${m.replyUrl ? 'Odpowiedź — Enter wysyła' : 'Odpowiedź — Enter: do schowka i otwiera rozmowę'}" value="${esc(m.reply || '')}"><button class="pill main" id="rSend" style="--btn:${esc(m.color)}">Wyślij</button></div>` : ''}`;
+function midKey(st) {
+  if (st === 'music') return [s.music.title, s.music.artist, s.music.art];
+  if (st === 'rest' || st === 'open') return [s.focus?.title, !!focusTiming(s), s.paused, s.next?.title, s.radio.waiting];
+  if (st === 'meet') return meetingSoon()?.mins;
+  if (st === 'hot') return [Math.round(stats?.cpu || 0), Math.round(stats?.mem || 0)];
+  return '';
+}
+function statusKey() {
+  const st = stats || {};
+  return [st.wifiSignal != null ? Math.floor(st.wifiSignal / 20) : -1, st.volume == null ? -1 : st.muted, st.btConnected, st.battery, st.charging, dateText()];
+}
+
+// Tylko teksty, które zmieniają się co sekundę (bez przerysowania notcha).
+function tickText(st) {
+  const tm = $('time');
+  if (tm) tm.textContent = timeText();
+  const cd = $('cd');
+  const t = focusTiming(s);
+  if (cd && s.focus && t) cd.textContent = s.paused ? 'pauza' : mmss(t.left);
+  const bc = $('bigClock');
+  if (bc && t) bc.textContent = mmss(t.left);
+}
+
+function replyHtml(m) {
+  return `<div class="n-reply fade"><input id="rIn" placeholder="${m.replyUrl ? 'Odpowiedź — Enter wysyła' : 'Odpowiedź — Enter: do schowka i otwiera rozmowę'}" value="${esc(m.reply || '')}"><button class="n-act" id="rSend">Wyślij</button></div>`;
 }
 
 function openKey() {
-  return JSON.stringify([s.focus?.title, s.paused, s.music.title, s.music.playing, (s.missed || []).length, s.next?.title, firstStep.step]);
+  return JSON.stringify([s.focus?.title, s.paused, s.oneThing, s.music.title, s.music.playing, (s.missed || []).length, s.next?.title, firstStep.step, s.mode.id, (s.presence || []).map((p) => p.state).join()]);
 }
 
-function panelHtml(music) {
+function peopleHtml() {
+  const people = (s.presence || []).filter((p) => p.state !== 'offline').slice(0, 5);
+  if (!people.length) return '';
+  const color = { focus: '#f87171', available: '#4ade80', away: '#71717a' };
+  const label = { focus: 'w fokusie', available: 'dostępny', away: 'z dala od komputera' };
+  const working = people.filter((p) => p.state === 'focus').length;
+  return `<span class="n-people">${working ? 'pracują teraz' : 'obecni'}${people.map((p) => {
+    const initials = p.name.split(/\s+/).map((x) => x[0]).join('').slice(0, 2).toUpperCase();
+    return `<span class="n-pp" style="--st:${color[p.state] || '#71717a'}" title="${esc(`${p.name} — ${label[p.state] || p.state}${p.task ? `: ${p.task}` : ''}`)}">${esc(initials)}</span>`;
+  }).join('')}</span>`;
+}
+
+function panelHtml() {
   const t = focusTiming(s);
+  const acc = s.mode.accent;
   let main;
   if (s.focus) {
     const p = t ? t.progress * 100 : 0;
-    const acc = s.mode.accent;
-    main = `<div class="card fade" style="background:linear-gradient(160deg, ${acc}38, ${acc}0a);border:1px solid ${acc}40">
-      <span class="ring" style="background:conic-gradient(${acc} 0 ${p}%, rgba(255,255,255,0.08) 0)"><span id="bigClock">${t ? mmss(t.left) : ''}</span></span>
+    main = `<div class="n-card fade" style="background:linear-gradient(160deg, ${acc}33, rgba(255,255,255,0.03))">
+      <span class="n-ring" style="background:conic-gradient(${acc} 0 ${p}%, rgba(255,255,255,0.08) 0)"><span id="bigClock">${t ? mmss(t.left) : ''}</span></span>
       <span style="display:flex;flex-direction:column;gap:7px;min-width:0">
-        <span class="kick" style="color:#fca5a5">TERAZ${s.focus.end ? ` · DO ${hhmm(s.focus.end)}` : ''}</span>
-        <b style="font-size:18px;font-weight:600;overflow:hidden;text-overflow:ellipsis">${esc(s.focus.title)}</b>
+        <span class="n-kick" style="color:#fca5a5">TERAZ${s.focus.end ? ` · DO ${hhmm(s.focus.end)}` : ''}</span>
+        <b style="font-size:17px;font-weight:600;overflow:hidden;text-overflow:ellipsis">${esc(s.focus.title)}</b>
         ${firstStep.step && firstStep.title === s.focus.title ? `<span style="font-size:12.5px;color:#d4d4d8">Pierwszy krok: ${esc(firstStep.step)}</span>` : ''}
-        <span style="display:flex;gap:6px;margin-top:4px">
-          ${s.focus.completable ? '<button class="btn2 w" id="pDone">✓ Skończone</button>' : ''}
-          <button class="btn2" id="pPause">${s.paused ? 'Wznów' : 'Pauza'}</button>
-          <button class="btn2" id="pOne">${s.oneThing ? 'Pokaż wszystko' : 'Jedna rzecz'}</button>
+        <span style="display:flex;gap:6px;margin-top:4px;flex-wrap:wrap">
+          ${s.focus.completable ? '<button class="n-b2 w" id="pDone">✓ Skończone</button>' : ''}
+          <button class="n-b2" id="pPause">${s.paused ? 'Wznów' : 'Pauza'}</button>
+          <button class="n-b2" id="pOne">${s.oneThing ? 'Pokaż wszystko' : 'Jedna rzecz'}</button>
         </span>
       </span></div>`;
   } else if (s.spotifyEnabled && s.music.connected && s.music.title) {
-    main = `<div class="card fade" style="flex-direction:column;align-items:stretch;justify-content:space-between;background:linear-gradient(160deg, rgba(76,29,149,0.85), rgba(30,16,60,0.9)), url('${esc(s.music.art)}') center/cover">
-      <span style="display:flex;gap:14px;align-items:center"><span style="width:70px;height:70px;border-radius:14px;flex:none;background:url('${esc(s.music.art)}') center/cover"></span>
-        <span style="display:flex;flex-direction:column;gap:3px;min-width:0"><b style="font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.music.title)}</b><span style="font-size:13px;color:rgba(255,255,255,0.7)">${esc(s.music.artist)}</span></span></span>
+    main = `<div class="n-card fade" style="flex-direction:column;align-items:stretch;justify-content:space-between;background:linear-gradient(160deg, rgba(76,29,149,0.9), rgba(157,23,77,0.75))">
+      <span style="display:flex;gap:14px;align-items:center"><span style="width:70px;height:70px;border-radius:14px;flex:none;background:#222 url('${esc(s.music.art)}') center/cover"></span>
+        <span style="display:flex;flex-direction:column;gap:3px;min-width:0"><b style="font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.music.title)}</b><span style="font-size:13px;color:rgba(255,255,255,0.75)">${esc(s.music.artist)}</span></span></span>
       <span style="display:flex;justify-content:center;gap:30px;align-items:center">
-        <button class="btn2" id="mPrev">${icon('prev', 14)}</button>
-        <button class="btn2 w" id="mPlay" style="width:44px;height:44px;border-radius:50%;padding:0">${icon(s.music.playing ? 'pause' : 'play', 16)}</button>
-        <button class="btn2" id="mNext">${icon('next', 14)}</button></span></div>`;
+        <button class="n-b2" id="pPrev">${icon('prev', 14)}</button>
+        <button class="n-b2 w" id="pPlay" style="width:44px;height:44px;border-radius:50%;padding:0">${icon(s.music.playing ? 'pause' : 'play', 16)}</button>
+        <button class="n-b2" id="pNext">${icon('next', 14)}</button></span></div>`;
   } else {
-    main = `<div class="card fade" style="background:#0f0f14;border:1px solid rgba(255,255,255,0.06);flex-direction:column;align-items:flex-start;justify-content:center;gap:10px">
-      <span class="kick" style="color:#6b6b76">TERAZ NIC NIE TRWA</span>
+    main = `<div class="n-card fade" style="background:rgba(255,255,255,0.03);flex-direction:column;align-items:flex-start;justify-content:center;gap:10px">
+      <span class="n-kick" style="color:#71717a">TERAZ NIC NIE TRWA</span>
       <b style="font-size:17px;font-weight:600">${s.next ? `Dalej: ${esc(s.next.title)} o ${hhmm(s.next.start)}` : 'Na dziś nic więcej w planie'}</b>
-      <span style="display:flex;gap:6px"><button class="btn2 w" id="pStart">Start fokusu</button><button class="btn2" id="pReplan">Przeplanuj</button></span></div>`;
+      <span style="display:flex;gap:6px"><button class="n-b2 w" id="pStart">Start fokusu</button><button class="n-b2" id="pReplan">Przeplanuj</button></span></div>`;
   }
   const upcoming = (s.day || []).filter((i) => i.status === 'next' && i.kind !== 'buffer').slice(0, 2);
   const missed = (s.missed || []).slice(0, 3);
-  return `<div class="panel">${main}
-    <div class="side fade">
-      <div class="box"><span class="lbl">DALEJ</span>
-        ${upcoming.map((i) => `<span class="it"><span class="tm">${hhmm(i.start)}</span><span class="tx">${esc(i.title)}</span></span>`).join('') || '<span class="it" style="color:#6b6b76">nic więcej dziś</span>'}
+  const modes = (s.modes || []).map((m) => {
+    const on = m.id === s.mode.id;
+    return `<button data-mode="${esc(m.id)}" style="${on ? `background:${m.accent}40;color:#fff` : ''}">${esc(m.label)}</button>`;
+  }).join('');
+  return `<div class="n-pn" id="pn">
+    <div class="n-modes fade">${modes}${peopleHtml()}</div>
+    <div class="n-grid">${main}
+      <div class="n-side fade">
+        <div class="n-box"><span class="lbl">DALEJ</span>
+          ${upcoming.map((i) => `<span class="n-it"><span class="tm">${hhmm(i.start)}</span><span class="tx">${esc(i.title)}</span></span>`).join('') || '<span class="n-it" style="color:#71717a">nic więcej dziś</span>'}
+        </div>
+        <div class="n-box"><span class="lbl">CO PRZEGAPIŁEŚ${missed.length ? '<button id="clrMissed" style="margin-left:auto;border:0;background:transparent;color:#71717a;font-size:10.5px">wyczyść</button>' : ''}</span>
+          ${missed.map((m, i) => `<button class="n-it" data-miss="${i}" title="${esc(m.message)}"><span class="dot" style="background:${esc(m.color)}"></span><span class="tx"><b style="color:${esc(m.color)}">${esc(m.name)}</b> ${esc(m.message)}</span>${m.openTarget ? '<b>Otwórz</b>' : ''}</button>`).join('') || '<span class="n-it" style="color:#71717a">nic — jesteś na bieżąco</span>'}
+        </div>
+        <div class="n-quick">
+          <button class="n-q" id="qCap" title="Wrzuć myśl">${icon('note', 16)}</button>
+          <button class="n-q" id="qOne" title="Jedna rzecz">${icon('layers', 16)}</button>
+          <button class="n-q" id="qShot" title="Zrzut ekranu">${icon('camera', 16)}</button>
+          <button class="n-q" id="qReplan" title="Przeplanuj">${icon('replan', 16)}</button>
+        </div>
+        <div class="n-deep">
+          <button id="dMusic">${icon('music', 13)} Muzyka i kolejka</button>
+          <button id="dShelf">${icon('clipboard', 13)} Półka i schowek</button>
+          <button id="dCal">${icon('calendar', 13)} Kalendarz</button>
+          <button id="dSys">${icon('cpu', 13)} System</button>
+        </div>
       </div>
-      <div class="box"><span class="lbl" style="display:flex">CO PRZEGAPIŁEŚ${missed.length ? '<button id="clrMissed" style="margin-left:auto;border:0;background:transparent;color:#6b6b76;font-size:10.5px">wyczyść</button>' : ''}</span>
-        ${missed.map((m, i) => `<button class="it" data-miss="${i}" title="${esc(m.message)}"><span class="dot" style="background:${esc(m.color)}"></span><span class="tx"><b style="color:${esc(m.color)}">${esc(m.name)}</b> ${esc(m.message)}</span>${m.openTarget ? '<b>Otwórz</b>' : ''}</button>`).join('') || '<span class="it" style="color:#6b6b76">nic — jesteś na bieżąco</span>'}
-      </div>
-      <div class="quick">
-        <button class="q" id="qCap" title="Wrzuć myśl">${icon('note', 16)}</button>
-        <button class="q" id="qOne" title="Jedna rzecz">${icon('layers', 16)}</button>
-        <button class="q" id="qShot" title="Zrzut ekranu">${icon('camera', 16)}</button>
-        <button class="q" id="qReplan" title="Przeplanuj">${icon('replan', 16)}</button>
-      </div>
-    </div></div>
-    <div class="deep fade">
-      <button id="dMusic">${icon('music', 13)} Muzyka i kolejka</button>
-      <button id="dShelf">${icon('clipboard', 13)} Półka i schowek</button>
-      <button id="dSys">${icon('cpu', 13)} System</button>
-    </div>`;
+    </div></div>`;
 }
 
-function hoursHtml() {
-  const [from, to] = dayRange();
-  const marks = [];
-  const step = (to - from) / 3;
-  for (let i = 0; i <= 3; i++) marks.push(hhmm(new Date(from + step * i).toISOString()));
-  return `<div class="hours">${marks.map((m) => `<span>${m}</span>`).join('')}</div>`;
+function popup(view, el) {
+  const r = el.getBoundingClientRect();
+  invoke('popup_open', { view, from: 'notch', x: r.left, y: r.top, w: r.width, h: r.height });
 }
 
-function wire(st, msg, meet) {
+function wire(st, msg) {
   const on = (id, fn) => { const el = $(id); if (el) el.onclick = (e) => { e.stopPropagation(); fn(e); }; };
-  on('joinBtn', () => { openState = true; render(); });
+  on('modeBtn', () => setOpen(!openState));
+  on('clockBtn', () => invoke('toggle_calendar'));
   on('waitBtn', () => invoke('radio_show_waiting'));
+  on('meetBtn', () => invoke('toggle_calendar'));
+  on('hotBtn', (e) => popup(e.currentTarget.dataset.view, e.currentTarget));
+  on('mTitle', () => invoke('player_toggle'));
+  on('mPrev', () => invoke('spotify_control', { action: 'previous' }));
+  on('mNext', () => invoke('spotify_control', { action: 'next' }));
+  on('mPlay', () => invoke('spotify_control', { action: 'pause' }));
+  for (const b of notch.querySelectorAll('[data-pop]')) b.onclick = (e) => { e.stopPropagation(); popup(b.dataset.pop, b); };
+  for (const b of notch.querySelectorAll('[data-open]')) b.onclick = (e) => { e.stopPropagation(); invoke('open_path', { path: b.dataset.open }); };
+  const vol = $('vol');
+  if (vol) {
+    vol.onauxclick = (e) => { if (e.button === 1) invoke('toggle_mute'); };
+    vol.onwheel = (e) => {
+      e.preventDefault();
+      const next = Math.max(0, Math.min(100, (stats?.volume || 0) + (e.deltaY < 0 ? 2 : -2)));
+      if (stats) { stats.volume = next; stats.muted = false; }
+      invoke('set_volume', { level: next });
+    };
+  }
+  // Środek otwiera panel (klik albo chwila najechania); ikony i zegar — nie, żeby nic nie uciekało spod kursora.
+  const mid = $('mid');
+  if (mid && st !== 'msg') {
+    mid.onclick = () => setOpen(!openState);
+    mid.onmouseenter = () => { if (!openState) { clearTimeout(hoverTimer); hoverTimer = setTimeout(() => setOpen(true), 420); } };
+    mid.onmouseleave = () => clearTimeout(hoverTimer);
+  }
   if (msg) {
     on('mYes', () => invoke('automation_answer', { yes: true }));
     on('mNo', () => invoke('automation_answer', { yes: false }));
@@ -356,21 +443,20 @@ function wire(st, msg, meet) {
     on('pOne', () => invoke('one_thing_toggle'));
     on('pStart', () => invoke('focus_start_adhoc', {}));
     on('pReplan', () => invoke('replan'));
-    on('mPrev', () => invoke('spotify_control', { action: 'previous' }));
-    on('mNext', () => invoke('spotify_control', { action: 'next' }));
-    on('mPlay', () => invoke('spotify_control', { action: s.music.playing ? 'pause' : 'play' }));
+    on('pPrev', () => invoke('spotify_control', { action: 'previous' }));
+    on('pNext', () => invoke('spotify_control', { action: 'next' }));
+    on('pPlay', () => invoke('spotify_control', { action: s.music.playing ? 'pause' : 'play' }));
     on('qCap', () => invoke('show_capture'));
     on('qOne', () => invoke('one_thing_toggle'));
-    on('qShot', () => { close(); setTimeout(() => invoke('shot_start'), 300); });
+    on('qShot', () => { setOpen(false); setTimeout(() => invoke('shot_start'), 300); });
     on('qReplan', () => invoke('replan'));
-    on('dMusic', () => { close(); invoke('player_toggle'); });
-    on('dShelf', () => { close(); invoke('notch_drawer', { view: 'clip' }); });
-    on('dSys', (e) => {
-      const r = e.currentTarget.getBoundingClientRect();
-      invoke('popup_open', { view: 'cpu', from: 'notch', x: r.left, y: r.top, w: r.width, h: r.height });
-    });
+    on('dMusic', () => { setOpen(false); invoke('player_toggle'); });
+    on('dShelf', () => { setOpen(false); invoke('notch_drawer', { view: 'clip' }); });
+    on('dCal', () => { setOpen(false); invoke('toggle_calendar'); });
+    on('dSys', (e) => popup('cpu', e.currentTarget));
     on('clrMissed', () => invoke('notch_clear_missed', { index: null }));
     for (const b of notch.querySelectorAll('[data-miss]')) b.onclick = (e) => { e.stopPropagation(); invoke('notch_open_missed', { index: +b.dataset.miss }); };
+    for (const b of notch.querySelectorAll('[data-mode]')) b.onclick = (e) => { e.stopPropagation(); invoke('set_mode', { id: b.dataset.mode }); };
     if (s.focus && firstStep.title !== s.focus.title) {
       const title = s.focus.title;
       invoke('get_first_step', { title }).then((step) => { firstStep = { title, step: step || '' }; lastKey = ''; render(); });
@@ -378,9 +464,9 @@ function wire(st, msg, meet) {
   }
 }
 
-// Okno rośnie przed animacją i kurczy się po niej (przezroczyste okno łapie kliknięcia).
+// Okno rośnie przed animacją i kurczy się po niej (przezroczysta część okna łapie kliknięcia).
 function resize(w, h) {
-  const outer = { w: w + 24, h: h + 4 };
+  const outer = { w: w + 32, h: h + 18 };
   notch.style.width = `${w}px`;
   notch.style.height = `${h}px`;
   if (outer.w === size.w && outer.h === size.h) return;
@@ -391,31 +477,23 @@ function resize(w, h) {
   else shrinkTimer = setTimeout(apply, 470);
 }
 
-function close() {
-  openState = false;
+function setOpen(v) {
+  clearTimeout(hoverTimer);
+  if (openState === v) return;
+  openState = v;
   render();
 }
 
 // ------------------------------------------------------------------ zdarzenia
 
-document.addEventListener('mouseenter', () => {
-  hover = true;
-  clearTimeout(leaveTimer);
-  clearTimeout(msgTimer);
-  if (!openState && stateOf() !== 'msg') {
-    hoverTimer = setTimeout(() => { openState = true; render(); }, 350);
-  }
-});
+document.addEventListener('mouseenter', () => { hover = true; clearTimeout(leaveTimer); clearTimeout(msgTimer); });
 document.addEventListener('mouseleave', () => {
   hover = false;
   clearTimeout(hoverTimer);
   if (document.activeElement?.tagName === 'INPUT') return;
-  leaveTimer = setTimeout(() => { if (openState) close(); armMsgTimer(true); }, 420);
+  leaveTimer = setTimeout(() => { if (openState) setOpen(false); armMsgTimer(true); }, 420);
 });
-notch.addEventListener('click', () => {
-  if (!openState && stateOf() !== 'msg') { clearTimeout(hoverTimer); openState = true; render(); }
-});
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openState) close(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openState) setOpen(false); });
 
 // Wiadomość: widać ją ~6 s, potem ląduje w „Co przegapiłeś” (chyba że to pytanie albo kursor jest nad nią).
 function armMsgTimer(force) {
@@ -435,15 +513,20 @@ function armMsgTimer(force) {
 function trackDone() {
   for (const i of s.day || []) {
     const before = prevStatus.get(i.key);
-    if (before && before !== i.status && STATUS[i.status]) {
-      doneColor = STATUS[i.status][0];
-      doneLabel = `${STATUS[i.status][1]} · ${i.title}`;
-      doneUntil = Date.now() + 4000;
+    if (before && before !== i.status && DONE[i.status]) {
+      done = { until: Date.now() + 4000, kind: i.status, title: i.title };
       setTimeout(render, 4100);
     }
     prevStatus.set(i.key, i.status);
   }
 }
+
+listen('stats', (st) => {
+  stats = st;
+  hotCount = (st.cpu ?? 0) >= 85 || (st.mem ?? 0) >= 90 ? hotCount + 1 : 0;
+  render();
+});
+invoke('get_stats').then((st) => { stats = st; render(); });
 
 onSnapshot((snap) => {
   s = snap;
@@ -452,13 +535,7 @@ onSnapshot((snap) => {
   if (!s.radio.current) replying = false;
   render();
 });
-onTick((snap) => {
-  s = snap;
-  render();
-  const bc = $('bigClock');
-  const t = focusTiming(s);
-  if (bc && t) bc.textContent = mmss(t.left);
-});
+onTick((snap) => { s = snap; render(); });
 listen('notch-wake', () => render());
 listen('notch-layout', () => { size = { w: 0, h: 0 }; render(); });
 </script>

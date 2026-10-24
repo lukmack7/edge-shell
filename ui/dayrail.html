@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — plan dnia</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  /* Lustro lewego paska: ten sam materiał, szerokość i przyciski. */
+  body { background: rgba(12, 12, 14, 0.92); border-left: 1px solid var(--line); }
+  .dr { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0; }
+  .tool { width: 40px; height: 40px; flex: none; border-radius: 11px; border: 0; background: transparent; color: var(--muted); display: flex; align-items: center; justify-content: center; }
+  .tool:hover { background: rgba(255,255,255,0.08); color: var(--text); }
+  .now { flex-direction: column; gap: 3px; background: var(--nowBg, rgba(255,255,255,0.06)); }
+  .now b { font-family: var(--mono); font-size: 11.5px; font-weight: 600; color: var(--nowFg, var(--text)); line-height: 1; }
+  .now i { width: 6px; height: 6px; border-radius: 50%; }
+  .line { width: 26px; height: 1px; flex: none; background: rgba(255,255,255,0.1); margin: 4px 0; }
+  .axis { position: relative; flex: 1; min-height: 0; width: 100%; cursor: pointer; }
+  .axis:hover .seg { filter: brightness(1.12); }
+  .hr { position: absolute; left: 5px; transform: translateY(-50%); font-family: var(--mono); font-size: 9.5px; color: #6b6b76; pointer-events: none; }
+  .tick { position: absolute; left: 22px; width: 4px; height: 1px; background: rgba(255,255,255,0.14); pointer-events: none; }
+  .track { position: absolute; left: 28px; width: 14px; top: 0; bottom: 0; border-radius: 4px; background: rgba(255,255,255,0.04); }
+  .seg { position: absolute; left: 28px; width: 14px; border-radius: 4px; transition: filter 0.15s; }
+  .seg.cur { box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55); }
+  .seg.flash { animation: flash 1.2s ease-out 3; }
+  @keyframes flash { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.9); } 100% { box-shadow: 0 0 0 7px rgba(255,255,255,0); } }
+  .nowmark { position: absolute; left: 23px; width: 24px; height: 2px; border-radius: 1px; background: #fff; box-shadow: 0 0 0 2px rgba(12,12,14,0.92); pointer-events: none; }
+</style>
+</head>
+<body>
+<div class="dr">
+  <button class="tool now" id="nowBtn" aria-label="Dziś — plan dnia"><b id="left">—</b><i id="hdot"></i></button>
+  <span class="line" aria-hidden="true"></span>
+  <div class="axis" id="axis" aria-label="Plan dnia z Horologa — klik: panel Dziś"></div>
+  <span class="line" aria-hidden="true"></span>
+  <button class="tool" id="replan" aria-label="Przeplanuj"></button>
+  <button class="tool" id="cal" aria-label="Kalendarz"></button>
+</div>
+<script type="module">
+import { invoke, onSnapshot, onTick, esc, icon, focusTiming, hhmm, blockColor } from './shared.js';
+
+const $ = (id) => document.getElementById(id);
+let s = null;
+const prevStatus = new Map();
+let flashKey = '';
+let flashUntil = 0;
+
+const STATUS = { early: '#a855f7', ontime: '#22c55e', late: '#eab308' };
+const STATUS_TXT = { early: 'ponad plan', ontime: 'w czasie', late: 'po czasie', past: 'minęło', now: 'teraz', next: 'później' };
+
+$('replan').innerHTML = icon('replan', 18);
+$('replan').title = 'Przeplanuj';
+$('replan').onclick = () => invoke('replan');
+$('cal').innerHTML = icon('calendar', 18);
+$('cal').title = 'Kalendarz';
+$('cal').onclick = () => invoke('toggle_calendar');
+$('nowBtn').onclick = () => invoke('toggle_panel', { label: 'now' });
+$('axis').onclick = () => invoke('toggle_panel', { label: 'now' });
+
+function dayRange() {
+  const items = (s?.day || []).filter((i) => i.kind !== 'buffer');
+  const d = new Date();
+  let from = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 8).getTime();
+  let to = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 20).getTime();
+  for (const i of items) {
+    from = Math.min(from, new Date(i.start).getTime());
+    to = Math.max(to, new Date(i.end).getTime());
+  }
+  // Pełne godziny na końcach osi.
+  const f = new Date(from); f.setMinutes(0, 0, 0);
+  const t = new Date(to); if (t.getMinutes() || t.getSeconds()) t.setHours(t.getHours() + 1, 0, 0, 0);
+  return [f.getTime(), t.getTime()];
+}
+
+function segColor(i) {
+  if (STATUS[i.status]) return STATUS[i.status];
+  if (i.kind === 'meeting' || i.kind === 'busy') return '#3b82f6';
+  if (i.status === 'past') return 'rgba(255,255,255,0.22)';
+  return blockColor(i, s.mode.accent);
+}
+
+function render() {
+  if (!s) return;
+  const [from, to] = dayRange();
+  const span = Math.max(1, to - from);
+  const now = Date.now();
+  const pct = (t) => Math.min(100, Math.max(0, ((t - from) / span) * 100));
+
+  // Godziny co 2 h (co 4 h, gdy dzień jest długi).
+  const hours = (to - from) / 3600000;
+  const step = hours > 14 ? 4 : 2;
+  let marks = '';
+  for (let t = from; t <= to; t += step * 3600000) {
+    const p = pct(t);
+    marks += `<span class="hr" style="top:${Math.min(97, Math.max(2, p))}%">${String(new Date(t).getHours()).padStart(2, '0')}</span><span class="tick" style="top:${p}%"></span>`;
+  }
+
+  const segs = (s.day || []).filter((i) => i.kind !== 'buffer').map((i) => {
+    const a = new Date(i.start).getTime();
+    const b = new Date(i.end).getTime();
+    const top = pct(a);
+    const h = Math.max(0.8, pct(b) - top - 0.35);
+    const col = segColor(i);
+    const isNow = a <= now && now < b && !STATUS[i.status];
+    const bg = isNow ? `linear-gradient(180deg, ${col} ${((now - a) / (b - a)) * 100}%, ${col}50 0)` : (i.status === 'next' ? `${col}b0` : col);
+    const flash = i.key === flashKey && now < flashUntil ? ' flash' : '';
+    const tip = `${i.title}\n${hhmm(i.start)}–${hhmm(i.end)} · ${STATUS_TXT[i.status] || ''}${isNow ? ` · zostało ${Math.max(0, Math.round((b - now) / 60000))} min` : ''}`;
+    return `<span class="seg${isNow ? ' cur' : ''}${flash}" style="top:${top}%;height:${h}%;background:${bg}" title="${esc(tip)}"></span>`;
+  }).join('');
+  const nowMark = now > from && now < to ? `<span class="nowmark" style="top:calc(${pct(now)}% - 1px)"></span>` : '';
+  $('axis').innerHTML = `<span class="track"></span>${marks}${segs}${nowMark}`;
+
+  // Górny przycisk: ile zostało z bloku albo kiedy następny.
+  const t = focusTiming(s);
+  const btn = $('nowBtn');
+  if (s.focus && t) {
+    const mins = Math.max(0, Math.ceil(t.left / 60000));
+    $('left').textContent = s.paused ? '❚❚' : mins >= 60 ? `${Math.floor(mins / 60)}h${String(mins % 60).padStart(2, '0')}` : `${mins}m`;
+    btn.style.setProperty('--nowBg', `${s.mode.accent}2e`);
+    btn.style.setProperty('--nowFg', '#fca5a5');
+    btn.title = `${s.focus.title} — zostało ${mins} min`;
+  } else if (s.next) {
+    $('left').textContent = hhmm(s.next.start);
+    btn.style.setProperty('--nowBg', 'rgba(255,255,255,0.06)');
+    btn.style.setProperty('--nowFg', 'var(--text)');
+    btn.title = `Dalej: ${s.next.title} o ${hhmm(s.next.start)}`;
+  } else {
+    $('left').textContent = '—';
+    btn.style.setProperty('--nowBg', 'rgba(255,255,255,0.04)');
+    btn.title = 'Na dziś nic więcej w planie';
+  }
+  const h = s.horolog;
+  $('hdot').style.background = h.connected ? '#22c55e' : '#71717a';
+  if (!h.connected) btn.title += ' · Horolog offline';
+}
+
+function trackDone() {
+  for (const i of s.day || []) {
+    const before = prevStatus.get(i.key);
+    if (before && before !== i.status && STATUS[i.status]) {
+      flashKey = i.key;
+      flashUntil = Date.now() + 3800;
+    }
+    prevStatus.set(i.key, i.status);
+  }
+}
+
+onSnapshot((snap) => { s = snap; trackDone(); render(); });
+onTick((snap) => { s = snap; if (new Date().getSeconds() % 15 === 0) render(); });
+</script>
+</body>
+</html>
