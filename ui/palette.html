@@ -150,6 +150,9 @@ document.addEventListener('keydown', (e) => {
     const d = e.key === 'ArrowDown' ? 1 : -1;
     if (actMode && r) { actSel = (actSel + d + r.actions.length) % r.actions.length; renderPreview(); }
     else if (rows.length) { sel = (sel + d + rows.length) % rows.length; render(); }
+  } else if (e.key === ' ' && e.shiftKey && r && r.actions.some((x) => x.id === 'look')) {
+    e.preventDefault();
+    run(sel, 'look');
   } else if (e.key === 'Enter') {
     e.preventDefault();
     if (actMode && r) run(sel, r.actions[actSel].id);

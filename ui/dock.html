@@ -22,6 +22,9 @@
   .app.stack .tile.real img { width: 46px; height: 46px; }
   @keyframes reveal { from { transform: translateY(70%); opacity: 0.4; } to { transform: none; opacity: 1; } }
   nav.reveal { animation: reveal 0.14s ease-out; }
+  .app.dragging { opacity: 0.55; transform: translateY(-8px) scale(1.06); transition: none; }
+  .app.drop-target .tile { outline: 2px solid #fbbf24; outline-offset: 3px; }
+  nav.drop-add { outline: 2px dashed rgba(251,191,36,0.7); outline-offset: -3px; }
   .sep { width: 1px; height: 34px; margin-bottom: 14px; background: rgba(255,255,255,0.12); }
 </style>
 </head>
@@ -72,6 +75,35 @@ function tile(a) {
 }
 
 onSnapshot((s) => { snap = s; render(s); });
+
+// Upuszczanie plików z Eksploratora: na ikonę = otwórz w tej aplikacji
+// (na stos = skopiuj do folderu), na pusty fragment docka = przypnij.
+const webview = window.__TAURI__.webview.getCurrentWebview();
+function dropTarget(pos) {
+  const r = window.devicePixelRatio || 1;
+  const el = document.elementFromPoint(pos.x / r, pos.y / r);
+  return el ? el.closest('.app') : null;
+}
+function clearDrop() {
+  for (const x of dock.querySelectorAll('.drop-target')) x.classList.remove('drop-target');
+  dock.classList.remove('drop-add');
+}
+webview.onDragDropEvent((ev) => {
+  const p = ev.payload;
+  if (p.type === 'over' || p.type === 'enter') {
+    clearDrop();
+    const t = p.position && dropTarget(p.position);
+    if (t) t.classList.add('drop-target'); else dock.classList.add('drop-add');
+  } else if (p.type === 'drop') {
+    const t = p.position && dropTarget(p.position);
+    clearDrop();
+    if (!p.paths?.length) return;
+    if (t) invoke('dock_open_with', { id: t.dataset.id, paths: p.paths }).catch((err) => console.warn(err));
+    else invoke('dock_add_paths', { paths: p.paths }).catch((err) => console.warn(err));
+  } else {
+    clearDrop();
+  }
+});
 // Wysunięcie docka (autoukrywanie): krótki wjazd od dołu.
 listen('dock-reveal', () => {
   dock.classList.remove('reveal');
@@ -79,7 +111,11 @@ listen('dock-reveal', () => {
   dock.classList.add('reveal');
 });
 
+let dragging = null;
+let suppressClick = false;
+
 function render(s) {
+  if (dragging) return;
   const key = JSON.stringify(s.dock) + Object.keys(icons).length + Object.values(runIcons).filter(Boolean).length;
   if (key === lastKey) return;
   lastKey = key;
@@ -94,6 +130,7 @@ function render(s) {
     const id = b.dataset.id;
     const isStack = b.dataset.stack === '1';
     b.onclick = (e) => {
+      if (suppressClick) return;
       clearTimeout(hoverTimer);
       if (isStack && !e.shiftKey) {
         const r = b.getBoundingClientRect();
@@ -106,6 +143,59 @@ function render(s) {
       invoke('previews_hide');
     };
     b.onauxclick = (e) => { if (e.button === 1) invoke('launch_new', { id }); };
+    // Kółko myszy: przełączanie między oknami tej aplikacji.
+    let wheelAt = 0;
+    b.onwheel = (e) => {
+      e.preventDefault();
+      const now = Date.now();
+      if (now - wheelAt < 160) return;
+      wheelAt = now;
+      clearTimeout(hoverTimer);
+      invoke('previews_hide');
+      invoke('dock_cycle', { id, dir: e.deltaY > 0 ? 1 : -1 });
+    };
+    // Przeciąganie ikon (tylko przypiętych): zmiana kolejności i sekcji.
+    if (!id.startsWith('run:')) {
+      b.onpointerdown = (e) => {
+        if (e.button !== 0) return;
+        const startX = e.clientX;
+        let active = false;
+        const move = (ev) => {
+          if (!active && Math.abs(ev.clientX - startX) > 6) {
+            active = true;
+            dragging = id;
+            b.classList.add('dragging');
+            clearTimeout(hoverTimer);
+            invoke('previews_hide');
+            b.setPointerCapture(e.pointerId);
+          }
+          if (!active) return;
+          const pinned = [...dock.querySelectorAll('.app')].filter((x) => x !== b && !x.dataset.id.startsWith('run:'));
+          const target = pinned.find((x) => { const r = x.getBoundingClientRect(); return ev.clientX < r.left + r.width / 2; });
+          if (target) {
+            if (b.nextElementSibling !== target) dock.insertBefore(b, target);
+          } else if (pinned.length) {
+            const last = pinned[pinned.length - 1];
+            const after = last.nextElementSibling?.classList.contains('sep') ? last.nextElementSibling : last;
+            if (after.nextElementSibling !== b) after.after(b);
+          }
+        };
+        const up = () => {
+          window.removeEventListener('pointermove', move);
+          window.removeEventListener('pointerup', up);
+          if (!active) return;
+          suppressClick = true;
+          setTimeout(() => { suppressClick = false; }, 50);
+          b.classList.remove('dragging');
+          const order = [...dock.querySelectorAll('.app')].map((x) => x.dataset.id).filter((x) => !x.startsWith('run:'));
+          dragging = null;
+          lastKey = '';
+          invoke('dock_reorder', { order, moved: id }).catch((err) => console.warn(err));
+        };
+        window.addEventListener('pointermove', move);
+        window.addEventListener('pointerup', up);
+      };
+    }
     // Prawy klik na otwartej aplikacji spoza docka: przypnij ją na stałe.
     if (id.startsWith('run:')) {
       b.oncontextmenu = (e) => {

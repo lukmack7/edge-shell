@@ -23,6 +23,17 @@
   .item .t { width: 82px; flex: none; font-size: 12px; color: var(--muted); }
   .item .b { width: 4px; height: 22px; flex: none; border-radius: 2px; }
   .foot { display: flex; gap: 8px; }
+  .tl { position: relative; flex: 1; min-height: 160px; overflow-y: auto; border-radius: 12px; background: rgba(255,255,255,0.02); scrollbar-width: thin; }
+  .tl .hr { position: absolute; left: 0; right: 0; height: 1px; background: rgba(255,255,255,0.06); }
+  .tl .hl { position: absolute; left: 6px; font-size: 10px; color: var(--muted); transform: translateY(-50%); font-family: var(--mono); }
+  .tl .now { position: absolute; left: 40px; right: 0; height: 2px; background: var(--accent); z-index: 2; }
+  .blk { position: absolute; left: 44px; right: 8px; min-height: 18px; padding: 3px 8px; border-radius: 8px; font-size: 12px; overflow: hidden; border-left: 3px solid; background: rgba(255,255,255,0.07); display: flex; gap: 6px; align-items: flex-start; }
+  .blk .tt { font-family: var(--mono); font-size: 10px; color: var(--muted); flex: none; padding-top: 1px; }
+  .blk.drag { cursor: grab; }
+  .blk.drag:hover { background: rgba(255,255,255,0.12); }
+  .blk.moving { opacity: 0.85; box-shadow: 0 6px 16px rgba(0,0,0,0.5); z-index: 3; cursor: grabbing; }
+  .day.dropping { outline: 2px solid var(--accent); }
+  .hint2 { font-size: 11px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -34,7 +45,8 @@
   </div>
   <div class="grid" id="grid"></div>
   <span class="label" id="dayTitle"></span>
-  <div class="list scroll" id="list"></div>
+  <div class="tl" id="list"></div>
+  <span class="hint2" id="hint">Przeciągnij blok, żeby zmienić godzinę — albo na dzień w kalendarzu.</span>
   <div class="foot">
     <button class="btn" style="flex:1" id="horolog">Otwórz Horologa</button>
     <button class="btn" style="flex:1" id="report">Raport tygodnia</button>
@@ -81,9 +93,89 @@ function render() {
   $('dayTitle').textContent = sameDay(selected, today) ? 'Dziś' : selected.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
   const items = itemsOn(selected);
   const inRange = (selected - today) / 86400000 < 8 && (selected - today) / 86400000 > -2;
-  $('list').innerHTML = items.length
-    ? items.map((i) => `<div class="item"><span class="t mono">${hhmm(i.start)}–${hhmm(i.end)}</span><span class="b" style="background:${kindColor(i.kind)}"></span><span class="ellipsis" style="flex:1">${esc(i.title)}</span><span style="font-size:11px;color:var(--muted)">${KIND_LABEL[i.kind] || ''}</span></div>`).join('')
-    : `<div class="empty">${inRange ? 'Nic w planie.' : 'Horolog planuje tylko najbliższe dni.'}</div>`;
+  renderTimeline(items, inRange);
+}
+
+// ------------------------------------------------------------------ oś dnia z przeciąganiem
+
+const PX = 0.8;          // px na minutę
+const FROM = 6 * 60;     // 6:00
+const TO = 23 * 60;      // 23:00
+const minsOf = (d) => d.getHours() * 60 + d.getMinutes();
+const fmt = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
+const movable = (i) => i.intentId && !['meeting', 'busy', 'buffer'].includes(i.kind);
+
+function renderTimeline(items, inRange) {
+  const tl = $('list');
+  let html = '';
+  for (let h = FROM / 60; h <= TO / 60; h++) {
+    const y = (h * 60 - FROM) * PX;
+    html += `<span class="hr" style="top:${y}px"></span><span class="hl" style="top:${y}px">${String(h).padStart(2, '0')}</span>`;
+  }
+  if (sameDay(selected, today)) html += `<span class="now" style="top:${(minsOf(new Date()) - FROM) * PX}px"></span>`;
+  html += items.map((i, n) => {
+    const s = Math.max(FROM, minsOf(new Date(i.start)));
+    const e = Math.min(TO, Math.max(s + 15, minsOf(new Date(i.end)) || TO));
+    return `<div class="blk ${movable(i) ? 'drag' : ''}" data-n="${n}" style="top:${(s - FROM) * PX}px;height:${(e - s) * PX - 2}px;border-color:${kindColor(i.kind)}" title="${esc(i.title)} · ${hhmm(i.start)}–${hhmm(i.end)}${movable(i) ? ' · przeciągnij' : ''}">
+      <span class="tt">${hhmm(i.start)}</span><span class="ellipsis">${esc(i.title)}</span></div>`;
+  }).join('');
+  tl.innerHTML = `<div style="position:relative;height:${(TO - FROM) * PX + 10}px">${html}</div>`;
+  if (!items.length && !inRange) tl.insertAdjacentHTML('beforeend', '<div class="empty" style="position:absolute;top:8px;left:50px">Horolog planuje tylko najbliższe dni.</div>');
+  // Przewiń do teraz albo do pierwszego bloku.
+  const first = sameDay(selected, today) ? minsOf(new Date()) - 60 : items.length ? minsOf(new Date(items[0].start)) - 30 : 8 * 60;
+  tl.scrollTop = Math.max(0, (first - FROM) * PX);
+  for (const el of tl.querySelectorAll('.blk.drag')) wireDrag(el, items[+el.dataset.n]);
+}
+
+function wireDrag(el, item) {
+  el.onpointerdown = (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const startY = e.clientY;
+    const top0 = parseFloat(el.style.top);
+    const dur = Math.max(15, (new Date(item.end) - new Date(item.start)) / 60000);
+    let moved = false;
+    let minute = minsOf(new Date(item.start));
+    let dropDay = null;
+    el.setPointerCapture(e.pointerId);
+    el.onpointermove = (ev) => {
+      const dy = ev.clientY - startY;
+      if (!moved && Math.abs(dy) < 4) return;
+      moved = true;
+      el.classList.add('moving');
+      minute = Math.round((FROM + (top0 + dy) / PX) / 15) * 15;
+      minute = Math.max(FROM, Math.min(TO - dur, minute));
+      el.style.top = `${(minute - FROM) * PX}px`;
+      el.querySelector('.tt').textContent = fmt(minute);
+      // Nad komórką dnia w kalendarzu = przeniesienie na ten dzień.
+      for (const d of document.querySelectorAll('.day.dropping')) d.classList.remove('dropping');
+      const hit = document.elementsFromPoint(ev.clientX, ev.clientY).find((x) => x.classList?.contains('day'));
+      dropDay = hit ? new Date(+hit.dataset.t) : null;
+      if (hit) hit.classList.add('dropping');
+      $('hint').textContent = dropDay ? `Na ${dropDay.toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric' })}, ${fmt(minsOf(new Date(item.start)))}` : `Nowa godzina: ${fmt(minute)}`;
+    };
+    el.onpointerup = async () => {
+      el.onpointermove = null;
+      el.onpointerup = null;
+      for (const d of document.querySelectorAll('.day.dropping')) d.classList.remove('dropping');
+      if (!moved) return;
+      const base = dropDay || selected;
+      const m = dropDay ? minsOf(new Date(item.start)) : minute;
+      const start = new Date(base.getFullYear(), base.getMonth(), base.getDate(), Math.floor(m / 60), m % 60);
+      $('hint').textContent = 'Horolog przeplanowuje…';
+      try {
+        await invoke('horolog_move', { intentId: item.intentId, start: start.toISOString() });
+        await load();
+        const now = week.find((w) => w.intentId === item.intentId && sameDay(new Date(w.start), start));
+        $('hint').textContent = now && minsOf(new Date(now.start)) !== m
+          ? `Horolog znalazł najbliższe wolne miejsce: ${hhmm(now.start)}`
+          : 'Przeniesione.';
+      } catch (err) {
+        $('hint').textContent = `Nie przeniesiono: ${err}`;
+        render();
+      }
+    };
+  };
 }
 
 async function load() {

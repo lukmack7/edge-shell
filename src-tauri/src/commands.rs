@@ -148,6 +148,128 @@ pub fn launch_new(app: AppHandle, id: String) -> Res<()> {
     open_target(&app, &entry.path, &entry.args)
 }
 
+/// Kółko myszy nad ikoną: następne / poprzednie okno tej aplikacji.
+#[tauri::command]
+pub fn dock_cycle(app: AppHandle, id: String, dir: i32) {
+    let wins = crate::previews::windows_of(&app, &id);
+    if wins.is_empty() {
+        return;
+    }
+    let fg = platform::foreground_hwnd();
+    let n = wins.len() as i32;
+    let i = match wins.iter().position(|w| w.hwnd == fg) {
+        Some(i) => (i as i32 + dir).rem_euclid(n),
+        None => if dir > 0 { 0 } else { n - 1 },
+    };
+    crate::sys::activate(wins[i as usize].hwnd);
+}
+
+/// Nowa kolejność przypiętych ikon po przeciągnięciu na docku. Przeniesiona
+/// ikona dostaje sekcję sąsiada, obok którego ją upuszczono.
+#[tauri::command]
+pub fn dock_reorder(app: AppHandle, order: Vec<String>, moved: String) -> Res<()> {
+    let mut cfg = state::cfg(&app);
+    let mut apps = std::mem::take(&mut cfg.dock);
+    let mut sorted: Vec<crate::config::DockApp> = Vec::new();
+    for id in &order {
+        if let Some(pos) = apps.iter().position(|a| &a.id == id) {
+            sorted.push(apps.remove(pos));
+        }
+    }
+    sorted.extend(apps);
+    if let Some(i) = sorted.iter().position(|a| a.id == moved) {
+        let neighbour = sorted.get(i + 1).or_else(|| if i > 0 { sorted.get(i - 1) } else { None }).map(|a| a.category.clone());
+        if let Some(cat) = neighbour {
+            sorted[i].category = cat;
+        }
+    }
+    cfg.dock = sorted;
+    crate::settings::save_config(app, cfg)
+}
+
+/// Plik .exe aplikacji z docka (ścieżka, cel skrótu albo działające okno).
+fn dock_exe(app: &AppHandle, id: &str) -> Option<String> {
+    if let Some(exe) = id.strip_prefix("run:") {
+        return state::read(app, |rt| rt.open_apps.iter().find(|o| o.exe == exe).map(|o| o.path.clone()));
+    }
+    let cfg = state::cfg(app);
+    let a = cfg.dock.iter().find(|a| a.id == id)?;
+    let path = expand_env(a.path.trim());
+    let lower = path.to_lowercase();
+    if lower.ends_with(".exe") && std::path::Path::new(&path).is_absolute() {
+        return Some(path);
+    }
+    if lower.ends_with(".lnk") {
+        if let Some(t) = crate::sys::shortcut_target(&path) {
+            return Some(t);
+        }
+    }
+    // Działające okno tej aplikacji zna pełną ścieżkę.
+    crate::previews::windows_of(app, id).into_iter().next().map(|w| w.exe).filter(|e| !e.is_empty()).or_else(|| {
+        lower.ends_with(".exe").then(|| crate::sys::resolve_icon_source(&path).map(|(p, _)| p)).flatten()
+    })
+}
+
+/// Pliki upuszczone na ikonę: otwórz je w tej aplikacji (na stosie — skopiuj do folderu).
+#[tauri::command]
+pub fn dock_open_with(app: AppHandle, id: String, paths: Vec<String>) -> Res<String> {
+    let cfg = state::cfg(&app);
+    if let Some(a) = cfg.dock.iter().find(|a| a.id == id) {
+        if crate::stacks::is_folder(&a.path) {
+            let dir = std::path::PathBuf::from(expand_env(a.path.trim()));
+            let mut n = 0;
+            for p in &paths {
+                let src = std::path::Path::new(p);
+                if let Some(name) = src.file_name() {
+                    if src.is_file() && std::fs::copy(src, dir.join(name)).is_ok() {
+                        n += 1;
+                    }
+                }
+            }
+            return Ok(format!("Skopiowano {n} do {}", a.name));
+        }
+    }
+    match dock_exe(&app, &id) {
+        Some(exe) => {
+            std::process::Command::new(&exe).args(&paths).spawn().map_err(|e| e.to_string())?;
+            Ok("ok".into())
+        }
+        None => {
+            for p in &paths {
+                open_target(&app, p, &[])?;
+            }
+            Ok("ok".into())
+        }
+    }
+}
+
+/// Pliki upuszczone na pusty fragment docka: przypnij (program, skrót, folder = stos, plik).
+#[tauri::command]
+pub fn dock_add_paths(app: AppHandle, paths: Vec<String>) -> Res<()> {
+    let mut cfg = state::cfg(&app);
+    let category = cfg.sections.last().map(|s| s.id.clone()).unwrap_or_else(|| "system".into());
+    for p in paths {
+        let path = std::path::Path::new(&p);
+        let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| p.clone());
+        let base: String = stem.to_lowercase().chars().filter(|c| c.is_alphanumeric()).take(20).collect();
+        let mut id = if base.is_empty() { "plik".to_string() } else { base };
+        while cfg.dock.iter().any(|a| a.id == id) {
+            id.push('2');
+        }
+        let process = if p.to_lowercase().ends_with(".exe") { platform::exe_name(&p) } else { String::new() };
+        cfg.dock.push(crate::config::DockApp {
+            id,
+            name: stem,
+            path: p,
+            category: category.clone(),
+            icon: "auto".into(),
+            process,
+            ..crate::config::DockApp::default()
+        });
+    }
+    crate::settings::save_config(app, cfg)
+}
+
 /// Przypina otwartą aplikację do docka (prawy klik na jej ikonie).
 #[tauri::command]
 pub fn dock_pin(app: AppHandle, exe: String) -> Res<()> {
@@ -301,6 +423,16 @@ pub async fn focus_finish(app: AppHandle) -> Res<FinishResult> {
 #[tauri::command]
 pub async fn radio_reply(app: AppHandle, text: String) -> Res<String> {
     radio::send_reply(&app, text).await
+}
+
+#[tauri::command]
+pub fn radio_focus(app: AppHandle) {
+    layout::show_window(&app, "radio", true);
+}
+
+#[tauri::command]
+pub async fn radio_quick_reply(app: AppHandle, text: String) -> Res<String> {
+    radio::quick_reply(&app, text).await
 }
 
 #[tauri::command]

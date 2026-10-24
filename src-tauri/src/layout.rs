@@ -219,7 +219,7 @@ pub fn arrange(app: &AppHandle) {
     let s = screen(app);
 
     place_dock(app, None);
-    let dock_on = cfg.shell.show_dock && !cfg.shell.dock_autohide;
+    let dock_on = cfg.shell.show_dock && !cfg.shell.dock_autohide && !crate::focus::ONE_THING.load(Ordering::Relaxed);
     DOCK_VISIBLE.store(!dock_on, Ordering::Relaxed);
     set_dock_visible(app, dock_on);
 
@@ -239,8 +239,12 @@ pub fn arrange(app: &AppHandle) {
         let (fw, fh) = (px(960.0, &s), px(660.0, &s));
         place(&w, (s.work.left + s.work.right - fw) / 2, (s.work.top + s.work.bottom - fh) / 2, fw, fh);
     }
+    if let Some(w) = win(app, "evening") {
+        let (fw, fh) = (px(760.0, &s), px(560.0, &s));
+        place(&w, (s.work.left + s.work.right - fw) / 2, (s.work.top + s.work.bottom - fh) / 2, fw, fh);
+    }
     if let Some(w) = win(app, "calendar") {
-        let (cw, ch) = (px(400.0, &s), px(600.0, &s));
+        let (cw, ch) = (px(400.0, &s), px(740.0, &s));
         place(&w, s.work.right - cw - px(MARGIN, &s), s.work.top + px(6.0, &s), cw, ch);
     }
     if let Some(w) = win(app, "capture") {
@@ -505,7 +509,7 @@ pub fn start_edges(app: AppHandle) {
             // Autoukrywanie docka: wysuwa się od razu po dotknięciu dolnej
             // krawędzi pod dockiem, chowa pół sekundy po odjechaniu kursora.
             let dock_fs = last_fs.is_some_and(|f| inside(f, s.monitor.left + 2, s.monitor.top + 2));
-            if shell.show_dock && shell.dock_autohide && !dock_fs {
+            if shell.show_dock && shell.dock_autohide && !dock_fs && !crate::focus::ONE_THING.load(Ordering::Relaxed) {
                 let r = DOCK_RECT.lock().map(|g| *g).unwrap_or_default();
                 let visible = DOCK_VISIBLE.load(Ordering::Relaxed);
                 if !visible {

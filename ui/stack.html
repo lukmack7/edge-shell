@@ -51,7 +51,14 @@ listen('stack', (st) => {
   $('grid').scrollTop = 0;
 });
 
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') invoke('stack_close'); });
+// Spacja nad plikiem: szybki podgląd.
+let hovered = null;
+document.addEventListener('mouseover', (e) => { hovered = e.target.closest('.it'); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') invoke('stack_close');
+  const el = document.activeElement?.closest?.('.it') || hovered;
+  if (e.key === ' ' && el) { e.preventDefault(); invoke('quicklook', { path: el.dataset.path }); }
+});
 </script>
 </body>
 </html>

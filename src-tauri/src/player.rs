@@ -190,6 +190,21 @@ pub async fn player_skip(app: AppHandle, count: u32) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+pub async fn player_like(app: AppHandle, on: bool) -> Result<(), String> {
+    spotify::like(&app, on).await
+}
+
+#[tauri::command]
+pub async fn player_shuffle(app: AppHandle, on: bool) -> Result<(), String> {
+    spotify::shuffle(&app, on).await
+}
+
+#[tauri::command]
+pub async fn player_repeat(app: AppHandle, mode: String) -> Result<(), String> {
+    spotify::repeat(&app, &mode).await
+}
+
 /// Głośność Spotify z kółka myszy.
 #[tauri::command]
 pub async fn player_volume(app: AppHandle, volume: i64) -> Result<(), String> {

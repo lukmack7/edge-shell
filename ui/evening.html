@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — zamknięcie dnia</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { padding: 10px; }
+  .box { height: 100%; display: flex; flex-direction: column; gap: 14px; padding: 22px; border-radius: 20px; background: rgba(18,18,21,0.98); border: 1px solid var(--line-strong); box-shadow: 0 8px 20px -8px rgba(0,0,0,0.6); }
+  .top { display: flex; align-items: baseline; gap: 10px; }
+  h2 { margin: 0; font-size: 20px; }
+  .sub { color: var(--muted); font-size: 13px; }
+  .x { margin-left: auto; }
+  .cols { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1.3fr; gap: 14px; }
+  .col { min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+  .lbl { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; color: var(--muted); }
+  .list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; }
+  .it { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 4px 10px; border-radius: 10px; background: rgba(255,255,255,0.04); font-size: 13px; }
+  .it .t { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .it .s { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .it .h { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .it button { height: 26px; padding: 0 9px; border-radius: 8px; border: 1px solid var(--line-strong); background: transparent; font-size: 11px; color: var(--text-2); }
+  .it button:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .it.gone { opacity: 0.4; }
+  textarea { height: 70px; resize: none; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line-strong); background: #0f0f11; color: var(--text); font: inherit; font-size: 14px; outline: none; user-select: text; }
+  textarea:focus { border-color: var(--accent); }
+  .foot { display: flex; gap: 8px; justify-content: flex-end; }
+  .empty { color: var(--muted); font-size: 13px; padding: 8px 2px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <div class="top"><h2>Zamknięcie dnia</h2><span class="sub" id="sub"></span><button class="icon-btn x" id="close" aria-label="Zamknij"></button></div>
+  <div class="cols">
+    <div class="col"><span class="lbl">ZROBIONE DZIŚ</span><div class="list" id="done"></div></div>
+    <div class="col"><span class="lbl">NIEDOKOŃCZONE — CO Z NIMI?</span><div class="list" id="open"></div></div>
+  </div>
+  <span class="lbl">JEDNO ZDANIE O DNIU</span>
+  <textarea id="note" placeholder="Co poszło dobrze, co jutro na start…"></textarea>
+  <div class="foot"><button class="btn" id="replan">Przeplanuj resztę tygodnia</button><button class="btn primary" id="finish">Zamknij dzień</button></div>
+</div>
+<script type="module">
+import { invoke, listen, esc, icon, hhmm, toast } from './shared.js';
+const $ = (id) => document.getElementById(id);
+const COLOR = { early: '#a855f7', ontime: '#22c55e', late: '#eab308' };
+$('close').innerHTML = icon('close', 14, 2.4);
+$('close').onclick = () => invoke('hide_window', { label: 'evening' });
+
+async function load() {
+  const d = await invoke('get_evening');
+  $('sub').textContent = new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
+  $('done').innerHTML = d.done.map((h) => `<div class="it"><span class="s" style="background:${COLOR[h.status] || '#71717a'}"></span><span class="t">${esc(h.title)}</span><span class="h">${h.deltaMin > 0 ? '+' : ''}${h.deltaMin} min</span></div>`).join('')
+    || '<div class="empty">Dziś nic nie odhaczyłeś — też się zdarza.</div>';
+  $('open').innerHTML = d.open.map((o, i) => `<div class="it" id="o${i}"><span class="h">${hhmm(o.start)}</span><span class="t">${esc(o.title)}</span>
+      <button data-tom="${i}">Na jutro</button>${o.kind === 'task' ? `<button data-done="${i}">Zrobione</button>` : ''}<button data-skip="${i}">Odpuść</button></div>`).join('')
+    || '<div class="empty">Wszystko domknięte. Brawo.</div>';
+  $('note').value = d.note || '';
+  for (const b of document.querySelectorAll('[data-tom]')) {
+    const o = d.open[+b.dataset.tom];
+    b.onclick = async () => {
+      b.disabled = true;
+      try { await invoke('evening_tomorrow', { intentId: o.intentId, start: o.start }); b.closest('.it').classList.add('gone'); b.textContent = 'Jutro ✓'; }
+      catch (e) { toast(String(e), 4000); b.disabled = false; }
+    };
+  }
+  for (const b of document.querySelectorAll('[data-done]')) {
+    const o = d.open[+b.dataset.done];
+    b.onclick = async () => {
+      try { await invoke('evening_done', { key: o.key }); b.closest('.it').classList.add('gone'); } catch (e) { toast(String(e), 4000); }
+    };
+  }
+  for (const b of document.querySelectorAll('[data-skip]')) b.onclick = () => b.closest('.it').classList.add('gone');
+}
+
+$('note').onchange = () => invoke('evening_note', { text: $('note').value });
+$('replan').onclick = async () => { try { await invoke('replan'); toast('Horolog przeplanował'); } catch (e) { toast(String(e), 4000); } };
+$('finish').onclick = async () => {
+  await invoke('evening_note', { text: $('note').value });
+  invoke('hide_window', { label: 'evening' });
+};
+listen('evening-open', load);
+window.addEventListener('focus', load);
+load();
+</script>
+</body>
+</html>

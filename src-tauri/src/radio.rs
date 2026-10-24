@@ -69,6 +69,8 @@ pub fn from_incoming(app: &AppHandle, inc: Incoming) -> RadioMsg {
         app: None,
         open_target: None,
         ask: None,
+        yes_label: None,
+        no_label: None,
     }
 }
 
@@ -103,6 +105,8 @@ pub fn pit_wall(app: &AppHandle, message: String, reply: Option<String>) {
             app: None,
             open_target: None,
             ask: None,
+            yes_label: None,
+            no_label: None,
         },
     );
 }
@@ -124,6 +128,11 @@ pub fn deliver(app: &AppHandle, msg: RadioMsg) {
     let quiet_override = state::read(app, |rt| rt.store.quiet_until.is_some_and(|t| t > Local::now()));
     let quiet = cfg.mode(&mode).quiet || quiet_override;
     let vip = msg.number.parse::<u8>().is_ok_and(|n| (1..=9).contains(&n));
+    // Cisza nocna: tylko kontakty z numerem (i pytania automatyzacji, które ktoś właśnie wywołał).
+    if is_night(&cfg) && !vip && msg.ask.is_none() {
+        state::update(app, true, |rt| rt.store.waiting.push(msg));
+        return;
+    }
     if msg.urgent || vip || !quiet {
         state::update(app, false, |rt| rt.showing.push_back(msg));
         layout::place_radio(app);
@@ -162,6 +171,25 @@ pub fn dismiss(app: &AppHandle, to_batch: bool) {
     }
 }
 
+/// Szybka odpowiedź wpisana na karcie. Z adresem odpowiedzi — wysyłamy od razu.
+/// Z powiadomienia Windows — tekst do schowka i otwarcie rozmowy (Windows nie
+/// pozwala odpowiadać na powiadomienia innych aplikacji).
+pub async fn quick_reply(app: &AppHandle, text: String) -> Result<String, String> {
+    let msg = state::read(app, |rt| rt.showing.front().cloned()).ok_or("Brak wiadomości")?;
+    if msg.reply_url.is_some() {
+        return send_reply(app, text).await;
+    }
+    use tauri_plugin_clipboard_manager::ClipboardExt;
+    app.clipboard().write_text(text).map_err(|e| e.to_string())?;
+    dismiss(app, false);
+    if let Some(t) = msg.open_target {
+        use tauri_plugin_opener::OpenerExt;
+        app.opener().open_path(t, None::<&str>).map_err(|e| e.to_string())?;
+        return Ok("W schowku — wklej Ctrl+V w rozmowie".into());
+    }
+    Ok("Skopiowano do schowka".into())
+}
+
 pub async fn send_reply(app: &AppHandle, text: String) -> Result<String, String> {
     let msg = state::read(app, |rt| rt.showing.front().cloned());
     let Some(msg) = msg else { return Err("Brak wiadomości".into()) };
@@ -183,11 +211,34 @@ pub async fn send_reply(app: &AppHandle, text: String) -> Result<String, String>
     }
 }
 
+/// Czy teraz trwa cisza nocna (zakres może przechodzić przez północ).
+pub fn is_night(cfg: &crate::config::Config) -> bool {
+    if !cfg.radio.night_quiet {
+        return false;
+    }
+    let (Some(a), Some(b)) = (state::parse_hhmm(&cfg.radio.night_start), state::parse_hhmm(&cfg.radio.night_end)) else { return false };
+    let now = Local::now();
+    let m = now.hour() * 60 + now.minute();
+    if a <= b { m >= a && m < b } else { m >= a || m < b }
+}
+
 /// Wywoływane co sekundę z silnika: dostarcza paczkę o umówionej godzinie.
 pub fn tick(app: &AppHandle) {
     let now = Local::now();
     let cfg = state::cfg(app);
     let hhmm = format!("{:02}:{:02}", now.hour(), now.minute());
+    // Koniec ciszy nocnej: to, co przyszło w nocy, czeka na pierwszą paczkę —
+    // chyba że tryb nie jest cichy, wtedy wychodzi od razu rano.
+    if cfg.radio.night_quiet && state::parse_hhmm(&cfg.radio.night_end).is_some_and(|m| m == now.hour() * 60 + now.minute()) {
+        let mode = state::read(app, |rt| rt.store.mode.clone());
+        let first = state::update(app, false, |rt| {
+            let key = format!("night-{hhmm}");
+            if rt.last_batch == key { false } else { rt.last_batch = key; true }
+        });
+        if first && !cfg.mode(&mode).quiet && state::read(app, |rt| !rt.store.waiting.is_empty()) {
+            release_batch(app);
+        }
+    }
     let due = cfg.radio.batch_times.iter().any(|t| {
         state::parse_hhmm(t).is_some_and(|m| m == now.hour() * 60 + now.minute())
     });

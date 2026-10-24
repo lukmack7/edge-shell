@@ -103,11 +103,19 @@ function renderFocus(s) {
       el.innerHTML = `
         <span class="label">Teraz nic nie trwa</span>
         ${next}
+        ${s.next && ['task', 'focus', 'habit'].includes(s.next.kind) ? `<label class="field" style="gap:6px;align-items:center">
+          <span style="font-size:11px;color:var(--muted);white-space:nowrap">Pierwszy krok</span>
+          <input id="nstep" type="text" placeholder="co zrobisz w pierwszych 2 minutach?" autocomplete="off" style="font-size:12px"></label>` : ''}
         <div style="display:flex;gap:8px">
           <button class="btn primary" style="flex:1" id="adhoc">Start fokusu</button>
           <button class="btn" id="replan0" aria-label="Przeplanuj">${icon('replan', 16, 2)}</button>
         </div>`;
       $('adhoc').onclick = () => invoke('focus_start_adhoc', {});
+      if ($('nstep')) {
+        invoke('get_first_step', { title: s.next.title }).then((v) => { if ($('nstep') && document.activeElement !== $('nstep')) $('nstep').value = v || ''; });
+        $('nstep').onchange = () => invoke('set_first_step', { title: s.next.title, step: $('nstep').value }).then(() => toast('Zapamiętano — pokażę na starcie'));
+        $('nstep').onkeydown = (e) => { if (e.key === 'Enter') e.target.blur(); };
+      }
       $('replan0').onclick = () => invoke('replan').then(() => toast('Przeplanowano')).catch((e) => toast(String(e)));
     } else {
       const kind = f.kind === 'meeting' || f.kind === 'busy' ? 'meeting' : f.kind === 'buffer' ? 'buffer' : '';
@@ -122,6 +130,10 @@ function renderFocus(s) {
           </div>
         </div>
         ${f.completable ? `
+        <label class="field" style="gap:6px;align-items:center" title="Pokazywany na karcie startu tego zadania">
+          <span style="font-size:11px;color:var(--muted);white-space:nowrap">Pierwszy krok</span>
+          <input id="step" type="text" placeholder="np. otwórz plik i napisz nagłówek" autocomplete="off" style="font-size:12px">
+        </label>
         <div class="grid3">
           <button class="btn primary" id="pause">${s.paused ? 'Wznów' : 'Pauza'}</button>
           <button class="btn" id="done">${icon('check', 16, 2.2)}Skończone</button>
@@ -130,6 +142,11 @@ function renderFocus(s) {
         <div style="display:flex;gap:8px">
           <button class="btn" style="flex:1" id="replan">Przeplanuj resztę dnia</button>
         </div>`}`;
+      if ($('step')) {
+        invoke('get_first_step', { title: f.title }).then((v) => { if ($('step') && document.activeElement !== $('step')) $('step').value = v || ''; });
+        $('step').onchange = () => invoke('set_first_step', { title: f.title, step: $('step').value }).then(() => toast('Zapamiętano pierwszy krok'));
+        $('step').onkeydown = (e) => { if (e.key === 'Enter') e.target.blur(); };
+      }
       if ($('pause')) $('pause').onclick = () => invoke('focus_toggle_pause');
       if ($('done')) $('done').onclick = () => invoke('focus_finish').catch((e) => toast(String(e)));
       $('replan').onclick = () => invoke('replan').then(() => toast('Przeplanowano')).catch((e) => toast(String(e)));

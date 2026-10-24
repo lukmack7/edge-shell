@@ -20,6 +20,7 @@ pub fn start(app: AppHandle) {
             plan_rules(&app_tick).await;
             radio::tick(&app_tick);
             report_tick(&app_tick);
+            evening_tick(&app_tick);
             if n % 30 == 0 {
                 // Raz na pół minuty: odśwież zegar w pasku i zakończ sesję ad hoc.
                 finish_expired_adhoc(&app_tick);
@@ -101,6 +102,12 @@ async fn plan_rules(app: &AppHandle) {
             if spotify_on && cfg.spotify.pause_on_buffer {
                 let _ = spotify::control(app, "pause", None).await;
             }
+        } else if matches!(item.kind.as_str(), "task" | "focus" | "habit") {
+            // Start bloku z pierwszym 2‑minutowym krokiem („Jadę” / „Za 5 min”).
+            crate::focus::ramp_card(app, &item.key, &item.title, item.end);
+            if spotify_on && cfg.spotify.play_on_focus && (item.kind == "focus" || item.kind == "task") {
+                spotify::play_playlist(app, &mode.playlist, Some(cfg.spotify.focus_volume)).await;
+            }
         } else {
             radio::pit_wall(app, format!("Zielone światło: {}. Do {}.", item.title, item.end.format("%H:%M")), Some("Jadę".into()));
             if spotify_on && cfg.spotify.play_on_focus && (item.kind == "focus" || item.kind == "task") {
@@ -125,6 +132,20 @@ fn report_tick(app: &AppHandle) {
     if fire_once(app, format!("report:{}", state::today_key())) {
         layout::show_window(app, "report", true);
         radio::pit_wall(app, "Raport tygodnia gotowy. Zobacz, jak poszły sektory.".into(), None);
+    }
+}
+
+/// Wieczorne zamknięcie dnia (pon–pt o ustawionej porze).
+fn evening_tick(app: &AppHandle) {
+    use chrono::{Datelike, Timelike};
+    let cfg = state::cfg(app);
+    let now = Local::now();
+    if !cfg.focus.evening_review || now.weekday().number_from_monday() > 5 {
+        return;
+    }
+    let Some(at) = state::parse_hhmm(&cfg.focus.evening_time) else { return };
+    if now.hour() * 60 + now.minute() == at && fire_once(app, format!("evening:{}", state::today_key())) {
+        crate::insights::open_evening(app.clone());
     }
 }
 
@@ -155,6 +176,14 @@ pub fn mark_done(app: &AppHandle, item: &DayItem) -> Mark {
         status: mark.status.clone(),
         delta_min: delta,
     };
+    // Faktyczna długość — tylko gdy odhaczasz blisko końca bloku (nie wieczorem).
+    let planned = (item.end - item.start).num_minutes();
+    if matches!(item.kind.as_str(), "habit" | "focus") && (now - item.end).num_minutes() < planned.max(30) {
+        if let Some(id) = &item.intent_id {
+            let actual = (now - item.start).num_minutes().max(1);
+            crate::insights::record_actual(app, id, &item.title, (item.end - item.start).num_minutes(), actual);
+        }
+    }
     state::update(app, true, |rt| {
         rt.store.marks.insert(key, m);
         rt.store.history.retain(|h| !(h.date == entry.date && h.title == entry.title && h.start == entry.start));
@@ -172,15 +201,27 @@ fn clipboard(app: &AppHandle) {
     use tauri_plugin_clipboard_manager::ClipboardExt;
     let Ok(text) = app.clipboard().read_text() else { return };
     let text = text.trim().to_string();
-    if text.is_empty() || text.len() > 4000 {
+    if text.is_empty() || text.len() > 4000 || platform::clipboard_private() {
         return;
     }
     let is_new = state::read(app, |rt| rt.clipboard.first() != Some(&text));
     if is_new {
-        state::update(app, false, |rt| {
+        state::update(app, true, |rt| {
             rt.clipboard.retain(|t| t != &text);
-            rt.clipboard.insert(0, text);
+            rt.clipboard.insert(0, text.clone());
             rt.clipboard.truncate(12);
+            // Trwała historia do palety (cb): przypięte zostają, reszta — ostatnie 150.
+            let pinned = rt.store.clips.iter().any(|c| c.text == text && c.pinned);
+            rt.store.clips.retain(|c| c.text != text);
+            rt.store.clips.insert(0, crate::state::Clip { text, at: Local::now(), pinned });
+            let mut unpinned = 0;
+            rt.store.clips.retain(|c| {
+                if c.pinned {
+                    return true;
+                }
+                unpinned += 1;
+                unpinned <= 150
+            });
         });
     }
 }

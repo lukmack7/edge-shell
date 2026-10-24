@@ -10,7 +10,7 @@ use sha2::Digest;
 use std::time::Duration;
 use tauri::AppHandle;
 
-const SCOPES: &str = "user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative";
+const SCOPES: &str = "user-read-playback-state user-modify-playback-state user-read-currently-playing playlist-read-private playlist-read-collaborative user-library-read user-library-modify";
 
 fn redirect_uri(port: u16) -> String {
     format!("http://127.0.0.1:{port}/callback")
@@ -230,7 +230,22 @@ async fn poll_once(app: &AppHandle) {
         rt.music.volume = v["device"]["volume_percent"].as_i64();
         rt.music.device = v["device"]["name"].as_str().unwrap_or("").to_string();
         rt.music.album = item["album"]["name"].as_str().unwrap_or("").to_string();
+        rt.music.shuffle = v["shuffle_state"].as_bool().unwrap_or(false);
+        rt.music.repeat = v["repeat_state"].as_str().unwrap_or("off").to_string();
+        let uri = item["uri"].as_str().unwrap_or("").to_string();
+        if rt.music.uri != uri {
+            rt.music.liked = None;
+        }
+        rt.music.uri = uri;
     });
+    // Serce: sprawdzamy raz na utwór.
+    let (uri, known) = state::read(app, |rt| (rt.music.uri.clone(), rt.music.liked.is_some()));
+    if !uri.is_empty() && !known {
+        if let Ok(v) = get_json(app, &format!("https://api.spotify.com/v1/me/library/contains?uris={}", urlencoding::encode(&uri))).await {
+            let liked = v.as_array().and_then(|a| a.first()).and_then(|b| b.as_bool());
+            state::update(app, false, |rt| if rt.music.uri == uri { rt.music.liked = liked.or(Some(false)) });
+        }
+    }
 }
 
 async fn get_json(app: &AppHandle, url: &str) -> Result<serde_json::Value, String> {
@@ -249,6 +264,49 @@ fn small_image(images: &serde_json::Value) -> String {
         .and_then(|i| i["url"].as_str())
         .unwrap_or("")
         .to_string()
+}
+
+/// Dowolne wywołanie sterujące (PUT/DELETE) z kodem błędu po polsku.
+pub async fn call(app: &AppHandle, method: reqwest::Method, url: &str, body: Option<serde_json::Value>) -> Result<(), String> {
+    let Some(tok) = token(app).await else { return Err("Spotify nie jest połączone".into()) };
+    let mut req = reqwest::Client::new().request(method, url).bearer_auth(tok).timeout(Duration::from_secs(10));
+    req = match body {
+        Some(b) => req.json(&b),
+        None => req.header("Content-Length", "0"),
+    };
+    let resp = req.send().await.map_err(|e| e.to_string())?;
+    match resp.status().as_u16() {
+        200..=299 => Ok(()),
+        401 | 403 => Err("Brak uprawnienia — połącz Spotify ponownie".into()),
+        404 => Err("Brak aktywnego urządzenia — włącz Spotify".into()),
+        s => Err(format!("Spotify: {s}")),
+    }
+}
+
+/// Serce: zapisz / usuń bieżący utwór z biblioteki.
+pub async fn like(app: &AppHandle, on: bool) -> Result<(), String> {
+    let uri = state::read(app, |rt| rt.music.uri.clone());
+    if uri.is_empty() {
+        return Err("Nic nie gra".into());
+    }
+    let url = format!("https://api.spotify.com/v1/me/library?uris={}", urlencoding::encode(&uri));
+    let method = if on { reqwest::Method::PUT } else { reqwest::Method::DELETE };
+    call(app, method, &url, Some(serde_json::json!({ "uris": [uri] }))).await?;
+    state::update(app, false, |rt| rt.music.liked = Some(on));
+    Ok(())
+}
+
+pub async fn shuffle(app: &AppHandle, on: bool) -> Result<(), String> {
+    call(app, reqwest::Method::PUT, &format!("https://api.spotify.com/v1/me/player/shuffle?state={on}"), None).await?;
+    state::update(app, false, |rt| rt.music.shuffle = on);
+    Ok(())
+}
+
+pub async fn repeat(app: &AppHandle, mode: &str) -> Result<(), String> {
+    let mode = if matches!(mode, "off" | "context" | "track") { mode } else { "off" };
+    call(app, reqwest::Method::PUT, &format!("https://api.spotify.com/v1/me/player/repeat?state={mode}"), None).await?;
+    state::update(app, false, |rt| rt.music.repeat = mode.to_string());
+    Ok(())
 }
 
 /// Kolejka: następne utwory (do 20).

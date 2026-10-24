@@ -66,6 +66,12 @@ enum Cmd {
     Spotify,
     SpotifyNext,
     Player,
+    OneThing,
+    Clip(String),
+    Screenshot,
+    LayoutSave(String),
+    LayoutRestore(String),
+    Evening,
     Tailscale(String),
     TailscaleOff,
     Calc(String),
@@ -447,6 +453,12 @@ const CMD_NAMES: &[(&str, &str)] = &[
     ("replan", "przeplanuj dzień"),
     ("report", "raport tygodnia"),
     ("settings", "ustawienia"),
+    ("one_thing", "jedna rzecz (przyciemnij resztę)"),
+    ("clipboard", "historia schowka"),
+    ("screenshot", "zrzut ekranu z adnotacją"),
+    ("layout_save", "zapisz układ okien"),
+    ("layout_restore", "przywróć układ okien"),
+    ("evening", "zamknięcie dnia"),
 ];
 
 fn cmd_label(cfg: &Config, cmd: &str) -> String {
@@ -581,6 +593,59 @@ fn add_command(b: &mut Builder, app: &AppHandle, cfg: &Config, cmd: &str, key: &
             pv("Raport tygodnia", "Otwiera kartę raportu tygodnia.", ""), &[], Cmd::Report),
         "settings" => b.add(g, "U", GREY, "Ustawienia Edge Shell".into(), "Dock, tryby, automatyzacje, skróty".into(), key,
             pv("Ustawienia", "Otwiera okno ustawień.", ""), &[], Cmd::Settings),
+        "one_thing" => {
+            let on = state::read(app, |rt| rt.one_thing);
+            let t = if on { "Wyłącz „jedną rzecz”" } else { "Jedna rzecz" };
+            b.add(g, "1", RED, t.into(), "Wszystko poza aktywnym oknem przygasa".into(), key,
+                pv(t, "Reszta ekranu przygasa, dock się chowa, pasek pokazuje tylko zadanie i czas. Wyłączasz Ctrl+Alt+J albo przyciskiem w pasku.", "• warstwa pod aktywnym oknem
+• kończy się sama z końcem fokusu"), &[], Cmd::OneThing);
+        }
+        "clipboard" => {
+            let clips = state::read(app, |rt| rt.store.clips.clone());
+            let needle = arg.trim().to_lowercase();
+            let mut shown = 0;
+            for c in clips.iter().filter(|c| needle.is_empty() || c.text.to_lowercase().contains(&needle)).take(12) {
+                shown += 1;
+                let one_line: String = c.text.split_whitespace().collect::<Vec<_>>().join(" ");
+                let title: String = one_line.chars().take(70).collect();
+                let sub = format!("{}{}", if c.pinned { "📌 przypięte · " } else { "" }, c.at.format("%d.%m %H:%M"));
+                let preview_text: String = c.text.chars().take(1200).collect();
+                b.add("Schowek", if c.pinned { "📌" } else { "T" }, GREY, title, sub, key,
+                    pv("Ze schowka", preview_text, "• Enter: wkleja w okno, w którym byłeś
+• Tab: tylko kopiuj, przypnij, usuń"),
+                    &[("copy", "Tylko kopiuj"), ("pin", if c.pinned { "Odepnij" } else { "Przypnij" }), ("del", "Usuń z historii")], Cmd::Clip(c.text.clone()));
+            }
+            if shown == 0 {
+                b.add("Schowek", "T", GREY, "Historia schowka jest pusta".into(), "Skopiuj coś (Ctrl+C), a pojawi się tutaj".into(), key, pv("Historia schowka", "Edge Shell pamięta ostatnie 150 wpisów i wszystkie przypięte. Hasła z menedżerów haseł są pomijane.", ""), &[], Cmd::Evening);
+            }
+        }
+        "screenshot" => b.add(g, "Z", PURPLE, "Zrzut ekranu z adnotacją".into(), "Zaznacz obszar, dorysuj strzałkę".into(), key,
+            pv("Zrzut ekranu", "Zaznaczasz obszar ekranu pod kursorem, dorysowujesz strzałkę, ramkę albo pisak. Enter zapisuje.", "• plik w Obrazy\\Zrzuty ekranu
+• obraz w schowku
+• plik na półce"), &[], Cmd::Screenshot),
+        "layout_save" => {
+            let name = arg.trim().to_string();
+            let n = platform::app_windows().len();
+            b.add("Okna", "U", BLUE, if name.is_empty() { "Zapisz układ okien".into() } else { format!("Zapisz układ „{name}”") },
+                format!("{n} okien · {}", if name.is_empty() { "nazwa: tryb + monitory" } else { "własna nazwa" }), key,
+                pv("Zapisz układ", "Zapamiętuje, gdzie stoi każde okno. Przywrócisz to „ul” albo automatyzacją (np. po podłączeniu monitora).", "• pozycje i rozmiary okien
+• tryb i zestaw monitorów"), &[], Cmd::LayoutSave(name));
+        }
+        "layout_restore" => {
+            let layouts = state::read(app, |rt| rt.store.layouts.clone());
+            let needle = arg.trim().to_lowercase();
+            for l in layouts.iter().filter(|l| needle.is_empty() || l.name.to_lowercase().contains(&needle)).take(8) {
+                b.add("Okna", "U", BLUE, format!("Układ: {}", l.name), format!("{} okien", l.windows.len()), key,
+                    pv(format!("Układ: {}", l.name), l.windows.iter().map(|w| w.exe.trim_end_matches(".exe").to_string()).collect::<Vec<_>>().join(", "), "• przesuwa otwarte okna
+• uruchamia brakujące aplikacje"),
+                    &[], Cmd::LayoutRestore(l.name.clone()));
+            }
+            if layouts.is_empty() {
+                b.add("Okna", "U", BLUE, "Nie masz zapisanych układów".into(), "Ułóż okna i wpisz „uz”".into(), key, pv("Układy okien", "Najpierw zapisz układ poleceniem „uz”.", ""), &[], Cmd::LayoutSave(String::new()));
+            }
+        }
+        "evening" => b.add(g, "K", AMBER, "Zamknięcie dnia".into(), "Co zrobione, co na jutro, jedno zdanie".into(), key,
+            pv("Zamknięcie dnia", "Karta z dzisiejszymi sektorami i niedokończonymi zadaniami — każde jednym kliknięciem na jutro.", ""), &[], Cmd::Evening),
         _ => {}
     }
 }
@@ -599,7 +664,7 @@ pub fn palette_query(app: AppHandle, query: String) -> Answer {
     // Puste pole: podpowiedź — wszystkie szybkie klawisze.
     if q.is_empty() {
         for (cmd, key) in &keys {
-            if cmd != "calc" && cmd != "capture" {
+            if !matches!(cmd.as_str(), "calc" | "capture" | "clipboard" | "layout_restore") {
                 add_command(&mut b, &app, &cfg, cmd, key, "");
             }
         }
@@ -629,7 +694,7 @@ pub fn palette_query(app: AppHandle, query: String) -> Answer {
                 add_command(&mut b, &app, &cfg, c, k, "");
             }
         }
-        if cmd == "capture" || cmd == "calc" || (cmd == "focus" && !rest.is_empty()) || cmd == "tailscale" {
+        if cmd == "capture" || cmd == "calc" || cmd == "clipboard" || cmd == "layout_restore" || cmd == "layout_save" || (cmd == "focus" && !rest.is_empty()) || cmd == "tailscale" {
             if cmd == "tailscale" {
                 if let Some((c, k)) = keys.iter().find(|(c, _)| c == "tailscale_off") {
                     add_command(&mut b, &app, &cfg, c, k, "");
@@ -646,7 +711,7 @@ pub fn palette_query(app: AppHandle, query: String) -> Answer {
         for (cmd, key) in &keys {
             let label = cmd_label(&cfg, cmd).to_lowercase();
             if key.starts_with(&head) || score(&label, &q, &[]) >= 25 {
-                if cmd != "calc" && cmd != "capture" {
+                if !matches!(cmd.as_str(), "calc" | "capture" | "clipboard" | "layout_restore") {
                     add_command(&mut b, &app, &cfg, cmd, key, "");
                 }
             }
@@ -715,7 +780,7 @@ pub fn palette_query(app: AppHandle, query: String) -> Answer {
                     (format!("{}\nZmieniony: {}", f.path, ago(f.modified)), "• otwiera plik w domyślnej aplikacji\n• Tab: otwórz folder, kopiuj ścieżkę, na półkę")
                 };
                 b.add("Pliki", mono, tile, f.name.clone(), sub, "", pv(f.name.clone(), body, eff),
-                    &[("folder", "Pokaż w folderze"), ("copy", "Kopiuj ścieżkę"), ("shelf", "Połóż na półce")], Cmd::File(f.path.clone()));
+                    &[("look", "Podgląd (Shift+Spacja)"), ("folder", "Pokaż w folderze"), ("copy", "Kopiuj ścieżkę"), ("shelf", "Połóż na półce")], Cmd::File(f.path.clone()));
             }
         }
 
@@ -878,12 +943,42 @@ pub async fn palette_run(app: AppHandle, id: String, action: Option<String>) -> 
         Cmd::Replan => commands::replan(app.clone()).await?,
         Cmd::Report => insights::open_report(app.clone()),
         Cmd::Settings => settings::open_settings(app.clone()),
+        Cmd::OneThing => crate::focus::one_thing_toggle(app.clone()),
+        Cmd::Screenshot => {
+            // Chwila na zniknięcie palety, żeby nie trafiła na zrzut.
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            crate::shot::start(&app);
+        }
+        Cmd::Evening => crate::insights::open_evening(app.clone()),
+        Cmd::LayoutSave(name) => {
+            let n = crate::windows_mgr::save_layout(&app, &name);
+            radio::pit_wall(&app, format!("Zapisano układ: {n} okien."), None);
+        }
+        Cmd::LayoutRestore(name) => {
+            crate::windows_mgr::restore_layout(&app, &name)?;
+        }
+        Cmd::Clip(text) => match action.as_str() {
+            "pin" => state::update(&app, true, |rt| {
+                if let Some(c) = rt.store.clips.iter_mut().find(|c| c.text == text) {
+                    c.pinned = !c.pinned;
+                }
+            }),
+            "del" => state::update(&app, true, |rt| rt.store.clips.retain(|c| c.text != text)),
+            "copy" => commands::copy_text(app.clone(), text)?,
+            _ => {
+                commands::copy_text(app.clone(), text)?;
+                // Paleta zniknęła — fokus wraca do poprzedniego okna; wklejamy.
+                tokio::time::sleep(std::time::Duration::from_millis(180)).await;
+                platform::send_paste();
+            }
+        },
         Cmd::Window(h) => match action.as_str() {
             "close" => crate::sys::close_window(h),
             "min" => platform::minimize(h),
             _ => crate::sys::activate(h),
         },
         Cmd::File(p) => match action.as_str() {
+            "look" => crate::shot::quicklook(app.clone(), p).await?,
             "folder" => commands::reveal(app.clone(), p)?,
             "copy" => commands::copy_text(app.clone(), p)?,
             "shelf" => commands::shelf_add(app.clone(), vec![p]),

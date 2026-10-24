@@ -27,6 +27,7 @@ enum Revert {
     Restore(Vec<isize>),
     Volume(u8),
     ShowShell,
+    OneThingOff,
 }
 
 /// Kontekst odpalenia: co wywołało regułę (plik, monitor, spotkanie…).
@@ -117,6 +118,9 @@ pub fn describe_action(cfg: &crate::config::Config, a: &RuleAction) -> String {
         "volume" => format!("głośność {v}%"),
         "focus" => format!("fokus {v} min"),
         "hide_shell" => "schowaj dock i paski".into(),
+        "layout" if v.is_empty() => "układ okien trybu".into(),
+        "layout" => format!("układ okien „{v}”"),
+        "one_thing" => "jedna rzecz".into(),
         "command" => format!("polecenie: {v}"),
         other => other.to_string(),
     }
@@ -272,6 +276,16 @@ async fn run_action(app: &AppHandle, a: &RuleAction, ctx: &Ctx) -> Option<Revert
             layout::FORCE_HIDE.store(true, Ordering::Relaxed);
             Some(Revert::ShowShell)
         }
+        "layout" => {
+            // Chwila na pojawienie się okien (np. po podłączeniu monitora).
+            tokio::time::sleep(std::time::Duration::from_millis(800)).await;
+            let _ = crate::windows_mgr::restore_layout(app, &v);
+            None
+        }
+        "one_thing" => {
+            crate::focus::set_one_thing(app, true);
+            Some(Revert::OneThingOff)
+        }
         "command" => {
             #[cfg(windows)]
             {
@@ -314,6 +328,7 @@ async fn undo(app: &AppHandle, r: Revert) {
         Revert::ShowShell => {
             layout::FORCE_HIDE.store(false, Ordering::Relaxed);
         }
+        Revert::OneThingOff => crate::focus::set_one_thing(app, false),
     }
 }
 
@@ -341,6 +356,8 @@ fn card(message: String, ask: Option<String>) -> RadioMsg {
         app: None,
         open_target: None,
         ask,
+        yes_label: None,
+        no_label: None,
     }
 }
 
@@ -636,6 +653,9 @@ pub fn automation_answer(app: AppHandle, yes: bool) {
     let rule_id = state::read(&app, |rt| rt.showing.front().and_then(|m| m.ask.clone()));
     radio::dismiss(&app, false);
     let Some(id) = rule_id else { return };
+    if crate::focus::answer(&app, &id, yes) || crate::insights::answer(&app, &id, yes) {
+        return;
+    }
     let ctx = PENDING.lock().ok().and_then(|mut g| g.as_mut().and_then(|m| m.remove(&id))).unwrap_or_default();
     let cfg = state::cfg(&app);
     let Some(rule) = cfg.automations.iter().find(|r| r.id == id).cloned() else { return };
@@ -667,6 +687,7 @@ pub struct AutomationStatus {
     last: HashMap<String, String>,
     monitors: Vec<String>,
     ssid: Option<String>,
+    layouts: Vec<String>,
 }
 
 #[tauri::command]
@@ -688,5 +709,6 @@ pub async fn automation_status(app: AppHandle) -> AutomationStatus {
     let (monitors, ssid) = tauri::async_runtime::spawn_blocking(|| (sys::monitor_names(), crate::stats::latest().wifi_ssid.or_else(|| sys::wifi().0)))
         .await
         .unwrap_or_default();
-    AutomationStatus { log, last, monitors, ssid }
+    let layouts = state::read(&app, |rt| rt.store.layouts.iter().map(|l| l.name.clone()).collect());
+    AutomationStatus { log, last, monitors, ssid, layouts }
 }

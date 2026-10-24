@@ -41,9 +41,20 @@
   .badge { font-size: 10px; font-weight: 700; color: var(--text); }
   .sep { width: 1px; height: 16px; background: rgba(255,255,255,0.12); margin: 0 4px; }
   @keyframes eq { 0%, 100% { height: 4px; } 50% { height: 12px; } }
+  .people { display: flex; align-items: center; }
+  .people:empty { display: none; }
+  .pp { width: 22px; height: 22px; margin-left: -5px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; background: #3f3f46; box-shadow: 0 0 0 2px #0c0c0e; position: relative; }
+  .pp:first-child { margin-left: 0; }
+  .pp::after { content: ''; position: absolute; right: -1px; bottom: -1px; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 2px #0c0c0e; background: var(--st); }
+  body.one .side > * { visibility: hidden; }
+  body.one .bar { background: rgba(8,8,10,0.96); }
+  .exit1 { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.18); background: transparent; color: var(--text-2); font-size: 12px; display: none; }
+  body.one .exit1 { display: block; }
+  .exit1:hover { color: #fff; border-color: rgba(255,255,255,0.4); }
 </style>
 </head>
 <body>
+<button class="exit1" id="exit1" title="Wyjdź z trybu „jedna rzecz” (Ctrl+Alt+J)">Jedna rzecz · wyjdź</button>
 <div class="bar">
   <div class="side">
     <button class="logo" id="logo" aria-label="Szuflada"><span></span></button>
@@ -56,6 +67,7 @@
     <span class="ellipsis" id="focusTitle" style="color:var(--text-2)"></span>
   </button>
   <div class="side right">
+    <span class="people" id="people" aria-label="Kto teraz pracuje"></span>
     <button class="chip" id="radio" aria-label="Radio — pokaż wiadomości"></button>
     <span class="chip" id="horolog" style="background:transparent;padding:0"></span>
     <button class="chip" id="music" aria-label="Muzyka" style="display:none"></button>
@@ -216,7 +228,24 @@ function renderStats() {
 listen('stats', (st) => { stats = st; renderStats(); });
 invoke('get_stats').then((st) => { stats = st; renderStats(); });
 
+document.getElementById('exit1').onclick = () => invoke('one_thing_toggle');
+function renderPeople(s) {
+  const people = (s.presence || []).filter((p) => p.state !== 'offline');
+  const color = { focus: '#f87171', available: '#4ade80', away: '#71717a' };
+  const label = { focus: 'w fokusie', available: 'dostępny', away: 'z dala od komputera' };
+  $('people').innerHTML = people.slice(0, 5).map((p) => {
+    const until = p.until ? ` do ${new Date(p.until).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}` : '';
+    const tip = `${p.name} — ${label[p.state] || p.state}${p.task ? `: ${p.task}` : ''}${p.state === 'focus' ? until : ''}`;
+    const initials = p.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+    return `<span class="pp" style="--st:${color[p.state] || '#71717a'}" title="${esc(tip)}">${esc(initials)}</span>`;
+  }).join('');
+  const working = people.filter((p) => p.state === 'focus').length;
+  $('people').title = working ? `${working} ${working === 1 ? 'osoba pracuje' : 'osoby pracują'} razem z Tobą` : '';
+}
+
 onSnapshot((s) => {
+  renderPeople(s);
+  document.body.classList.toggle('one', !!s.oneThing);
   if (s.barStats) statsOrder = s.barStats;
   renderStatic(s);
   renderClock(s);

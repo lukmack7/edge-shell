@@ -94,6 +94,11 @@ pub struct RadioMsg {
     /// Pytanie automatyzacji: id reguły, karta pokazuje „Tak / Nie”.
     #[serde(default)]
     pub ask: Option<String>,
+    /// Napisy na przyciskach pytania (domyślnie „Tak” / „Nie”).
+    #[serde(default)]
+    pub yes_label: Option<String>,
+    #[serde(default)]
+    pub no_label: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -139,6 +144,54 @@ pub struct Store {
     pub rule_last: HashMap<String, DateTime<Local>>,
     pub automation_log: Vec<LogEntry>,
     pub player: PlayerState,
+    /// Pierwszy 2‑minutowy krok dla zadań (tytuł małymi literami → krok).
+    pub first_steps: HashMap<String, String>,
+    /// Faktyczne długości bloków nawyków/fokusu (id zadania → minuty, ostatnie 5).
+    pub actuals: HashMap<String, Vec<i64>>,
+    /// Kiedy ostatnio pytaliśmy o korektę czasu (id → data).
+    pub dur_asked: HashMap<String, String>,
+    /// Jedno zdanie o dniu z wieczornego zamknięcia (data → tekst).
+    pub day_notes: HashMap<String, String>,
+    /// Historia schowka z przypiętymi fragmentami.
+    pub clips: Vec<Clip>,
+    /// Zapamiętane układy okien (nazwa → okna).
+    pub layouts: Vec<WinLayout>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Clip {
+    pub text: String,
+    pub at: DateTime<Local>,
+    #[serde(default)]
+    pub pinned: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WinLayout {
+    pub name: String,
+    /// Tryb, do którego należy układ (pusty = dowolny).
+    #[serde(default)]
+    pub mode: String,
+    /// Podpis monitorów, przy których zapisano układ.
+    #[serde(default)]
+    pub monitors: String,
+    pub windows: Vec<WinPlace>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WinPlace {
+    pub exe: String,
+    pub path: String,
+    pub title: String,
+    pub x: i32,
+    pub y: i32,
+    pub w: i32,
+    pub h: i32,
+    #[serde(default)]
+    pub maximized: bool,
 }
 
 /// Pływający odtwarzacz: czy widoczny, pozycja (px fizyczne), karta/pasek, na wierzchu.
@@ -201,6 +254,11 @@ pub struct Music {
     pub volume: Option<i64>,
     pub device: String,
     pub album: String,
+    pub uri: String,
+    pub liked: Option<bool>,
+    pub shuffle: bool,
+    /// off | context | track
+    pub repeat: String,
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
@@ -242,6 +300,13 @@ pub struct Runtime {
     pub open_apps: Vec<OpenApp>,
     /// Który widok pokazuje okno kart przy pasku (cpu, wifi, bt, sound, power).
     pub popup_view: String,
+    /// Tryb „jedna rzecz” włączony.
+    pub one_thing: bool,
+    /// Okno, do którego wraca „Wracam” z karty rozproszenia.
+    pub return_hwnd: isize,
+    /// Inne osoby z serwera obecności.
+    pub presence: Vec<crate::presence::Person>,
+    pub presence_at: Option<DateTime<Local>>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, PartialEq)]
@@ -449,6 +514,8 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "music": rt.music,
         "spotifyEnabled": !cfg.spotify.client_id.is_empty(),
         "player": rt.store.player,
+        "oneThing": rt.one_thing,
+        "presence": rt.presence,
         "panels": { "drawer": rt.drawer_open, "now": rt.now_open },
         "friction": rt.friction_app.as_ref().and_then(|id| cfg.dock.iter().find(|a| &a.id == id))
             .map(|a| json!({ "id": a.id, "name": a.name })),

@@ -1,0 +1,14 @@
+# Serwer obecności Edge Shell na home serwerze.
+#   docker compose up -d
+# W Edge Shell: Ustawienia → Fokus → Obecność: http://<home-serwer>:7320 i ten sam token.
+services:
+  presence:
+    image: python:3.12-alpine
+    restart: unless-stopped
+    command: python /app/presence.py
+    environment:
+      PRESENCE_TOKEN: "zmien-mnie"
+    ports:
+      - "7320:7320"
+    volumes:
+      - ./presence.py:/app/presence.py:ro

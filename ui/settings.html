@@ -160,6 +160,8 @@ const PAGES = [
   ['dock', 'Dock', 'apps'],
   ['modes', 'Tryby', 'clock'],
   ['auto', 'Automatyzacje', 'replan'],
+  ['focus', 'Fokus i ludzie', 'clock'],
+  ['windows', 'Okna', 'apps'],
   ['radio', 'Radio i kontakty', 'radio'],
   ['notifications', 'Powiadomienia', 'bell'],
   ['spotify', 'Spotify', 'music'],
@@ -417,6 +419,10 @@ const render = {
         <div class="chips">${times}</div>
         <div class="row"><input type="time" class="in" id="btNew" style="width:140px"><button class="btn" id="btAdd">Dodaj godzinę</button></div>
       </div>
+      <div class="card"><h3>Cisza nocna</h3>
+        <div class="row"><div class="txt"><b>Nocą przechodzą tylko kontakty z numerem</b><span>Reszta czeka do rana (do pierwszej paczki albo od razu, jeśli tryb nie jest cichy).</span></div>${sw(cfg.radio.nightQuiet, 'radio.nightQuiet')}</div>
+        <div class="row"><span class="hint">od</span><input type="time" class="in" data-bind="radio.nightStart" style="width:120px"><span class="hint">do</span><input type="time" class="in" data-bind="radio.nightEnd" style="width:120px"></div>
+      </div>
       <div class="card"><h3>Lokalny endpoint</h3>
         <span class="hint">POST http://127.0.0.1:${cfg.radio.port}/radio — dla n8n, Home Assistanta, skryptów i telefonu.</span>
         <div class="grid2">
@@ -506,10 +512,65 @@ const render = {
       </div>`;
   },
 
+  focus() {
+    return `
+      <h2>Fokus i ludzie</h2>
+      <p class="lead">Pomoc przy skupieniu: delikatne przypomnienia, start bloku z pierwszym krokiem, wieczorne zamknięcie dnia i praca „razem” z innymi.</p>
+      <div class="card">
+        <h3>Rozproszenia</h3>
+        <div class="row"><div class="txt"><b>Karta „wracamy?”</b><span>Gdy w trakcie fokusu siedzisz w rozpraszaczu dłużej niż <span data-out="focus.distractionMinutes">${cfg.focus.distractionMinutes}</span> min. Bez blokowania.</span></div>${sw(cfg.focus.distractionAlert, 'focus.distractionAlert')}</div>
+        <input type="range" min="1" max="15" step="1" data-num="focus.distractionMinutes">
+        <label class="field-l">Co rozprasza (nazwa procesu albo fragment tytułu okna, np. karta YouTube w przeglądarce). Aplikacje wyciszone w trybie liczą się zawsze.
+          <input class="in" id="distr" value="${esc(cfg.focus.distractions.join(', '))}"></label>
+      </div>
+      <div class="card">
+        <h3>Start bloku i jedna rzecz</h3>
+        <div class="row"><div class="txt"><b>„Jadę” włącza tryb jedna rzecz</b><span>Na starcie bloku z Horologa. Wszystko poza aktywnym oknem przygasa, kończy się samo z końcem fokusu.</span></div>${sw(cfg.focus.oneThingOnStart, 'focus.oneThingOnStart')}</div>
+        <span class="hint">Pierwszy krok dla zadania ustawiasz w panelu Teraz (pole pod bieżącym blokiem). Bez niego karta podpowiada: „otwórz to, czego potrzebujesz, i zrób najmniejszy ruch”.</span>
+      </div>
+      <div class="card">
+        <h3>Zamknięcie dnia</h3>
+        <div class="row"><div class="txt"><b>Wieczorna karta (pon–pt)</b><span>Co zrobione, co na jutro, jedno zdanie o dniu. Ręcznie: „kd” w palecie.</span></div>${sw(cfg.focus.eveningReview, 'focus.eveningReview')}<input type="time" class="in" data-bind="focus.eveningTime" style="width:120px"></div>
+      </div>
+      <div class="card">
+        <h3>Praca razem (body doubling)</h3>
+        <span class="hint">Serwer obecności to mały program na home serwerze — w repozytorium: server/presence (docker compose up -d). Każdy, kto poda ten sam adres i token, widzi pozostałych w górnym pasku.</span>
+        <div class="row"><div class="txt"><b>Pokazuj, że pracuję, i widzę innych</b></div>${sw(cfg.presence.enabled, 'presence.enabled')}</div>
+        <div class="grid2">
+          <label class="field-l">Adres serwera<input class="in" data-bind="presence.url" placeholder="http://homeserver.local:7320"></label>
+          <label class="field-l">Token<input class="in" data-bind="presence.token" placeholder="taki sam jak PRESENCE_TOKEN"></label>
+          <label class="field-l">Jak widzą Cię inni<input class="in" data-bind="presence.name" placeholder="np. Łukasz"></label>
+        </div>
+        <div class="row"><div class="txt"><b>Pokazuj tytuł zadania</b><span>Inaczej inni widzą tylko „w fokusie do 15:30”.</span></div>${sw(cfg.presence.shareTask, 'presence.shareTask')}</div>
+      </div>`;
+  },
+
+  windows() {
+    const Z = [['thirds', 'Trzy kolumny', [[0, 33], [33, 33], [66, 34]]], ['wide-center', 'Szeroki środek', [[0, 25], [25, 50], [75, 25]]], ['halves', 'Połowy', [[0, 50], [50, 50]]], ['wide-left', 'Szeroka lewa', [[0, 60], [60, 40]]], ['quarters', 'Ćwiartki', [[0, 50], [50, 50]]]];
+    const layouts = (autoStatus?.layouts || []);
+    return `
+      <h2>Okna</h2>
+      <p class="lead">Strefy pod szeroki monitor i zapamiętane układy okien.</p>
+      <div class="card">
+        <h3>Strefy</h3>
+        <div class="chips">${Z.map(([id, name, cols]) => `<button class="chip ${cfg.windows.zones === id ? 'on' : ''}" data-zone="${id}" style="height:auto;padding:8px;flex-direction:column;gap:6px">
+          <span style="display:flex;gap:2px;width:96px;height:40px">${cols.map(([, w]) => `<i style="flex:${w};border-radius:3px;background:rgba(255,255,255,0.25)"></i>`).join('')}</span>${name}</button>`).join('')}</div>
+        <div class="row"><div class="txt"><b>Shift podczas przeciągania okna</b><span>Pokazuje strefy — puść okno nad strefą, a się dopasuje.</span></div>${sw(cfg.windows.shiftDrag, 'windows.shiftDrag')}</div>
+        <div class="row"><div class="txt"><b>Ctrl+Alt+1…6</b><span>Wkłada aktywne okno do strefy o tym numerze. Zmiana działa po zapisaniu.</span></div>${sw(cfg.windows.zoneHotkeys, 'windows.zoneHotkeys')}</div>
+        <div class="row"><div class="txt"><b>Odstęp między oknami</b><span><span data-out="windows.gap">${cfg.windows.gap}</span> px</span></div><input type="range" min="0" max="24" step="2" data-num="windows.gap" style="width:200px"></div>
+      </div>
+      <div class="card">
+        <h3>Układy okien</h3>
+        <span class="hint">Ułóż okna i wpisz w palecie „uz” (zapisz) — „ul” przywraca. Automatyzacja „Układ okien” zrobi to sama, np. po podłączeniu monitora.</span>
+        <div class="list">${layouts.map((l) => `<div class="item"><span style="flex:1">${esc(l)}</span><button class="btn" data-lrest="${esc(l)}">Przywróć</button><button class="mini" data-ldel="${esc(l)}" aria-label="Usuń">${icon('trash', 16)}</button></div>`).join('') || '<span class="hint">Brak zapisanych układów.</span>'}</div>
+        <div><button class="btn" id="lsave">${icon('plus', 16, 2)}Zapisz bieżący układ</button></div>
+      </div>`;
+  },
+
   hotkeys() {
     const KEYS = [
       ['drawer', 'Szuflada'], ['now', 'Panel Teraz'], ['capture', 'Wrzuć myśl'],
-      ['focus', 'Start / pauza fokusu'], ['player', 'Odtwarzacz na wierzchu'], ['search', 'Paleta poleceń'], ['radio', 'Pokaż radio z paczki'],
+      ['focus', 'Start / pauza fokusu'], ['player', 'Odtwarzacz na wierzchu'], ['oneThing', 'Jedna rzecz'], ['screenshot', 'Zrzut z adnotacją'], ['search', 'Paleta poleceń'], ['radio', 'Pokaż radio z paczki'],
     ];
     return `
       <h2>Skróty klawiszowe</h2>
@@ -770,6 +831,26 @@ const after = {
       if (p) { cfg.palette.folders.push(p); markDirty(); show(page); }
     };
   },
+  focus(root) {
+    $('distr').onchange = (e) => { cfg.focus.distractions = e.target.value.split(',').map((x) => x.trim()).filter(Boolean); markDirty(); };
+  },
+  windows(root) {
+    if (!autoLoading) {
+      autoLoading = true;
+      invoke('automation_status').then((st) => { autoStatus = st; if (page === 'windows') show('windows'); }).catch(() => {});
+    }
+    for (const b of root.querySelectorAll('[data-zone]')) b.onclick = () => { cfg.windows.zones = b.dataset.zone; markDirty(); show(page); };
+    for (const b of root.querySelectorAll('[data-lrest]')) b.onclick = () => invoke('layout_restore', { name: b.dataset.lrest }).then((n) => toast(`Ustawiono ${n} okien`)).catch((e) => toast(String(e)));
+    for (const b of root.querySelectorAll('[data-ldel]')) b.onclick = async () => { await invoke('layout_delete', { name: b.dataset.ldel }); autoLoading = false; show(page); };
+    $('lsave').onclick = async () => {
+      const name = prompt('Nazwa układu (puste = tryb + monitory)') ?? null;
+      if (name === null) return;
+      const n = await invoke('layout_save', { name });
+      toast(`Zapisano ${n} okien`);
+      autoLoading = false;
+      show(page);
+    };
+  },
   auto(root) {
     if (!autoLoading) {
       autoLoading = true;
@@ -802,7 +883,7 @@ const TRIG = [
 const ACTS = [
   ['mode', 'Przełącz tryb'], ['spotify', 'Spotify'], ['quiet', 'Radio: cisza'], ['message', 'Radio: wiadomość'],
   ['shelf', 'Połóż plik na półce'], ['minimize', 'Odłóż okna aplikacji'], ['close', 'Zamknij aplikację'], ['launch', 'Uruchom z docka'],
-  ['brightness', 'Jasność'], ['volume', 'Głośność'], ['focus', 'Start fokusu'], ['hide_shell', 'Schowaj dock i paski'], ['command', 'Polecenie (cmd)'],
+  ['brightness', 'Jasność'], ['volume', 'Głośność'], ['focus', 'Start fokusu'], ['hide_shell', 'Schowaj dock i paski'], ['layout', 'Układ okien'], ['one_thing', 'Jedna rzecz'], ['command', 'Polecenie (cmd)'],
 ];
 const DAY = ['pon', 'wt', 'śr', 'czw', 'pt', 'sob', 'nd'];
 const HKINDS = [['meeting', 'Spotkanie'], ['focus', 'Blok fokusu'], ['task', 'Zadanie'], ['habit', 'Nawyk'], ['any', 'Dowolny blok']];
@@ -867,6 +948,8 @@ function describeAction(a) {
     case 'volume': return `głośność ${v}%`;
     case 'focus': return `fokus ${v} min`;
     case 'hide_shell': return 'schowaj dock i paski';
+    case 'layout': return v ? `układ okien „${v}”` : 'układ okien trybu';
+    case 'one_thing': return 'jedna rzecz';
     case 'command': return `polecenie: ${v}`;
     default: return a.kind;
   }
@@ -886,7 +969,8 @@ function actionValue(a, n) {
         ${custom ? `<input class="in" style="flex:1" data-avt="${n}" value="${esc(a.value)}" placeholder="spotify:playlist:…">` : ''}`;
     }
     case 'launch': return `<select class="in" style="flex:1" data-av="${n}">${cfg.dock.map((d) => opt(d.id, d.name)).join('')}</select>`;
-    case 'shelf': case 'hide_shell': return '<span class="hint" style="flex:1">bez ustawień</span>';
+    case 'shelf': case 'hide_shell': case 'one_thing': return '<span class="hint" style="flex:1">bez ustawień</span>';
+    case 'layout': return `<select class="in" style="flex:1" data-av="${n}"><option value="" ${!a.value ? 'selected' : ''}>układ bieżącego trybu</option>${(autoStatus?.layouts || []).map((l) => opt(l, l)).join('')}</select>`;
     default: {
       const ph = { quiet: '12:00, 30 (min) albo puste = do końca', message: 'treść karty, {plik} = nazwa pliku', minimize: 'Discord.exe, Steam.exe', close: 'Discord.exe',
         brightness: '0–100', volume: '0–100', focus: 'minuty, np. 45', command: 'np. tailscale set --exit-node=' }[a.kind] || '';
@@ -1199,6 +1283,9 @@ async function load() {
   cfg.backup ||= { folder: '' };
   cfg.palette ||= { keys: [], tailscaleNode: '', folders: [] };
   cfg.automations ||= [];
+  cfg.presence ||= { enabled: false, url: '', name: '', token: '', shareTask: false };
+  cfg.windows ||= { zones: 'thirds', shiftDrag: true, zoneHotkeys: true, gap: 8 };
+  cfg.focus.distractions ||= [];
   for (const a of cfg.dock) { a.iconPath ??= ''; a.icon ??= 'auto'; }
   saved = JSON.stringify(cfg);
   markDirty();

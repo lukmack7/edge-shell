@@ -22,6 +22,10 @@ mod watchdog;
 mod palette;
 mod player;
 mod popup;
+mod focus;
+mod presence;
+mod shot;
+mod windows_mgr;
 mod sysx;
 mod automations;
 mod backup;
@@ -91,6 +95,9 @@ fn main() {
             palette::init(&handle);
             player::init(&handle);
             popup::init(&handle);
+            focus::start(handle.clone());
+            presence::start(handle.clone());
+            windows_mgr::start(handle.clone());
             automations::start(handle.clone());
 
             // Szuflada i Teraz chowają się, gdy klikniesz gdzie indziej.
@@ -152,6 +159,8 @@ fn main() {
             commands::focus_finish,
             commands::radio_reply,
             commands::radio_next,
+            commands::radio_quick_reply,
+            commands::radio_focus,
             commands::radio_later,
             commands::radio_open,
             commands::radio_show_waiting,
@@ -180,6 +189,10 @@ fn main() {
             icons::app_icon,
             commands::launch_new,
             commands::dock_pin,
+            commands::dock_cycle,
+            commands::dock_reorder,
+            commands::dock_open_with,
+            commands::dock_add_paths,
             previews::previews_show,
             previews::previews_layout,
             previews::previews_hide,
@@ -201,6 +214,24 @@ fn main() {
             palette::palette_query,
             player::player_toggle,
             popup::popup_open,
+            focus::one_thing_toggle,
+            shot::shot_start,
+            shot::shot_cancel,
+            shot::shot_save,
+            shot::quicklook,
+            windows_mgr::layout_save,
+            windows_mgr::layout_restore,
+            windows_mgr::layout_list,
+            windows_mgr::layout_delete,
+            windows_mgr::zone_snap,
+            focus::set_first_step,
+            focus::get_first_step,
+            insights::open_evening,
+            insights::get_evening,
+            insights::evening_tomorrow,
+            insights::evening_done,
+            insights::evening_note,
+            insights::horolog_move,
             popup::popup_resize,
             popup::popup_hide,
             popup::sys_processes,
@@ -225,6 +256,9 @@ fn main() {
             player::player_playlists,
             player::player_play,
             player::player_skip,
+            player::player_like,
+            player::player_shuffle,
+            player::player_repeat,
             palette::palette_run,
             palette::palette_show,
             palette::palette_hide,

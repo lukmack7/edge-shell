@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — strefy</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font-family: "Segoe UI Variable Display", "Segoe UI", sans-serif; }
+  .z { position: absolute; border-radius: 14px; border: 2px solid rgba(255,255,255,0.35); background: rgba(20,20,24,0.28); display: flex; align-items: center; justify-content: center; color: rgba(255,255,255,0.7); font-size: 28px; font-weight: 700; transition: background 0.08s, border-color 0.08s; box-sizing: border-box; }
+  .z.on { background: rgba(212,46,37,0.35); border-color: #f87171; color: #fff; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+const { listen } = window.__TAURI__.event;
+const root = document.getElementById('root');
+listen('zones', (e) => {
+  root.innerHTML = e.payload.map((z, i) => `<div class="z" id="z${i}" style="left:${z.x}px;top:${z.y}px;width:${z.w}px;height:${z.h}px">${i + 1}</div>`).join('');
+});
+listen('zones-hover', (e) => {
+  for (const el of root.querySelectorAll('.z')) el.classList.remove('on');
+  if (e.payload != null) document.getElementById(`z${e.payload}`)?.classList.add('on');
+});
+</script>
+</body>
+</html>

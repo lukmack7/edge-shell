@@ -39,6 +39,48 @@ pub struct Config {
     pub backup: BackupCfg,
     pub palette: PaletteCfg,
     pub automations: Vec<Rule>,
+    pub presence: PresenceCfg,
+    pub windows: WindowsCfg,
+}
+
+/// Obecność („body doubling”) przez serwer na home serwerze.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct PresenceCfg {
+    pub enabled: bool,
+    /// np. http://homeserver.local:7320
+    pub url: String,
+    /// Jak widzą Cię inni (pusty = nazwa użytkownika Windows).
+    pub name: String,
+    pub token: String,
+    /// Pokazuj innym tytuł bieżącego zadania (inaczej tylko „fokus”).
+    pub share_task: bool,
+}
+
+impl Default for PresenceCfg {
+    fn default() -> Self {
+        Self { enabled: false, url: String::new(), name: String::new(), token: String::new(), share_task: false }
+    }
+}
+
+/// Okna: strefy przyciągania i układy.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct WindowsCfg {
+    /// Układ stref: thirds | wide-center | halves | wide-left | quarters
+    pub zones: String,
+    /// Shift podczas przeciągania okna pokazuje strefy.
+    pub shift_drag: bool,
+    /// Ctrl+Alt+1…6 wkłada aktywne okno do strefy.
+    pub zone_hotkeys: bool,
+    /// Odstęp między oknami w strefach (px).
+    pub gap: i32,
+}
+
+impl Default for WindowsCfg {
+    fn default() -> Self {
+        Self { zones: "thirds".into(), shift_drag: true, zone_hotkeys: true, gap: 8 }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -87,6 +129,12 @@ impl Default for PaletteCfg {
                 k("replan", "pl"),
                 k("report", "rap"),
                 k("settings", "ust"),
+                k("one_thing", "jr"),
+                k("clipboard", "cb"),
+                k("screenshot", "zr"),
+                k("layout_save", "uz"),
+                k("layout_restore", "ul"),
+                k("evening", "kd"),
             ],
             tailscale_node: "homeserver".into(),
             folders: vec![],
@@ -389,6 +437,8 @@ pub struct Contact {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Hotkeys {
+    pub one_thing: String,
+    pub screenshot: String,
     pub player: String,
     pub drawer: String,
     pub now: String,
@@ -407,6 +457,10 @@ pub struct RadioCfg {
     pub token: String,
     /// Godziny dostarczania paczek, np. ["10:00", "12:00", "15:00", "17:00"].
     pub batch_times: Vec<String>,
+    /// Cisza nocna: między tymi godzinami przechodzą tylko kontakty z numerem 1–9.
+    pub night_quiet: bool,
+    pub night_start: String,
+    pub night_end: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -451,11 +505,21 @@ pub struct ShellCfg {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct FocusCfg {
+    /// Karta „wracamy?”, gdy w trakcie fokusu siedzisz w rozpraszaczu.
+    pub distraction_alert: bool,
+    pub distraction_minutes: u64,
+    /// Fragmenty nazw procesów albo tytułów okien (np. karta YouTube w przeglądarce).
+    pub distractions: Vec<String>,
+    /// Kliknięcie „Jadę” na starcie bloku włącza tryb „jedna rzecz”.
+    pub one_thing_on_start: bool,
     pub adhoc_minutes: i64,
     pub weekly_goal_hours: f64,
     /// Dzień raportu tygodnia: 1 = poniedziałek … 7 = niedziela (0 = wyłączony).
     pub report_weekday: u32,
     pub report_time: String,
+    /// Wieczorne zamknięcie dnia: co zrobione, co na jutro, jedno zdanie.
+    pub evening_review: bool,
+    pub evening_time: String,
 }
 
 impl Default for HorologCfg {
@@ -539,6 +603,8 @@ impl Default for Contact {
 impl Default for Hotkeys {
     fn default() -> Self {
         Self {
+            one_thing: "Ctrl+Alt+J".into(),
+            screenshot: "Ctrl+Alt+S".into(),
             player: "Ctrl+Alt+M".into(),
             drawer: "Ctrl+Alt+ArrowLeft".into(),
             now: "Ctrl+Alt+ArrowRight".into(),
@@ -556,6 +622,9 @@ impl Default for RadioCfg {
             port: 7311,
             token: String::new(),
             batch_times: vec!["10:00".into(), "12:00".into(), "15:00".into(), "17:00".into()],
+            night_quiet: true,
+            night_start: "22:00".into(),
+            night_end: "07:00".into(),
         }
     }
 }
@@ -595,7 +664,21 @@ impl Default for ShellCfg {
 
 impl Default for FocusCfg {
     fn default() -> Self {
-        Self { adhoc_minutes: 25, weekly_goal_hours: 15.0, report_weekday: 5, report_time: "16:00".into() }
+        Self {
+            distraction_alert: true,
+            distraction_minutes: 3,
+            distractions: ["YouTube", "Netflix", "Reddit", "Facebook", "Instagram", "TikTok", "Twitch", "discord.exe", "steam.exe"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect(),
+            one_thing_on_start: false,
+            adhoc_minutes: 25,
+            weekly_goal_hours: 15.0,
+            report_weekday: 5,
+            report_time: "16:00".into(),
+            evening_review: true,
+            evening_time: "17:30".into(),
+        }
     }
 }
 
@@ -682,6 +765,8 @@ impl Default for Config {
             backup: BackupCfg::default(),
             palette: PaletteCfg::default(),
             automations: default_rules(),
+            presence: PresenceCfg::default(),
+            windows: WindowsCfg::default(),
         }
     }
 }

@@ -290,6 +290,60 @@ mod imp {
         }
     }
 
+    /// Ctrl+V do aktywnego okna (wklejenie wpisu z historii schowka).
+    pub fn send_paste() {
+        use windows::Win32::UI::Input::KeyboardAndMouse::{
+            SendInput, INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYBD_EVENT_FLAGS, KEYEVENTF_KEYUP, VIRTUAL_KEY, VK_CONTROL,
+        };
+        let key = |vk: VIRTUAL_KEY, up: bool| INPUT {
+            r#type: INPUT_KEYBOARD,
+            Anonymous: INPUT_0 {
+                ki: KEYBDINPUT { wVk: vk, wScan: 0, dwFlags: if up { KEYEVENTF_KEYUP } else { KEYBD_EVENT_FLAGS(0) }, time: 0, dwExtraInfo: 0 },
+            },
+        };
+        let v = VIRTUAL_KEY(0x56);
+        let inputs = [key(VK_CONTROL, false), key(v, false), key(v, true), key(VK_CONTROL, true)];
+        unsafe {
+            SendInput(&inputs, std::mem::size_of::<INPUT>() as i32);
+        }
+    }
+
+    /// Menedżery haseł oznaczają schowek, żeby nie trafiał do historii.
+    pub fn clipboard_private() -> bool {
+        use windows::Win32::System::DataExchange::{IsClipboardFormatAvailable, RegisterClipboardFormatW};
+        unsafe {
+            for name in [windows::core::w!("ExcludeClipboardContentFromMonitorProcessing")] {
+                let f = RegisterClipboardFormatW(name);
+                if f != 0 && IsClipboardFormatAvailable(f).is_ok() {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
+    /// Czy okno należy do Edge Shell.
+    pub fn is_own_window(raw: isize) -> bool {
+        raw != 0 && pid_of(hwnd(raw)) == unsafe { GetCurrentProcessId() }
+    }
+
+    /// (ścieżka .exe, tytuł) okna.
+    pub fn window_info(raw: isize) -> (String, String) {
+        if raw == 0 {
+            return (String::new(), String::new());
+        }
+        let h = hwnd(raw);
+        (exe_of(h), title_of(h))
+    }
+
+    /// Stawia okno `raw` w kolejności tuż pod oknem `after` (bez aktywacji).
+    pub fn place_below(raw: isize, after: isize) {
+        use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE};
+        unsafe {
+            let _ = SetWindowPos(hwnd(raw), hwnd(after), 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        }
+    }
+
     #[allow(dead_code)]
     pub fn unused(_: WPARAM) {}
 }
@@ -314,6 +368,11 @@ mod imp {
     pub fn set_taskbar_visible(_: bool) {}
     pub fn fullscreen_monitor() -> Option<Rect> { None }
     pub fn idle_secs() -> u64 { 0 }
+    pub fn is_own_window(_: isize) -> bool { false }
+    pub fn clipboard_private() -> bool { false }
+    pub fn send_paste() {}
+    pub fn window_info(_: isize) -> (String, String) { (String::new(), String::new()) }
+    pub fn place_below(_: isize, _: isize) {}
 }
 
 pub use imp::*;

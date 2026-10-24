@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — zrzut</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  html, body { cursor: crosshair; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .bar { position: absolute; display: none; gap: 4px; padding: 6px; border-radius: 12px; background: rgba(18,18,21,0.97); border: 1px solid var(--line-strong); box-shadow: 0 6px 18px rgba(0,0,0,0.5); cursor: default; z-index: 2; }
+  .bar button { height: 32px; min-width: 32px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); display: flex; align-items: center; gap: 6px; font-size: 12px; }
+  .bar button:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .bar button.on { background: rgba(255,255,255,0.14); color: #fff; }
+  .bar .sw { width: 18px; height: 18px; border-radius: 50%; border: 2px solid transparent; }
+  .bar button.on .sw { border-color: #fff; }
+  .bar .sep { width: 1px; background: var(--line); margin: 4px 2px; }
+  .bar .save { background: var(--accent); color: #fff; font-weight: 600; }
+  .help { position: absolute; top: 18px; left: 50%; transform: translateX(-50%); padding: 8px 14px; border-radius: 10px; background: rgba(18,18,21,0.9); font-size: 13px; color: var(--text-2); pointer-events: none; }
+  .size { position: absolute; padding: 2px 6px; border-radius: 6px; background: rgba(0,0,0,0.7); font-family: var(--mono); font-size: 11px; color: #fff; pointer-events: none; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<span class="help" id="help">Zaznacz obszar · Esc anuluje</span>
+<span class="size" id="size" style="display:none"></span>
+<div class="bar" id="bar"></div>
+<script type="module">
+import { invoke, listen, icon } from './shared.js';
+
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const bar = document.getElementById('bar');
+const img = new Image();
+let sel = null;            // {x,y,w,h} w px CSS
+let phase = 'select';      // select | annotate
+let tool = 'arrow';
+let color = '#ef4444';
+let shapes = [];
+let drawing = null;
+let dragStart = null;
+
+function resize() {
+  cv.width = innerWidth * devicePixelRatio;
+  cv.height = innerHeight * devicePixelRatio;
+  ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+  draw();
+}
+addEventListener('resize', resize);
+
+function drawShape(c, s) {
+  c.save();
+  c.strokeStyle = s.color;
+  c.fillStyle = s.color;
+  c.lineCap = 'round';
+  c.lineJoin = 'round';
+  if (s.type === 'rect') {
+    c.lineWidth = 3;
+    c.strokeRect(s.x1, s.y1, s.x2 - s.x1, s.y2 - s.y1);
+  } else if (s.type === 'arrow') {
+    c.lineWidth = 4;
+    const a = Math.atan2(s.y2 - s.y1, s.x2 - s.x1);
+    const head = 16;
+    c.beginPath();
+    c.moveTo(s.x1, s.y1);
+    c.lineTo(s.x2 - Math.cos(a) * head * 0.6, s.y2 - Math.sin(a) * head * 0.6);
+    c.stroke();
+    c.beginPath();
+    c.moveTo(s.x2, s.y2);
+    c.lineTo(s.x2 - head * Math.cos(a - 0.45), s.y2 - head * Math.sin(a - 0.45));
+    c.lineTo(s.x2 - head * Math.cos(a + 0.45), s.y2 - head * Math.sin(a + 0.45));
+    c.closePath();
+    c.fill();
+  } else if (s.type === 'pen' || s.type === 'mark') {
+    c.lineWidth = s.type === 'mark' ? 18 : 3;
+    if (s.type === 'mark') c.globalAlpha = 0.35;
+    c.beginPath();
+    s.pts.forEach((p, i) => (i ? c.lineTo(p.x, p.y) : c.moveTo(p.x, p.y)));
+    c.stroke();
+  }
+  c.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, innerWidth, innerHeight);
+  if (!img.complete || !img.naturalWidth) return;
+  ctx.drawImage(img, 0, 0, innerWidth, innerHeight);
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  if (!sel) { ctx.fillRect(0, 0, innerWidth, innerHeight); return; }
+  const { x, y, w, h } = sel;
+  ctx.fillRect(0, 0, innerWidth, y);
+  ctx.fillRect(0, y + h, innerWidth, innerHeight - y - h);
+  ctx.fillRect(0, y, x, h);
+  ctx.fillRect(x + w, y, innerWidth - x - w, h);
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(x, y, w, h);
+  ctx.clip();
+  for (const s of shapes) drawShape(ctx, s);
+  if (drawing) drawShape(ctx, drawing);
+  ctx.restore();
+}
+
+function toolbar() {
+  const T = [['arrow', 'Strzałka', 'right'], ['rect', 'Ramka', 'apps'], ['pen', 'Pisak', 'note'], ['mark', 'Zakreślacz', 'layers']];
+  const C = ['#ef4444', '#fbbf24', '#22c55e', '#3b82f6', '#ffffff'];
+  bar.innerHTML = T.map(([k, l, ic]) => `<button data-t="${k}" class="${tool === k ? 'on' : ''}" title="${l}">${icon(ic, 15)}</button>`).join('')
+    + '<span class="sep"></span>'
+    + C.map((c) => `<button data-c="${c}" class="${color === c ? 'on' : ''}" title="Kolor"><span class="sw" style="background:${c}"></span></button>`).join('')
+    + '<span class="sep"></span>'
+    + `<button id="undo" title="Cofnij (Ctrl+Z)">${icon('left', 15, 2)}</button>`
+    + `<button id="cancel" title="Anuluj (Esc)">${icon('close', 13, 2.4)}</button>`
+    + `<button class="save" id="save" title="Zapisz (Enter)">${icon('check', 15, 2.4)} Zapisz</button>`;
+  for (const b of bar.querySelectorAll('[data-t]')) b.onclick = () => { tool = b.dataset.t; toolbar(); };
+  for (const b of bar.querySelectorAll('[data-c]')) b.onclick = () => { color = b.dataset.c; toolbar(); };
+  document.getElementById('undo').onclick = () => { shapes.pop(); draw(); };
+  document.getElementById('cancel').onclick = cancel;
+  document.getElementById('save').onclick = save;
+  // Pasek pod zaznaczeniem (albo nad, gdy brak miejsca).
+  bar.style.display = 'flex';
+  const bw = bar.offsetWidth;
+  const left = Math.max(8, Math.min(innerWidth - bw - 8, sel.x + sel.w - bw));
+  const below = sel.y + sel.h + 10;
+  bar.style.left = `${left}px`;
+  bar.style.top = `${below + 48 < innerHeight ? below : Math.max(8, sel.y - 54)}px`;
+}
+
+function reset() {
+  sel = null; phase = 'select'; shapes = []; drawing = null; dragStart = null;
+  bar.style.display = 'none';
+  document.getElementById('help').style.display = '';
+  document.getElementById('size').style.display = 'none';
+}
+
+function cancel() {
+  reset();
+  invoke('shot_cancel');
+}
+
+async function save() {
+  if (!sel || sel.w < 3 || sel.h < 3) return;
+  const r = img.naturalWidth / innerWidth;
+  const out = document.createElement('canvas');
+  out.width = Math.round(sel.w * r);
+  out.height = Math.round(sel.h * r);
+  const o = out.getContext('2d');
+  o.drawImage(img, sel.x * r, sel.y * r, sel.w * r, sel.h * r, 0, 0, out.width, out.height);
+  o.setTransform(r, 0, 0, r, -sel.x * r, -sel.y * r);
+  for (const s of shapes) drawShape(o, s);
+  const png = out.toDataURL('image/png');
+  reset();
+  try { await invoke('shot_save', { png }); } catch (e) { console.warn(e); }
+}
+
+cv.onpointerdown = (e) => {
+  if (phase === 'select') {
+    dragStart = { x: e.clientX, y: e.clientY };
+    sel = { x: e.clientX, y: e.clientY, w: 0, h: 0 };
+    document.getElementById('help').style.display = 'none';
+  } else if (inside(e)) {
+    const p = { x: e.clientX, y: e.clientY };
+    drawing = tool === 'pen' || tool === 'mark' ? { type: tool, color, pts: [p] } : { type: tool, color, x1: p.x, y1: p.y, x2: p.x, y2: p.y };
+  }
+  cv.setPointerCapture(e.pointerId);
+};
+cv.onpointermove = (e) => {
+  if (phase === 'select' && dragStart) {
+    sel = { x: Math.min(dragStart.x, e.clientX), y: Math.min(dragStart.y, e.clientY), w: Math.abs(e.clientX - dragStart.x), h: Math.abs(e.clientY - dragStart.y) };
+    const sz = document.getElementById('size');
+    const r = img.naturalWidth / innerWidth;
+    sz.style.display = '';
+    sz.style.left = `${sel.x}px`;
+    sz.style.top = `${Math.max(0, sel.y - 22)}px`;
+    sz.textContent = `${Math.round(sel.w * r)} × ${Math.round(sel.h * r)}`;
+    draw();
+  } else if (drawing) {
+    if (drawing.pts) drawing.pts.push({ x: e.clientX, y: e.clientY });
+    else { drawing.x2 = e.clientX; drawing.y2 = e.clientY; }
+    draw();
+  }
+};
+cv.onpointerup = () => {
+  if (phase === 'select' && dragStart) {
+    dragStart = null;
+    if (!sel || sel.w < 6 || sel.h < 6) {
+      // Klik bez przeciągania = cały ekran.
+      sel = { x: 0, y: 0, w: innerWidth, h: innerHeight };
+    }
+    phase = 'annotate';
+    draw();
+    toolbar();
+  } else if (drawing) {
+    shapes.push(drawing);
+    drawing = null;
+    draw();
+  }
+};
+const inside = (e) => sel && e.clientX >= sel.x && e.clientX <= sel.x + sel.w && e.clientY >= sel.y && e.clientY <= sel.y + sel.h;
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+  else if (e.key === 'Enter' && phase === 'annotate') { e.preventDefault(); save(); }
+  else if (e.ctrlKey && e.key.toLowerCase() === 'z') { shapes.pop(); draw(); }
+});
+
+listen('shot', (d) => {
+  reset();
+  img.onload = resize;
+  img.src = d.image;
+});
+resize();
+</script>
+</body>
+</html>

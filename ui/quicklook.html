@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — podgląd</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { padding: 10px; }
+  .box { height: 100%; display: flex; flex-direction: column; border-radius: 18px; overflow: hidden; background: rgba(16,16,19,0.98); border: 1px solid var(--line-strong); box-shadow: 0 8px 20px -8px rgba(0,0,0,0.6); }
+  header { display: flex; align-items: center; gap: 10px; height: 52px; padding: 0 12px 0 18px; border-bottom: 1px solid var(--line); flex: none; }
+  header .n { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  header .i { font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .view { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; padding: 14px; overflow: auto; background: #0b0b0d; }
+  .view img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 6px; }
+  .view pre { align-self: stretch; width: 100%; margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; color: var(--text-2); user-select: text; }
+  .none { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <header><span class="n" id="name"></span><span class="i" id="info"></span>
+    <button class="btn" id="open">Otwórz</button><button class="btn" id="folder">Pokaż w folderze</button><button class="icon-btn" id="close" aria-label="Zamknij"></button></header>
+  <div class="view" id="view"></div>
+</div>
+<script type="module">
+import { invoke, listen, esc, icon } from './shared.js';
+const $ = (id) => document.getElementById(id);
+let cur = null;
+$('close').innerHTML = icon('close', 14, 2.4);
+const hide = () => invoke('hide_window', { label: 'quicklook' });
+$('close').onclick = hide;
+$('open').onclick = () => { if (cur) invoke('open_path', { path: cur.path }); hide(); };
+$('folder').onclick = () => { if (cur) invoke('reveal', { path: cur.path }); hide(); };
+listen('quicklook', (p) => {
+  cur = p;
+  $('name').textContent = p.name;
+  $('info').textContent = p.info;
+  $('view').innerHTML = p.image ? `<img src="${p.image}" alt="">`
+    : p.text != null ? `<pre>${esc(p.text)}</pre>`
+    : '<span class="none">Windows nie ma podglądu tego pliku.</span>';
+  $('view').scrollTop = 0;
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' || e.key === ' ') { e.preventDefault(); hide(); }
+  if (e.key === 'Enter') { $('open').click(); }
+});
+window.addEventListener('blur', hide);
+</script>
+</body>
+</html>

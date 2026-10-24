@@ -28,7 +28,7 @@
   .track::after { content: ''; position: absolute; top: 50%; left: var(--knob, 0%); width: 13px; height: 13px; border-radius: 50%; background: #fff; transform: translate(-50%, -50%) scale(0); transition: transform 0.12s; box-shadow: 0 1px 4px rgba(0,0,0,0.4); }
   .seek:hover .track::after, .seek.drag .track::after { transform: translate(-50%, -50%) scale(1); }
   .track i { display: block; height: 100%; width: 0; background: var(--p-accent); border-radius: 3px; transition: background 0.5s ease; }
-  .ctl { display: flex; align-items: center; justify-content: center; gap: 22px; padding: 8px 0 6px; }
+  .ctl { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 8px 0 6px; }
   .tabs { display: flex; justify-content: center; gap: 6px; padding: 0 0 12px; flex: none; }
   .tab { height: 28px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.14); background: transparent; color: rgba(255,255,255,0.75); font-size: 12px; display: flex; align-items: center; gap: 6px; }
   .tab:hover { color: #fff; border-color: rgba(255,255,255,0.3); }
@@ -48,6 +48,12 @@
   .note button { margin-top: 8px; }
   .ctl .sk { width: 40px; height: 40px; border-radius: 50%; border: 0; background: transparent; color: rgba(255,255,255,0.8); display: flex; align-items: center; justify-content: center; }
   .ctl .sk:hover { background: rgba(255,255,255,0.08); color: #fff; }
+  .ctl .sk.sm { width: 34px; height: 34px; color: rgba(255,255,255,0.5); position: relative; }
+  .ctl .sk.sm.on { color: var(--p-accent); }
+  .ctl .sk.sm sup { position: absolute; top: 3px; right: 4px; font-size: 9px; font-weight: 700; }
+  .tab.heart { width: 28px; padding: 0; justify-content: center; }
+  .tab.heart.on { color: #fb7185; background: transparent; border-color: rgba(251,113,133,0.5); }
+  .tab.heart.on svg { fill: #fb7185; }
   .pp { width: 54px; height: 54px; border-radius: 50%; border: 0; background: var(--p-accent); color: var(--p-on); display: flex; align-items: center; justify-content: center; transition: background 0.5s ease, transform 0.1s; }
   .pp:active { transform: scale(0.94); }
   .bar { height: 48px; display: flex; align-items: center; gap: 10px; padding: 0 10px 0 7px; border-radius: 999px; cursor: grab; }
@@ -169,7 +175,7 @@ function render() {
   const compact = !!s.player?.compact;
   const panel = s.player?.panel || '';
   const ok = s.spotifyEnabled && m.connected && m.title;
-  const key = `${compact}|${panel}|${ok}|${m.title}|${m.artist}|${m.art}|${m.playing}|${s.player?.pinned}|${m.error}|${s.spotifyEnabled}`;
+  const key = `${compact}|${panel}|${ok}|${m.title}|${m.artist}|${m.art}|${m.playing}|${s.player?.pinned}|${m.error}|${s.spotifyEnabled}|${m.liked}|${m.shuffle}|${m.repeat}`;
   if (key !== shape) {
     shape = key;
     if (!ok) {
@@ -193,11 +199,14 @@ function render() {
           <div class="meta"><span class="title" title="${esc(m.title)}">${esc(m.title)}</span><span class="artist" title="${esc(m.album || '')}">${esc(m.artist)}</span></div>
           <div class="prog"><span id="pos">0:00</span><span class="seek" id="seek" title="Przewiń"><span class="track" id="trk"><i id="bar"></i></span></span><span id="len">0:00</span></div>
           <div class="ctl">
+            <button class="sk sm ${m.shuffle ? 'on' : ''}" id="shuf" title="Losowo" aria-label="Losowo">${icon('shuffle', 16)}</button>
             <button class="sk" id="prev" aria-label="Poprzedni">${icon('prev', 20)}</button>
             <button class="pp" id="pp" aria-label="${m.playing ? 'Pauza' : 'Graj'}">${icon(m.playing ? 'pause' : 'play', 22)}</button>
             <button class="sk" id="next" aria-label="Następny">${icon('next', 20)}</button>
+            <button class="sk sm ${m.repeat && m.repeat !== 'off' ? 'on' : ''}" id="rep" title="${m.repeat === 'track' ? 'Powtarzaj utwór' : m.repeat === 'context' ? 'Powtarzaj playlistę' : 'Bez powtarzania'}" aria-label="Powtarzaj">${icon('repeat', 16)}${m.repeat === 'track' ? '<sup>1</sup>' : ''}</button>
           </div>
           <div class="tabs">
+            <button class="tab heart ${m.liked ? 'on' : ''}" id="like" title="${m.liked ? 'Usuń z polubionych' : 'Polub'}" aria-label="Polub">${icon('heart', 13)}</button>
             <button class="tab ${panel === 'queue' ? 'on' : ''}" data-panel="queue">${icon('layers', 13)}Kolejka</button>
             <button class="tab ${panel === 'playlists' ? 'on' : ''}" data-panel="playlists">${icon('music', 13)}Playlisty</button>
           </div>
@@ -286,6 +295,12 @@ function wire() {
   if ($('pp')) $('pp').onclick = (e) => { e.stopPropagation(); ctl(s.music.playing ? 'pause' : 'play'); };
   if ($('prev')) $('prev').onclick = () => ctl('previous');
   if ($('next')) $('next').onclick = () => ctl('next');
+  if ($('shuf')) $('shuf').onclick = () => invoke('player_shuffle', { on: !s.music.shuffle }).catch((e) => flash(String(e)));
+  if ($('rep')) $('rep').onclick = () => {
+    const next = { off: 'context', context: 'track', track: 'off' }[s.music.repeat || 'off'];
+    invoke('player_repeat', { mode: next }).catch((e) => flash(String(e)));
+  };
+  if ($('like')) $('like').onclick = () => invoke('player_like', { on: !s.music.liked }).catch((e) => flash(String(e)));
   if ($('login')) $('login').onclick = () => invoke('spotify_login').catch((e) => flash(String(e)));
   for (const t of document.querySelectorAll('[data-panel]')) {
     t.onclick = () => invoke('player_panel', { panel: s.player?.panel === t.dataset.panel ? '' : t.dataset.panel });

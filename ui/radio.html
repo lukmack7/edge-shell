@@ -16,6 +16,12 @@
   .reply { max-height: 62px; overflow: hidden; }
   .x { width: 28px; height: 28px; border-radius: 8px; border: 0; background: var(--fill); color: var(--text-2); display: flex; align-items: center; justify-content: center; }
   .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: auto; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: auto; }
+  .card.replying .msg { max-height: 40px; }
+  .rbox { display: flex; flex-direction: column; gap: 6px; }
+  .rbox textarea { height: 64px; resize: none; padding: 8px 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.18); background: #0b0b0d; color: var(--text); font: inherit; font-size: 13px; outline: none; user-select: text; }
+  .rbox textarea:focus { border-color: var(--accent); }
+  .rbox .hint { font-size: 11px; color: var(--muted); }
   .meta { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
 </style>
 </head>
@@ -27,12 +33,21 @@ import { invoke, onSnapshot, esc, icon, hhmm } from './shared.js';
 const card = document.getElementById('card');
 let shownId = '';
 let state = 'idle';
+let replying = false;
+let snapRef = null;
 
 function render(s) {
   const m = s.radio.current;
   if (!m) { card.innerHTML = ''; shownId = ''; return; }
-  if (m.id === shownId && state === 'sending') return;
-  if (m.id !== shownId) state = 'ready';
+  snapRef = s;
+  if (m.id !== shownId) { state = 'ready'; replying = false; }
+  else if (state === 'sending' || state === 'typing') return;
+  draw(s);
+}
+
+function draw(s) {
+  const m = s.radio.current;
+  if (!m) return;
   shownId = m.id;
   const total = s.radio.showingCount;
   card.innerHTML = `
@@ -50,16 +65,50 @@ function render(s) {
         <span style="font-size:10px;font-weight:700;letter-spacing:0.12em;color:var(--muted)" id="replyLabel">${m.replyUrl ? 'PROPOZYCJA ODPOWIEDZI' : 'ODPOWIEDŹ · TRAFI DO SCHOWKA'}</span>
         <p class="quote reply">„${esc(m.reply)}”</p>
       </div>` : ''}
-    <div class="grid2">
-      ${m.ask ? '<button class="btn light" id="yes">Tak</button><button class="btn" id="no">Nie</button>'
-        : m.reply ? '<button class="btn light" id="send">Wyślij odpowiedź</button>'
-        : m.openTarget ? `<button class="btn light" id="open">Otwórz ${esc(m.app || 'aplikację')}</button>`
+    ${replying ? `<div class="rbox"><textarea id="rtext" placeholder="Twoja odpowiedź…">${esc(m.reply || '')}</textarea>
+      <span class="hint">${m.replyUrl ? 'Enter wysyła · Esc anuluje' : 'Enter: do schowka i otwiera rozmowę — wklej Ctrl+V · Esc anuluje'}</span></div>` : ''}
+    <div class="${!m.ask && !replying && (m.openTarget || m.replyUrl || m.reply) ? 'grid3' : 'grid2'}">
+      ${m.ask ? `<button class="btn light" id="yes">${esc(m.yesLabel || 'Tak')}</button><button class="btn" id="no">${esc(m.noLabel || 'Nie')}</button>`
+        : replying ? '<button class="btn light" id="rsend">Wyślij</button><button class="btn" id="rcancel">Anuluj</button>'
+        : m.reply ? '<button class="btn light" id="send">Wyślij odpowiedź</button><button class="btn" id="reply">Zmień</button>'
+        : m.openTarget ? `<button class="btn light" id="reply">Odpowiedz</button><button class="btn" id="open">Otwórz</button>`
+        : m.replyUrl ? '<button class="btn light" id="reply">Odpowiedz</button><button class="btn" id="ok">Rozumiem</button>'
         : '<button class="btn light" id="ok">Rozumiem</button>'}
-      ${m.ask ? '' : `<button class="btn" id="later">${total > 1 ? 'Następne radio' : 'Do paczki'}</button>`}
+      ${m.ask || replying ? '' : `<button class="btn" id="later">${total > 1 ? 'Następne' : 'Do paczki'}</button>`}
     </div>
     <div class="meta"><span>@${esc(m.source)} · ${hhmm(m.at)}</span><span class="mono">1/${total}</span></div>`;
 
+  card.classList.toggle('replying', replying);
   document.getElementById('close').onclick = () => invoke('radio_next');
+  const reply = document.getElementById('reply');
+  if (reply) reply.onclick = () => { replying = true; draw(snapRef || s); };
+  const rtext = document.getElementById('rtext');
+  if (rtext) {
+    // Okno radia nie bierze fokusu samo — przy pisaniu prosimy o fokus.
+    state = 'typing';
+    invoke('radio_focus').catch(() => {});
+    rtext.focus();
+    rtext.selectionStart = rtext.value.length;
+    const sendIt = async () => {
+      const text = rtext.value.trim();
+      if (!text) return;
+      state = 'sending';
+      try {
+        const r = await invoke('radio_quick_reply', { text });
+        document.getElementById('rsend').textContent = r.length > 22 ? 'Gotowe' : r;
+        setTimeout(() => { state = 'ready'; replying = false; if (m.replyUrl) invoke('radio_next'); else draw(snapRef || s); }, 900);
+      } catch (err) {
+        state = 'typing';
+        rtext.placeholder = String(err);
+      }
+    };
+    rtext.onkeydown = (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendIt(); }
+      if (e.key === 'Escape') { replying = false; state = 'ready'; draw(snapRef || s); }
+    };
+    document.getElementById('rsend').onclick = sendIt;
+    document.getElementById('rcancel').onclick = () => { replying = false; state = 'ready'; draw(snapRef || s); };
+  }
   const later = document.getElementById('later');
   if (later) later.onclick = () => invoke(total > 1 ? 'radio_next' : 'radio_later');
   const yes = document.getElementById('yes');

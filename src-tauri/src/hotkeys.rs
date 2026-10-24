@@ -33,6 +33,9 @@ fn run(app: &AppHandle, action: &str) {
         "search" => crate::palette::show(app),
         "radio" => crate::radio::release_batch(app),
         "player" => crate::player::toggle(app),
+        "one_thing" => crate::focus::one_thing_toggle(app.clone()),
+        "screenshot" => crate::shot::start(app),
+        z if z.starts_with("zone") => crate::windows_mgr::snap_foreground(app, z[4..].parse().unwrap_or(1)),
         "focus" => {
             let app = app.clone();
             tauri::async_runtime::spawn(async move {
@@ -53,7 +56,9 @@ pub fn register(app: &AppHandle) {
     let gs = app.global_shortcut();
     let _ = gs.unregister_all();
     let keys = state::cfg(app).hotkeys;
-    let pairs: [(&str, &'static str); 7] = [
+    let pairs: [(&str, &'static str); 9] = [
+        (&keys.one_thing, "one_thing"),
+        (&keys.screenshot, "screenshot"),
         (&keys.player, "player"),
         (&keys.drawer, "drawer"),
         (&keys.now, "now"),
@@ -77,6 +82,18 @@ pub fn register(app: &AppHandle) {
                 }
             }
             Err(err) => log::warn!("nie rozumiem skrótu {combo}: {err}"),
+        }
+    }
+    // Strefy okien: Ctrl+Alt+1…6 (układ strefy z ustawień).
+    for (n, label) in [(1, "zone1"), (2, "zone2"), (3, "zone3"), (4, "zone4"), (5, "zone5"), (6, "zone6")] {
+        if !state::cfg(app).windows.zone_hotkeys {
+            break;
+        }
+        if let Ok(sc) = format!("Ctrl+Alt+Digit{n}").parse::<Shortcut>() {
+            let id = sc.id();
+            if gs.register(sc).is_ok() {
+                actions.push((id, label));
+            }
         }
     }
     if let Ok(mut a) = ACTIONS.lock() {
