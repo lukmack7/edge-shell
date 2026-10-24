@@ -92,6 +92,12 @@ pub fn day_rail_on(cfg: &crate::config::Config) -> bool {
     cfg.shell.notch && cfg.shell.day_rail
 }
 
+/// Z notchem szyny sięgają samej góry ekranu (pas pod notchem jest przezroczysty),
+/// bez notcha zaczynają się pod paskiem.
+fn rail_top(cfg: &crate::config::Config, s: &Screen) -> i32 {
+    if cfg.shell.notch { s.monitor.top } else { s.monitor.top + px(BAR_H, s) }
+}
+
 /// Monitory poza głównym, w stałej kolejności (po pozycji).
 fn secondary_monitors(app: &AppHandle) -> Vec<(Rect, f64)> {
     let primary = app.primary_monitor().ok().flatten().map(|m| rect_of(&m));
@@ -227,7 +233,7 @@ pub fn arrange(app: &AppHandle) {
     if let Some(rail) = win(app, "rail") {
         if cfg.shell.show_rail {
             let w = px(RAIL_W, &s);
-            let top = s.monitor.top + px(bar_h(&cfg), &s);
+            let top = rail_top(&cfg, &s);
             let mut rect = Rect { left: s.monitor.left, top, right: s.monitor.left + w, bottom: s.monitor.bottom };
             if cfg.shell.reserve_top_bar {
                 rect = register_appbar(&rail, rect, ABE_LEFT);
@@ -244,7 +250,7 @@ pub fn arrange(app: &AppHandle) {
     if let Some(dr) = win(app, "dayrail") {
         if day_rail_on(&cfg) {
             let w = px(RAIL_W, &s);
-            let top = s.monitor.top + px(bar_h(&cfg), &s);
+            let top = rail_top(&cfg, &s);
             let mut rect = Rect { left: s.monitor.right - w, top, right: s.monitor.right, bottom: s.monitor.bottom };
             if cfg.shell.reserve_top_bar {
                 rect = register_appbar(&dr, rect, ABE_RIGHT);
