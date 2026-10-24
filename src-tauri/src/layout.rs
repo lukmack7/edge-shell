@@ -38,6 +38,9 @@ const DRAWER_W: f64 = 380.0;
 const NOW_W: f64 = 400.0;
 const ABE_LEFT: u32 = 0;
 const ABE_TOP: u32 = 1;
+const ABE_BOTTOM: u32 = 3;
+/// Dock zarezerwował dół ekranu — zmaksymalizowane okna kończą się nad nim.
+pub static DOCK_RESERVED: AtomicBool = AtomicBool::new(false);
 
 fn win(app: &AppHandle, label: &str) -> Option<WebviewWindow> {
     app.get_webview_window(label)
@@ -215,16 +218,31 @@ pub fn arrange(app: &AppHandle) {
         }
     }
 
+    // Stały dock rezerwuje dół ekranu jak pasek zadań — okna nie wchodzą pod niego.
+    let dock_on = cfg.shell.show_dock && !cfg.shell.dock_autohide && !crate::focus::ONE_THING.load(Ordering::Relaxed);
+    if let Some(dock) = win(app, "dock") {
+        let fs = FULLSCREEN.lock().ok().and_then(|g| *g).is_some();
+        if dock_on && cfg.shell.reserve_top_bar && !fs {
+            let h = px(DOCK_H + 6.0, &s);
+            let rect = Rect { left: s.monitor.left, top: s.monitor.bottom - h, right: s.monitor.right, bottom: s.monitor.bottom };
+            register_appbar(&dock, rect, ABE_BOTTOM);
+            DOCK_RESERVED.store(true, Ordering::Relaxed);
+        } else {
+            unregister_appbar(&dock);
+            DOCK_RESERVED.store(false, Ordering::Relaxed);
+        }
+    }
+
     // Obszar roboczy mógł się zmienić po rezerwacji pasków.
     let s = screen(app);
 
     place_dock(app, None);
-    let dock_on = cfg.shell.show_dock && !cfg.shell.dock_autohide && !crate::focus::ONE_THING.load(Ordering::Relaxed);
     DOCK_VISIBLE.store(!dock_on, Ordering::Relaxed);
     set_dock_visible(app, dock_on);
 
     let top = s.work.top + px(MARGIN, &s);
-    let height = s.work.bottom - top - px(MARGIN + DOCK_H, &s);
+    let dock_space = if DOCK_RESERVED.load(Ordering::Relaxed) { 0.0 } else { DOCK_H };
+    let height = s.work.bottom - top - px(MARGIN + dock_space, &s);
     if let Some(w) = win(app, "drawer") {
         place(&w, s.work.left + px(MARGIN, &s), top, px(DRAWER_W, &s), height);
     }
@@ -332,7 +350,8 @@ pub fn place_dock(app: &AppHandle, logical_width: Option<f64>) {
     };
     let h = px(DOCK_H, &s);
     let x = (s.work.left + s.work.right - width) / 2;
-    let y = s.work.bottom - h - px(6.0, &s);
+    // Z rezerwacją dock stoi w zarezerwowanym pasie pod obszarem roboczym.
+    let y = if DOCK_RESERVED.load(Ordering::Relaxed) { s.work.bottom } else { s.work.bottom - h - px(6.0, &s) };
     place(&dock, x, y, width, h);
     if let Ok(mut r) = DOCK_RECT.lock() {
         *r = Rect { left: x, top: y, right: x + width, bottom: y + h };

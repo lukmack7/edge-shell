@@ -32,12 +32,8 @@ fn work_area_at(app: &AppHandle, x: i32, y: i32) -> Rect {
         if x >= r.left && x < r.right && y >= r.top && y < r.bottom {
             if r.left == s.monitor.left && r.top == s.monitor.top {
                 // Główny: obszar roboczy minus miejsce na dock, gdy dock jest stały.
-                let cfg = state::cfg(app);
-                let mut w = s.work;
-                if cfg.shell.show_dock && !cfg.shell.dock_autohide {
-                    w.bottom -= (crate::layout::DOCK_H * s.scale) as i32;
-                }
-                return w;
+                // Stały dock rezerwuje dół (obszar roboczy go już nie obejmuje).
+                return s.work;
             }
             let bar = if state::cfg(app).shell.bar_on_all_monitors { (crate::layout::BAR_H * m.scale_factor()) as i32 } else { 0 };
             return Rect { top: r.top + bar, ..r };

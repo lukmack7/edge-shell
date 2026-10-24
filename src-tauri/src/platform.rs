@@ -87,6 +87,9 @@ mod imp {
             SHAppBarMessage(ABM_QUERYPOS, &mut abd);
             if edge == ABE_TOP {
                 abd.rc.bottom = abd.rc.top + height;
+            } else if edge == 3 {
+                // ABE_BOTTOM: pasek przy dolnej krawędzi (dock).
+                abd.rc.top = abd.rc.bottom - height;
             } else {
                 abd.rc.right = abd.rc.left + width;
             }
