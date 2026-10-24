@@ -398,8 +398,11 @@ pub async fn focus_finish(app: AppHandle) -> Res<FinishResult> {
         rt.paused_since = None;
         rt.adhoc.take()
     });
+    let notch = state::cfg(&app).shell.notch;
     if adhoc.is_some() {
-        radio::pit_wall(&app, "Meta! Sesja zakończona — zapisz jedno zdanie, gdzie skończyłeś.".into(), None);
+        if !notch {
+            radio::pit_wall(&app, "Meta! Sesja zakończona — zapisz jedno zdanie, gdzie skończyłeś.".into(), None);
+        }
         return Ok(FinishResult { status: "ontime".into(), delta_min: 0 });
     }
     let Some(item) = engine::current(&app) else { return Err("Teraz nic nie trwa".into()) };
@@ -414,7 +417,10 @@ pub async fn focus_finish(app: AppHandle) -> Res<FinishResult> {
         "ontime" => "Zielony sektor — idealnie w czasie.".to_string(),
         _ => format!("Żółty sektor, +{} min. Horolog przesunie resztę.", mark.delta_min),
     };
-    radio::pit_wall(&app, msg, None);
+    // Z notchem kolor sektora pokazuje sam notch (linia dnia + znak).
+    if !notch {
+        radio::pit_wall(&app, msg, None);
+    }
     Ok(FinishResult { status: mark.status, delta_min: mark.delta_min })
 }
 

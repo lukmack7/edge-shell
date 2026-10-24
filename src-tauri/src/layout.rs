@@ -280,6 +280,7 @@ pub fn arrange(app: &AppHandle) {
     place_radio(app);
     sync_bubbles(app);
     crate::player::sync(app);
+    crate::notch::sync(app);
     let fs = FULLSCREEN.lock().ok().and_then(|g| *g);
     if let Some(fs) = fs {
         hide_covered(app, fs);
@@ -293,7 +294,7 @@ fn inside(r: Rect, x: i32, y: i32) -> bool {
 /// Chowa nasze okna leżące na monitorze zajętym przez pełny ekran.
 fn hide_covered(app: &AppHandle, fs: Rect) {
     for (label, w) in app.webview_windows() {
-        let ours = label == "topbar" || label.starts_with("topbar-") || matches!(label.as_str(), "rail" | "dock" | "bubbles" | "preview" | "stack" | "player");
+        let ours = label == "topbar" || label.starts_with("topbar-") || matches!(label.as_str(), "rail" | "dock" | "bubbles" | "preview" | "stack" | "player" | "notch");
         if !ours {
             continue;
         }
@@ -444,7 +445,9 @@ pub fn toggle_panel(app: &AppHandle, label: &str) {
 /// Dymki są widoczne tylko wtedy, gdy panel Teraz jest schowany.
 pub fn sync_bubbles(app: &AppHandle) {
     let Some(w) = win(app, "bubbles") else { return };
-    let show = state::cfg(app).shell.show_bubbles && !state::read(app, |rt| rt.now_open);
+    let cfg = state::cfg(app);
+    // Z notchem timer i muzyka są w notchu — dymki byłyby duplikatem.
+    let show = cfg.shell.show_bubbles && !cfg.shell.notch && !state::read(app, |rt| rt.now_open);
     let _ = if show { w.show() } else { w.hide() };
 }
 
@@ -569,7 +572,8 @@ pub fn start_edges(app: AppHandle) {
                 hover_opened = Some("drawer");
                 left_since = None;
             }
-            if right_since.is_some_and(|t| t.elapsed() >= delay) && !now_open {
+            // Z notchem panel Teraz nie wysuwa się z prawej krawędzi (jest w notchu).
+            if right_since.is_some_and(|t| t.elapsed() >= delay) && !now_open && !shell.notch {
                 set_panel(&app, "now", true);
                 hover_opened = Some("now");
                 right_since = None;

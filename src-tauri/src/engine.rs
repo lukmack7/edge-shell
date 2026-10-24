@@ -229,6 +229,10 @@ fn clipboard(app: &AppHandle) {
 fn foreground(app: &AppHandle) {
     let Some(exe) = platform::foreground_exe() else { return };
     let file = platform::exe_name(&exe);
+    if state::read(app, |rt| rt.foreground_exe != file) {
+        let f = file.clone();
+        state::update(app, false, |rt| rt.foreground_exe = f);
+    }
     let cfg = state::cfg(app);
     // Przejście do aplikacji zdejmuje jej plakietkę.
     if let Some(a) = cfg.dock.iter().find(|a| a.exe_names().contains(&file)) {
@@ -286,9 +290,12 @@ fn app_display_name(path: &str, exe: &str, title: &str) -> String {
 
 fn running(app: &AppHandle) {
     let mut counts: std::collections::HashMap<String, usize> = std::collections::HashMap::new();
+    let mut titles: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
     let windows = platform::app_windows();
     for w in &windows {
-        *counts.entry(platform::exe_name(&w.exe)).or_insert(0) += 1;
+        let exe = platform::exe_name(&w.exe);
+        *counts.entry(exe.clone()).or_insert(0) += 1;
+        titles.entry(exe).or_default().push(w.title.clone());
     }
     let set: std::collections::HashSet<String> = counts.keys().cloned().collect();
 
@@ -317,11 +324,12 @@ fn running(app: &AppHandle) {
         });
     }
 
-    if state::read(app, |rt| rt.window_counts != counts || rt.open_apps != open) {
+    if state::read(app, |rt| rt.window_counts != counts || rt.open_apps != open || rt.window_titles != titles) {
         state::update(app, false, |rt| {
             rt.running = set;
             rt.window_counts = counts;
             rt.open_apps = open;
+            rt.window_titles = titles;
         });
     }
 }

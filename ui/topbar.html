@@ -46,6 +46,10 @@
   .pp { width: 22px; height: 22px; margin-left: -5px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; background: #3f3f46; box-shadow: 0 0 0 2px #0c0c0e; position: relative; }
   .pp:first-child { margin-left: 0; }
   .pp::after { content: ''; position: absolute; right: -1px; bottom: -1px; width: 8px; height: 8px; border-radius: 50%; box-shadow: 0 0 0 2px #0c0c0e; background: var(--st); }
+  /* Notch: środek paska zajmuje notch, a z paska znika to, co jest w notchu. */
+  body.notch .center { visibility: hidden; }
+  body.notch #music, body.notch #radio, body.notch #horolog { display: none !important; }
+  body.notch .st .v.opt { display: none; }
   body.one .side > * { visibility: hidden; }
   body.one .bar { background: rgba(8,8,10,0.96); }
   .exit1 { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); height: 24px; padding: 0 10px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.18); background: transparent; color: var(--text-2); font-size: 12px; display: none; }
@@ -166,6 +170,7 @@ function renderClock(s) {
 
 // --- Statystyki systemu -------------------------------------------------
 let stats = null;
+let notchOn = false;
 let statsOrder = ['network', 'cpu', 'memory', 'volume', 'bluetooth', 'wifi', 'battery'];
 
 function speed(bps) {
@@ -192,11 +197,11 @@ function batteryIcon(pct, charging) {
 }
 
 const ITEMS = {
-  network: (st) => `<button class="st" data-open="ms-settings:network-status" title="Sieć: pobieranie / wysyłanie">
+  network: (st) => notchOn ? '' : `<button class="st" data-open="ms-settings:network-status" title="Sieć: pobieranie / wysyłanie">
       <span class="net"><span>${icon('down', 9, 3)} ${speed(st.downBps)}</span><span>${icon('up', 9, 3)} ${speed(st.upBps)}</span></span></button>`,
-  cpu: (st) => st.cpu == null ? '' : `<button class="st" data-pop="cpu" title="Procesor — kliknij: co obciąża">${icon('cpu', 15)}<span class="v">${Math.round(st.cpu)}%</span>${meter(st.cpu, load(st.cpu))}</button>`,
-  memory: (st) => st.mem == null ? '' : `<button class="st" data-pop="mem" title="Kliknij: co zajmuje pamięć · Pamięć: ${st.memUsedGb?.toFixed(1)} / ${st.memTotalGb?.toFixed(1)} GB">${icon('ram', 15)}<span class="v">${Math.round(st.mem)}%</span>${meter(st.mem, load(st.mem))}</button>`,
-  volume: (st) => st.volume == null ? '' : `<button class="st" id="vol" data-pop="sound" title="Dźwięk — klik: wyjście i aplikacje · środkowy klik: wycisz · kółko: głośność">${icon(st.muted ? 'mute' : 'volume', 16)}<span class="v">${st.muted ? '—' : st.volume + '%'}</span></button>`,
+  cpu: (st) => st.cpu == null || (notchOn && st.cpu < 85) ? '' : `<button class="st" data-pop="cpu" title="Procesor — kliknij: co obciąża">${icon('cpu', 15)}<span class="v">${Math.round(st.cpu)}%</span>${meter(st.cpu, load(st.cpu))}</button>`,
+  memory: (st) => st.mem == null || (notchOn && st.mem < 90) ? '' : `<button class="st" data-pop="mem" title="Kliknij: co zajmuje pamięć · Pamięć: ${st.memUsedGb?.toFixed(1)} / ${st.memTotalGb?.toFixed(1)} GB">${icon('ram', 15)}<span class="v">${Math.round(st.mem)}%</span>${meter(st.mem, load(st.mem))}</button>`,
+  volume: (st) => st.volume == null ? '' : `<button class="st" id="vol" data-pop="sound" title="Dźwięk — klik: wyjście i aplikacje · środkowy klik: wycisz · kółko: głośność">${icon(st.muted ? 'mute' : 'volume', 16)}<span class="v opt">${st.muted ? '—' : st.volume + '%'}</span></button>`,
   bluetooth: (st) => !st.btPresent ? '' : `<button class="st" data-pop="bt" title="Bluetooth: ${st.btConnected} połączonych">${icon('bluetooth', 15)}${st.btConnected ? `<span class="badge">${st.btConnected}</span>` : ''}</button>`,
   wifi: (st) => `<button class="st" data-pop="wifi" title="${st.wifiSsid ? esc(st.wifiSsid) + ' · ' + st.wifiSignal + '%' : 'Wi‑Fi: brak połączenia'}">${wifiIcon(st.wifiSignal)}</button>`,
   battery: (st) => st.battery == null ? '' : `<button class="st" data-open="ms-settings:batterysaver" title="Bateria${st.charging ? ' · ładuje' : ''}">${batteryIcon(st.battery, st.charging)}<span class="v">${st.battery}%</span></button>`,
@@ -244,6 +249,9 @@ function renderPeople(s) {
 }
 
 onSnapshot((s) => {
+  // Notch tylko na głównym monitorze — na pozostałych pasek zostaje pełny.
+  const on = !!s.notch && windowLabel === 'topbar';
+  if (on !== notchOn) { notchOn = on; document.body.classList.toggle('notch', on); renderStats(); }
   renderPeople(s);
   document.body.classList.toggle('one', !!s.oneThing);
   if (s.barStats) statsOrder = s.barStats;

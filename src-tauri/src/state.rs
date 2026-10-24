@@ -156,6 +156,21 @@ pub struct Store {
     pub clips: Vec<Clip>,
     /// Zapamiętane układy okien (nazwa → okna).
     pub layouts: Vec<WinLayout>,
+    /// „Co przegapiłeś” — wiadomości, które notch pokazał i schował (ostatnie 10).
+    pub missed: Vec<Missed>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Missed {
+    pub at: DateTime<Local>,
+    pub name: String,
+    pub color: String,
+    pub message: String,
+    #[serde(default)]
+    pub open_target: Option<String>,
+    #[serde(default)]
+    pub app: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -298,6 +313,9 @@ pub struct Runtime {
     pub badges: HashMap<String, u32>,
     /// Uruchomione aplikacje z oknami, których nie ma w docku (w kolejności otwarcia).
     pub open_apps: Vec<OpenApp>,
+    /// Tytuły okien per plik .exe (do kart w docku).
+    pub window_titles: HashMap<String, Vec<String>>,
+    pub foreground_exe: String,
     /// Który widok pokazuje okno kart przy pasku (cpu, wifi, bt, sound, power).
     pub popup_view: String,
     /// Tryb „jedna rzecz” włączony.
@@ -417,7 +435,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
                 "bg": bg, "fg": fg, "stripe": stripe,
                 "dim": mode.dim.iter().any(|d| d == &a.id),
                 "running": running, "windows": windows, "separatorAfter": separator,
-                "badge": badge, "stack": stack,
+                "badge": badge, "stack": stack, "exe": exes.first().cloned().unwrap_or_default(),
             })
         })
         .collect();
@@ -432,7 +450,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
                 "id": format!("run:{}", o.exe), "name": o.name, "icon": "auto", "category": "",
                 "bg": "#27272a", "fg": "#e4e4e7", "stripe": "rgba(255,255,255,0.35)",
                 "dim": false, "running": true, "windows": o.windows, "separatorAfter": false,
-                "badge": 0, "stack": false, "unpinned": true, "path": o.path,
+                "badge": 0, "stack": false, "unpinned": true, "path": o.path, "exe": o.exe,
             }));
         }
     }
@@ -515,6 +533,10 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "spotifyEnabled": !cfg.spotify.client_id.is_empty(),
         "player": rt.store.player,
         "oneThing": rt.one_thing,
+        "missed": rt.store.missed,
+        "notch": cfg.shell.notch,
+        "windowTitles": rt.window_titles,
+        "fgExe": rt.foreground_exe,
         "presence": rt.presence,
         "panels": { "drawer": rt.drawer_open, "now": rt.now_open },
         "friction": rt.friction_app.as_ref().and_then(|id| cfg.dock.iter().find(|a| &a.id == id))

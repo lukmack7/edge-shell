@@ -135,8 +135,7 @@ pub fn deliver(app: &AppHandle, msg: RadioMsg) {
     }
     if msg.urgent || vip || !quiet {
         state::update(app, false, |rt| rt.showing.push_back(msg));
-        layout::place_radio(app);
-        layout::show_window(app, "radio", false);
+        show_cards(app);
     } else {
         state::update(app, true, |rt| rt.store.waiting.push(msg));
     }
@@ -151,9 +150,36 @@ pub fn release_batch(app: &AppHandle) {
         any || !rt.showing.is_empty()
     });
     if any {
+        show_cards(app);
+    }
+}
+
+/// Karty radia: z notchem wiadomości pokazuje notch, bez niego — okno radia.
+fn show_cards(app: &AppHandle) {
+    if state::cfg(app).shell.notch {
+        crate::notch::wake(app);
+    } else {
         layout::place_radio(app);
         layout::show_window(app, "radio", false);
     }
+}
+
+/// Notch schował wiadomość bez reakcji → trafia do „Co przegapiłeś”.
+pub fn to_missed(app: &AppHandle) {
+    let msg = state::read(app, |rt| rt.showing.front().cloned());
+    let Some(m) = msg else { return };
+    // Pytania (Tak / Nie) nie znikają same — czekają na odpowiedź.
+    if m.ask.is_some() {
+        return;
+    }
+    state::update(app, true, |rt| {
+        rt.showing.pop_front();
+        rt.store.missed.insert(
+            0,
+            crate::state::Missed { at: m.at, name: m.name, color: m.color, message: m.message, open_target: m.open_target, app: m.app },
+        );
+        rt.store.missed.truncate(10);
+    });
 }
 
 /// Zdejmuje bieżącą kartę; chowa okno, gdy nic nie zostało.

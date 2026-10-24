@@ -1,0 +1,466 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — notch</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  html, body { background: transparent; overflow: hidden; }
+  .wrap { position: absolute; left: 0; top: 0; display: flex; align-items: flex-start; }
+  .sh { width: 12px; height: 12px; flex: none; }
+  .sh.l { background: radial-gradient(circle at 0 100%, transparent 11.5px, #000 12px); }
+  .sh.r { background: radial-gradient(circle at 100% 100%, transparent 11.5px, #000 12px); }
+  .n { position: relative; background: #000; border-radius: 0 0 16px 16px; overflow: hidden;
+       box-shadow: 0 0 0 1px var(--edge, rgba(255,255,255,0.06));
+       transition: width 0.45s cubic-bezier(.2,1.2,.35,1), height 0.45s cubic-bezier(.2,1.2,.35,1), border-radius 0.45s, box-shadow 0.4s; }
+  .row { height: 34px; display: grid; align-items: center; transition: grid-template-columns 0.45s cubic-bezier(.2,1.2,.35,1); }
+  .ear { display: flex; align-items: center; justify-content: center; overflow: hidden; min-width: 0; }
+  .ear .art { width: 22px; height: 22px; border-radius: 7px; background: #222 center/cover; }
+  .eq { display: flex; gap: 2px; align-items: flex-end; height: 13px; }
+  .eq i { width: 3px; border-radius: 2px; background: var(--eq, #f9a8d4); animation: eq 0.9s ease-in-out infinite alternate; }
+  .eq i:nth-child(2) { animation-delay: -0.3s; } .eq i:nth-child(3) { animation-delay: -0.6s; } .eq i:nth-child(4) { animation-delay: -0.15s; }
+  .eq.stop i { animation: none; height: 3px !important; }
+  @keyframes eq { from { height: 3px; } to { height: 13px; } }
+  .mid { display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 0; white-space: nowrap; font-size: 12.5px; padding: 0 12px; }
+  .mid .t { overflow: hidden; text-overflow: ellipsis; color: #d4d4d8; }
+  .mid .c { font-family: var(--mono); font-weight: 600; flex: none; }
+  .join { height: 22px; padding: 0 10px; border-radius: 999px; background: #3b82f6; color: #fff; font-size: 11.5px; font-weight: 700; border: 0; white-space: nowrap; }
+  .cnt { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #fbbf24; color: #1c1917; font-size: 11px; font-weight: 700; border: 0; }
+  .num { font-size: 17px; font-weight: 800; font-style: italic; }
+  .chk { width: 20px; height: 20px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #0b0a0b; }
+  .line { position: absolute; transition: all 0.45s cubic-bezier(.2,1.2,.35,1); }
+  .line i { position: absolute; top: 0; bottom: 0; border-radius: 3px; }
+  .line .nowmark { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #fff; border-radius: 1px; }
+  .msg { display: flex; align-items: center; gap: 10px; height: 40px; padding: 0 12px 0 18px; }
+  .msg .tx { flex: 1; min-width: 0; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pill { height: 26px; padding: 0 12px; border-radius: 999px; border: 0; font-size: 12px; font-weight: 700; background: rgba(255,255,255,0.1); color: #fff; white-space: nowrap; }
+  .pill.main { background: var(--btn, #fbbf24); color: #1c1917; }
+  .reply { display: flex; gap: 8px; padding: 0 12px 10px 18px; }
+  .reply input { flex: 1; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.18); background: #0b0b0d; color: #fff; font-size: 13px; outline: none; user-select: text; }
+  .reply input:focus { border-color: #fbbf24; }
+  .panel { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; padding: 8px 18px 0; }
+  .card { height: 196px; box-sizing: border-box; border-radius: 20px; padding: 18px 20px; display: flex; gap: 18px; align-items: center; }
+  .ring { width: 120px; height: 120px; flex: none; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+  .ring span { width: 100px; height: 100px; border-radius: 50%; background: #0b0607; display: flex; align-items: center; justify-content: center; font-family: var(--mono); font-size: 21px; font-weight: 600; }
+  .kick { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; }
+  .side { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .box { border-radius: 16px; background: #0f0f14; border: 1px solid rgba(255,255,255,0.06); padding: 10px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; }
+  .box .lbl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; color: #6b6b76; }
+  .it { display: flex; gap: 8px; align-items: center; min-width: 0; border: 0; background: transparent; padding: 2px 0; text-align: left; color: #e4e4e7; font-size: 12.5px; }
+  .it .tm { font-family: var(--mono); color: #6b6b76; flex: none; }
+  .it .tx { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .it b { font-weight: 600; flex: none; }
+  .it .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .quick { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .q { height: 40px; border-radius: 13px; background: #0f0f14; border: 1px solid rgba(255,255,255,0.06); color: #d4d4d8; display: flex; align-items: center; justify-content: center; }
+  .q:hover, .deep button:hover, .box button.it:hover { background: rgba(255,255,255,0.08); }
+  .deep { display: flex; gap: 6px; padding: 12px 18px 0; align-items: center; }
+  .deep button { height: 28px; padding: 0 12px; border-radius: 999px; border: 0; background: rgba(255,255,255,0.06); color: #d4d4d8; font-size: 12px; display: flex; align-items: center; gap: 6px; }
+  .btn2 { height: 30px; padding: 0 12px; border-radius: 999px; border: 0; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.1); color: #fff; }
+  .btn2.w { background: #fff; color: #000; }
+  .hours { position: absolute; left: 18px; right: 18px; bottom: 6px; display: flex; justify-content: space-between; font-family: var(--mono); font-size: 10px; color: #6b6b76; }
+  .fade { animation: fade 0.25s ease-out 0.2s both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+  .measure { position: absolute; visibility: hidden; white-space: nowrap; font-size: 12.5px; font-family: var(--font); }
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap"><span class="sh l"></span><div class="n" id="n"></div><span class="sh r"></span></div>
+<span class="measure" id="measure"></span>
+<script type="module">
+import { invoke, listen, onSnapshot, onTick, esc, icon, focusTiming, mmss, hhmm, blockColor } from './shared.js';
+
+const $ = (id) => document.getElementById(id);
+const notch = $('n');
+let s = null;
+let hover = false;
+let openState = false;
+let hoverTimer = null;
+let leaveTimer = null;
+let replying = false;
+let msgShownId = '';
+let msgTimer = null;
+let msgHidden = '';         // id wiadomości, którą notch już schował
+let doneUntil = 0;
+let doneColor = '#22c55e';
+let doneLabel = '';
+const prevStatus = new Map();
+let size = { w: 0, h: 0 };
+let shrinkTimer = null;
+let firstStep = { title: '', step: '' };
+let lastKey = '';
+
+const STATUS = { early: ['#a855f7', 'Fioletowy sektor'], ontime: ['#22c55e', 'Zielony sektor'], late: ['#eab308', 'Żółty sektor'] };
+
+// ------------------------------------------------------------------ stan
+
+function meetingSoon() {
+  const n = s?.next;
+  if (!n || !['meeting', 'busy'].includes(n.kind)) return null;
+  const mins = (new Date(n.start) - Date.now()) / 60000;
+  return mins > 0 && mins <= 5 ? { title: n.title, mins: Math.ceil(mins) } : null;
+}
+
+function currentMsg() {
+  const m = s?.radio?.current;
+  if (!m || m.id === msgHidden) return null;
+  return m;
+}
+
+function stateOf() {
+  if (!s) return 'rest';
+  if (openState) return 'open';
+  if (currentMsg()) return 'msg';
+  if (Date.now() < doneUntil) return 'done';
+  if (s.oneThing) return 'focus';
+  return 'rest';
+}
+
+// ------------------------------------------------------------------ linia dnia
+
+function dayRange() {
+  const items = (s?.day || []).filter((i) => i.kind !== 'buffer');
+  const d = new Date();
+  let from = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 8).getTime();
+  let to = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 20).getTime();
+  for (const i of items) {
+    from = Math.min(from, new Date(i.start).getTime());
+    to = Math.max(to, new Date(i.end).getTime());
+  }
+  return [from, to];
+}
+
+function segColor(i) {
+  if (STATUS[i.status]) return STATUS[i.status][0];
+  if (i.kind === 'meeting' || i.kind === 'busy') return '#3b82f6';
+  if (i.status === 'past') return 'rgba(255,255,255,0.22)';
+  return blockColor(i, s.mode.accent);
+}
+
+function lineHtml(big) {
+  const [from, to] = dayRange();
+  const span = Math.max(1, to - from);
+  const now = Date.now();
+  const pct = (t) => ((t - from) / span) * 100;
+  const segs = (s?.day || []).filter((i) => i.kind !== 'buffer').map((i) => {
+    const a = new Date(i.start).getTime();
+    const b = new Date(i.end).getTime();
+    const left = pct(a);
+    const w = Math.max(0.6, pct(b) - left);
+    const col = segColor(i);
+    const isNow = a <= now && now < b && !STATUS[i.status];
+    const bg = isNow ? `linear-gradient(90deg, ${col} ${((now - a) / (b - a)) * 100}%, ${col}55 0)` : (i.status === 'next' ? `${col}aa` : col);
+    return `<i style="left:${left}%;width:${w}%;background:${bg}" title="${esc(i.title)} · ${hhmm(i.start)}–${hhmm(i.end)}"></i>`;
+  }).join('');
+  const nowMark = now > from && now < to ? `<span class="nowmark" style="left:${pct(now)}%"></span>` : '';
+  return segs + (big ? nowMark : '');
+}
+
+// ------------------------------------------------------------------ rysowanie
+
+function textWidth(text) {
+  const m = $('measure');
+  m.textContent = text;
+  return m.getBoundingClientRect().width;
+}
+
+function render() {
+  if (!s) return;
+  const st = stateOf();
+  const music = s.spotifyEnabled && s.music.connected && s.music.title && s.music.playing;
+  const meet = meetingSoon();
+  const t = focusTiming(s);
+  const msg = st === 'msg' ? currentMsg() : null;
+
+  // Środek: co trwa / co dalej
+  let mid = '';
+  let clock = '';
+  let midColor = '#d4d4d8';
+  if (st === 'focus') {
+    clock = t ? mmss(t.left) : hhmm(new Date().toISOString());
+  } else if (st === 'msg') {
+    mid = `${msg.name} · ${msg.source}`;
+    midColor = msg.color;
+  } else if (st === 'done') {
+    mid = doneLabel;
+    midColor = doneColor;
+  } else if (meet) {
+    mid = `${meet.title} za ${meet.mins} min`;
+    midColor = '#bfdbfe';
+  } else if (s.focus) {
+    mid = s.focus.title;
+    clock = t ? (s.paused ? 'pauza' : mmss(t.left)) : '';
+  } else if (s.next) {
+    mid = `Dalej: ${s.next.title}`;
+    clock = hhmm(s.next.start);
+  } else {
+    mid = 'Wolne';
+  }
+
+  // Uszy
+  let left = '';
+  let right = '';
+  if (st === 'msg') left = `<span class="num" style="color:${esc(msg.color)}">${esc(msg.number)}</span>`;
+  else if (st === 'done') left = `<span class="chk" style="background:${doneColor}">${icon('check', 12, 3)}</span>`;
+  else if (st !== 'focus' && music) left = `<span class="art" style="background-image:url('${esc(s.music.art)}')"></span>`;
+  if (st === 'open' || st === 'rest') {
+    if (meet) right = `<button class="join" id="joinBtn">${meet.mins} min</button>`;
+    else if (music) right = `<span class="eq"><i style="height:6px"></i><i style="height:13px"></i><i style="height:4px"></i><i style="height:10px"></i></span>`;
+    else if (s.radio.waiting) right = `<button class="cnt" id="waitBtn" title="Wiadomości czekają na paczkę — pokaż teraz">${s.radio.waiting}</button>`;
+  }
+  const earL = left ? 44 : 0;
+  const earR = right ? (meet && st !== 'msg' ? 70 : 44) : 0;
+
+  // Rozmiar (px CSS, bez ramion)
+  const textW = textWidth(mid) + (clock ? textWidth(clock) + 10 : 0);
+  let w = Math.min(560, Math.max(st === 'focus' ? 110 : 220, Math.ceil(textW) + 34 + earL + earR));
+  let h = 38;
+  let r = 16;
+  if (st === 'msg') { w = 540; h = replying ? 120 : 80; r = 22; }
+  if (st === 'open') { w = 860; h = 360; r = 30; }
+
+  const edge = st === 'msg' ? `${msg.color}80` : st === 'done' ? `${doneColor}90` : meet ? 'rgba(59,130,246,0.55)' : music ? 'rgba(244,114,182,0.25)' : 'rgba(255,255,255,0.06)';
+  notch.style.setProperty('--edge', edge);
+  notch.style.borderRadius = `0 0 ${r}px ${r}px`;
+
+  const key = JSON.stringify([st, mid, !!clock, left, right, replying, msg?.id, st === 'open' ? openKey() : '']);
+  if (key !== lastKey) {
+    lastKey = key;
+    notch.innerHTML = `
+      <div class="row" style="grid-template-columns:${earL}px minmax(0,1fr) ${earR}px">
+        <span class="ear">${left}</span>
+        <span class="mid">${mid ? `<span class="t" style="color:${midColor}">${esc(mid)}</span>` : ''}${clock ? `<span class="c" id="clock">${esc(clock)}</span>` : ''}</span>
+        <span class="ear">${right}</span>
+      </div>
+      ${st === 'msg' ? msgHtml(msg) : ''}
+      ${st === 'open' ? panelHtml(music) : ''}
+      <div class="line" id="line"></div>
+      ${st === 'open' ? hoursHtml() : ''}`;
+    wire(st, msg, meet);
+  } else if (clock && $('clock')) {
+    $('clock').textContent = clock;
+  }
+  const line = $('line');
+  if (line) {
+    const big = st === 'open';
+    Object.assign(line.style, big
+      ? { left: '18px', right: '18px', bottom: '24px', height: '24px' }
+      : { left: '14px', right: '14px', bottom: '3px', height: '3px' });
+    line.innerHTML = lineHtml(big);
+  }
+  resize(w, h);
+}
+
+function msgHtml(m) {
+  const canReply = !m.ask && (m.openTarget || m.replyUrl || m.reply);
+  const btns = m.ask
+    ? `<button class="pill main" id="mYes">${esc(m.yesLabel || 'Tak')}</button><button class="pill" id="mNo">${esc(m.noLabel || 'Nie')}</button>`
+    : `${canReply ? '<button class="pill main" id="mReply">Odpowiedz</button>' : ''}${m.openTarget ? '<button class="pill" id="mOpen">Otwórz</button>' : ''}<button class="pill" id="mOk">OK</button>`;
+  return `<div class="msg fade" style="--btn:${esc(m.color)}"><span class="tx">„${esc(m.message)}”</span>${btns}</div>
+    ${replying ? `<div class="reply"><input id="rIn" placeholder="${m.replyUrl ? 'Odpowiedź — Enter wysyła' : 'Odpowiedź — Enter: do schowka i otwiera rozmowę'}" value="${esc(m.reply || '')}"><button class="pill main" id="rSend" style="--btn:${esc(m.color)}">Wyślij</button></div>` : ''}`;
+}
+
+function openKey() {
+  return JSON.stringify([s.focus?.title, s.paused, s.music.title, s.music.playing, (s.missed || []).length, s.next?.title, firstStep.step]);
+}
+
+function panelHtml(music) {
+  const t = focusTiming(s);
+  let main;
+  if (s.focus) {
+    const p = t ? t.progress * 100 : 0;
+    const acc = s.mode.accent;
+    main = `<div class="card fade" style="background:linear-gradient(160deg, ${acc}38, ${acc}0a);border:1px solid ${acc}40">
+      <span class="ring" style="background:conic-gradient(${acc} 0 ${p}%, rgba(255,255,255,0.08) 0)"><span id="bigClock">${t ? mmss(t.left) : ''}</span></span>
+      <span style="display:flex;flex-direction:column;gap:7px;min-width:0">
+        <span class="kick" style="color:#fca5a5">TERAZ${s.focus.end ? ` · DO ${hhmm(s.focus.end)}` : ''}</span>
+        <b style="font-size:18px;font-weight:600;overflow:hidden;text-overflow:ellipsis">${esc(s.focus.title)}</b>
+        ${firstStep.step && firstStep.title === s.focus.title ? `<span style="font-size:12.5px;color:#d4d4d8">Pierwszy krok: ${esc(firstStep.step)}</span>` : ''}
+        <span style="display:flex;gap:6px;margin-top:4px">
+          ${s.focus.completable ? '<button class="btn2 w" id="pDone">✓ Skończone</button>' : ''}
+          <button class="btn2" id="pPause">${s.paused ? 'Wznów' : 'Pauza'}</button>
+          <button class="btn2" id="pOne">${s.oneThing ? 'Pokaż wszystko' : 'Jedna rzecz'}</button>
+        </span>
+      </span></div>`;
+  } else if (s.spotifyEnabled && s.music.connected && s.music.title) {
+    main = `<div class="card fade" style="flex-direction:column;align-items:stretch;justify-content:space-between;background:linear-gradient(160deg, rgba(76,29,149,0.85), rgba(30,16,60,0.9)), url('${esc(s.music.art)}') center/cover">
+      <span style="display:flex;gap:14px;align-items:center"><span style="width:70px;height:70px;border-radius:14px;flex:none;background:url('${esc(s.music.art)}') center/cover"></span>
+        <span style="display:flex;flex-direction:column;gap:3px;min-width:0"><b style="font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.music.title)}</b><span style="font-size:13px;color:rgba(255,255,255,0.7)">${esc(s.music.artist)}</span></span></span>
+      <span style="display:flex;justify-content:center;gap:30px;align-items:center">
+        <button class="btn2" id="mPrev">${icon('prev', 14)}</button>
+        <button class="btn2 w" id="mPlay" style="width:44px;height:44px;border-radius:50%;padding:0">${icon(s.music.playing ? 'pause' : 'play', 16)}</button>
+        <button class="btn2" id="mNext">${icon('next', 14)}</button></span></div>`;
+  } else {
+    main = `<div class="card fade" style="background:#0f0f14;border:1px solid rgba(255,255,255,0.06);flex-direction:column;align-items:flex-start;justify-content:center;gap:10px">
+      <span class="kick" style="color:#6b6b76">TERAZ NIC NIE TRWA</span>
+      <b style="font-size:17px;font-weight:600">${s.next ? `Dalej: ${esc(s.next.title)} o ${hhmm(s.next.start)}` : 'Na dziś nic więcej w planie'}</b>
+      <span style="display:flex;gap:6px"><button class="btn2 w" id="pStart">Start fokusu</button><button class="btn2" id="pReplan">Przeplanuj</button></span></div>`;
+  }
+  const upcoming = (s.day || []).filter((i) => i.status === 'next' && i.kind !== 'buffer').slice(0, 2);
+  const missed = (s.missed || []).slice(0, 3);
+  return `<div class="panel">${main}
+    <div class="side fade">
+      <div class="box"><span class="lbl">DALEJ</span>
+        ${upcoming.map((i) => `<span class="it"><span class="tm">${hhmm(i.start)}</span><span class="tx">${esc(i.title)}</span></span>`).join('') || '<span class="it" style="color:#6b6b76">nic więcej dziś</span>'}
+      </div>
+      <div class="box"><span class="lbl" style="display:flex">CO PRZEGAPIŁEŚ${missed.length ? '<button id="clrMissed" style="margin-left:auto;border:0;background:transparent;color:#6b6b76;font-size:10.5px">wyczyść</button>' : ''}</span>
+        ${missed.map((m, i) => `<button class="it" data-miss="${i}" title="${esc(m.message)}"><span class="dot" style="background:${esc(m.color)}"></span><span class="tx"><b style="color:${esc(m.color)}">${esc(m.name)}</b> ${esc(m.message)}</span>${m.openTarget ? '<b>Otwórz</b>' : ''}</button>`).join('') || '<span class="it" style="color:#6b6b76">nic — jesteś na bieżąco</span>'}
+      </div>
+      <div class="quick">
+        <button class="q" id="qCap" title="Wrzuć myśl">${icon('note', 16)}</button>
+        <button class="q" id="qOne" title="Jedna rzecz">${icon('layers', 16)}</button>
+        <button class="q" id="qShot" title="Zrzut ekranu">${icon('camera', 16)}</button>
+        <button class="q" id="qReplan" title="Przeplanuj">${icon('replan', 16)}</button>
+      </div>
+    </div></div>
+    <div class="deep fade">
+      <button id="dMusic">${icon('music', 13)} Muzyka i kolejka</button>
+      <button id="dShelf">${icon('clipboard', 13)} Półka i schowek</button>
+      <button id="dSys">${icon('cpu', 13)} System</button>
+    </div>`;
+}
+
+function hoursHtml() {
+  const [from, to] = dayRange();
+  const marks = [];
+  const step = (to - from) / 3;
+  for (let i = 0; i <= 3; i++) marks.push(hhmm(new Date(from + step * i).toISOString()));
+  return `<div class="hours">${marks.map((m) => `<span>${m}</span>`).join('')}</div>`;
+}
+
+function wire(st, msg, meet) {
+  const on = (id, fn) => { const el = $(id); if (el) el.onclick = (e) => { e.stopPropagation(); fn(e); }; };
+  on('joinBtn', () => { openState = true; render(); });
+  on('waitBtn', () => invoke('radio_show_waiting'));
+  if (msg) {
+    on('mYes', () => invoke('automation_answer', { yes: true }));
+    on('mNo', () => invoke('automation_answer', { yes: false }));
+    on('mOk', () => { replying = false; invoke('radio_next'); });
+    on('mOpen', () => invoke('radio_open'));
+    on('mReply', () => { replying = true; clearTimeout(msgTimer); invoke('notch_focus'); lastKey = ''; render(); setTimeout(() => $('rIn')?.focus(), 60); });
+    const input = $('rIn');
+    if (input) {
+      const send = async () => {
+        const text = input.value.trim();
+        if (!text) return;
+        try { await invoke('radio_quick_reply', { text }); replying = false; if (msg.replyUrl) invoke('radio_next'); lastKey = ''; render(); }
+        catch (err) { input.value = ''; input.placeholder = String(err); }
+      };
+      input.onkeydown = (e) => { if (e.key === 'Enter') send(); if (e.key === 'Escape') { replying = false; lastKey = ''; render(); } };
+      on('rSend', send);
+    }
+  }
+  if (st === 'open') {
+    on('pDone', () => invoke('focus_finish'));
+    on('pPause', () => invoke('focus_toggle_pause'));
+    on('pOne', () => invoke('one_thing_toggle'));
+    on('pStart', () => invoke('focus_start_adhoc', {}));
+    on('pReplan', () => invoke('replan'));
+    on('mPrev', () => invoke('spotify_control', { action: 'previous' }));
+    on('mNext', () => invoke('spotify_control', { action: 'next' }));
+    on('mPlay', () => invoke('spotify_control', { action: s.music.playing ? 'pause' : 'play' }));
+    on('qCap', () => invoke('show_capture'));
+    on('qOne', () => invoke('one_thing_toggle'));
+    on('qShot', () => { close(); setTimeout(() => invoke('shot_start'), 300); });
+    on('qReplan', () => invoke('replan'));
+    on('dMusic', () => { close(); invoke('player_toggle'); });
+    on('dShelf', () => { close(); invoke('notch_drawer', { view: 'clip' }); });
+    on('dSys', (e) => {
+      const r = e.currentTarget.getBoundingClientRect();
+      invoke('popup_open', { view: 'cpu', from: 'notch', x: r.left, y: r.top, w: r.width, h: r.height });
+    });
+    on('clrMissed', () => invoke('notch_clear_missed', { index: null }));
+    for (const b of notch.querySelectorAll('[data-miss]')) b.onclick = (e) => { e.stopPropagation(); invoke('notch_open_missed', { index: +b.dataset.miss }); };
+    if (s.focus && firstStep.title !== s.focus.title) {
+      const title = s.focus.title;
+      invoke('get_first_step', { title }).then((step) => { firstStep = { title, step: step || '' }; lastKey = ''; render(); });
+    }
+  }
+}
+
+// Okno rośnie przed animacją i kurczy się po niej (przezroczyste okno łapie kliknięcia).
+function resize(w, h) {
+  const outer = { w: w + 24, h: h + 4 };
+  notch.style.width = `${w}px`;
+  notch.style.height = `${h}px`;
+  if (outer.w === size.w && outer.h === size.h) return;
+  const grow = outer.w > size.w || outer.h > size.h;
+  clearTimeout(shrinkTimer);
+  const apply = () => { size = outer; invoke('notch_size', { width: outer.w, height: outer.h }); };
+  if (grow || !size.w) apply();
+  else shrinkTimer = setTimeout(apply, 470);
+}
+
+function close() {
+  openState = false;
+  render();
+}
+
+// ------------------------------------------------------------------ zdarzenia
+
+document.addEventListener('mouseenter', () => {
+  hover = true;
+  clearTimeout(leaveTimer);
+  clearTimeout(msgTimer);
+  if (!openState && stateOf() !== 'msg') {
+    hoverTimer = setTimeout(() => { openState = true; render(); }, 350);
+  }
+});
+document.addEventListener('mouseleave', () => {
+  hover = false;
+  clearTimeout(hoverTimer);
+  if (document.activeElement?.tagName === 'INPUT') return;
+  leaveTimer = setTimeout(() => { if (openState) close(); armMsgTimer(true); }, 420);
+});
+notch.addEventListener('click', () => {
+  if (!openState && stateOf() !== 'msg') { clearTimeout(hoverTimer); openState = true; render(); }
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openState) close(); });
+
+// Wiadomość: widać ją ~6 s, potem ląduje w „Co przegapiłeś” (chyba że to pytanie albo kursor jest nad nią).
+function armMsgTimer(force) {
+  const m = s?.radio?.current;
+  if (!m || m.ask) return;
+  if (m.id === msgShownId && !force) return;
+  msgShownId = m.id;
+  clearTimeout(msgTimer);
+  msgTimer = setTimeout(() => {
+    if (hover || replying) return;
+    msgHidden = m.id;
+    invoke('notch_missed');
+    render();
+  }, 6000);
+}
+
+function trackDone() {
+  for (const i of s.day || []) {
+    const before = prevStatus.get(i.key);
+    if (before && before !== i.status && STATUS[i.status]) {
+      doneColor = STATUS[i.status][0];
+      doneLabel = `${STATUS[i.status][1]} · ${i.title}`;
+      doneUntil = Date.now() + 4000;
+      setTimeout(render, 4100);
+    }
+    prevStatus.set(i.key, i.status);
+  }
+}
+
+onSnapshot((snap) => {
+  s = snap;
+  trackDone();
+  if (s.radio.current && s.radio.current.id !== msgHidden) armMsgTimer(false);
+  if (!s.radio.current) replying = false;
+  render();
+});
+onTick((snap) => {
+  s = snap;
+  render();
+  const bc = $('bigClock');
+  const t = focusTiming(s);
+  if (bc && t) bc.textContent = mmss(t.left);
+});
+listen('notch-wake', () => render());
+listen('notch-layout', () => { size = { w: 0, h: 0 }; render(); });
+</script>
+</body>
+</html>

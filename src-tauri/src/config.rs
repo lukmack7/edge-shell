@@ -500,6 +500,8 @@ pub struct ShellCfg {
     pub dock_autohide: bool,
     /// Gra, film albo prezentacja na pełnym ekranie chowa pasek, dock i dymki.
     pub hide_in_fullscreen: bool,
+    /// Notch na środku górnego paska: plan dnia, muzyka, radio i panel w jednym miejscu.
+    pub notch: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -658,6 +660,7 @@ impl Default for ShellCfg {
             bar_on_all_monitors: true,
             dock_autohide: true,
             hide_in_fullscreen: true,
+            notch: true,
         }
     }
 }

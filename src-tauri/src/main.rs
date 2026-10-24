@@ -21,6 +21,7 @@ mod tray;
 mod watchdog;
 mod palette;
 mod player;
+mod notch;
 mod popup;
 mod focus;
 mod presence;
@@ -213,6 +214,12 @@ fn main() {
             backup::backup_import,
             palette::palette_query,
             player::player_toggle,
+            notch::notch_size,
+            notch::notch_focus,
+            notch::notch_missed,
+            notch::notch_clear_missed,
+            notch::notch_open_missed,
+            notch::notch_drawer,
             popup::popup_open,
             focus::one_thing_toggle,
             shot::shot_start,

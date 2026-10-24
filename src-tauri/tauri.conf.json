@@ -346,6 +346,21 @@
         "shadow": false,
         "visible": false,
         "focus": false
+      },
+      {
+        "label": "notch",
+        "url": "notch.html",
+        "title": "Edge Shell — notch",
+        "width": 330,
+        "height": 40,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "visible": false,
+        "focus": false
       }
     ]
   },
