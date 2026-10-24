@@ -159,6 +159,17 @@ const ICONS = {
   keyboard: '<rect x="2" y="6" width="20" height="12" rx="2"></rect>' + P('M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10'),
   radio: '<circle cx="12" cy="12" r="2"></circle>' + P('M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19A10 10 0 0 1 5 5'),
   layers: P('M12 3l9 5-9 5-9-5z') + P('M3 13l9 5 9-5'),
+  power: P('M12 3v9') + P('M6.4 6.4a8 8 0 1 0 11.2 0'),
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"></rect>' + P('M8 11V8a4 4 0 0 1 8 0v3'),
+  moon: P('M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z'),
+  restart: P('M3 12a9 9 0 1 0 3-6.7L3 8') + P('M3 3v5h5'),
+  logout: P('M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3') + P('M10 17l-5-5 5-5M5 12h11'),
+  snow: P('M12 2v20M4.9 7l14.2 10M4.9 17L19.1 7'),
+  heart: P('M12 20s-7-4.4-9.3-9A5 5 0 0 1 12 6a5 5 0 0 1 9.3 5c-2.3 4.6-9.3 9-9.3 9z'),
+  shuffle: P('M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6M4 4l5 5'),
+  repeat: P('M17 2l4 4-4 4') + P('M3 11V9a3 3 0 0 1 3-3h15') + P('M7 22l-4-4 4-4') + P('M21 13v2a3 3 0 0 1-3 3H3'),
+  wifi_lock: P('M12 15v2'),
+  send: P('M22 2L11 13M22 2l-7 20-4-9-9-4z'),
   sliders: P('M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0') + '<circle cx="16" cy="6" r="2"></circle><circle cx="10" cy="12" r="2"></circle><circle cx="18" cy="18" r="2"></circle>',
 };
 

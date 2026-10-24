@@ -64,7 +64,7 @@
   </div>
 </div>
 <script type="module">
-import { invoke, listen, onSnapshot, onTick, esc, focusTiming, mmss, blockColor, icon } from './shared.js';
+import { invoke, listen, onSnapshot, onTick, esc, focusTiming, mmss, blockColor, icon, windowLabel } from './shared.js';
 
 const $ = (id) => document.getElementById(id);
 $('logo').onclick = () => invoke('toggle_panel', { label: 'drawer' });
@@ -182,11 +182,11 @@ function batteryIcon(pct, charging) {
 const ITEMS = {
   network: (st) => `<button class="st" data-open="ms-settings:network-status" title="Sieć: pobieranie / wysyłanie">
       <span class="net"><span>${icon('down', 9, 3)} ${speed(st.downBps)}</span><span>${icon('up', 9, 3)} ${speed(st.upBps)}</span></span></button>`,
-  cpu: (st) => st.cpu == null ? '' : `<button class="st" data-open="taskmgr.exe" title="Procesor">${icon('cpu', 15)}<span class="v">${Math.round(st.cpu)}%</span>${meter(st.cpu, load(st.cpu))}</button>`,
-  memory: (st) => st.mem == null ? '' : `<button class="st" data-open="taskmgr.exe" title="Pamięć: ${st.memUsedGb?.toFixed(1)} / ${st.memTotalGb?.toFixed(1)} GB">${icon('ram', 15)}<span class="v">${Math.round(st.mem)}%</span>${meter(st.mem, load(st.mem))}</button>`,
-  volume: (st) => st.volume == null ? '' : `<button class="st" id="vol" title="Dźwięk — kliknij, by wyciszyć; kółko myszy zmienia głośność">${icon(st.muted ? 'mute' : 'volume', 16)}<span class="v">${st.muted ? '—' : st.volume + '%'}</span></button>`,
-  bluetooth: (st) => !st.btPresent ? '' : `<button class="st" data-open="ms-settings:bluetooth" title="Bluetooth: ${st.btConnected} połączonych">${icon('bluetooth', 15)}${st.btConnected ? `<span class="badge">${st.btConnected}</span>` : ''}</button>`,
-  wifi: (st) => `<button class="st" data-open="ms-settings:network-wifi" title="${st.wifiSsid ? esc(st.wifiSsid) + ' · ' + st.wifiSignal + '%' : 'Wi‑Fi: brak połączenia'}">${wifiIcon(st.wifiSignal)}</button>`,
+  cpu: (st) => st.cpu == null ? '' : `<button class="st" data-pop="cpu" title="Procesor — kliknij: co obciąża">${icon('cpu', 15)}<span class="v">${Math.round(st.cpu)}%</span>${meter(st.cpu, load(st.cpu))}</button>`,
+  memory: (st) => st.mem == null ? '' : `<button class="st" data-pop="mem" title="Kliknij: co zajmuje pamięć · Pamięć: ${st.memUsedGb?.toFixed(1)} / ${st.memTotalGb?.toFixed(1)} GB">${icon('ram', 15)}<span class="v">${Math.round(st.mem)}%</span>${meter(st.mem, load(st.mem))}</button>`,
+  volume: (st) => st.volume == null ? '' : `<button class="st" id="vol" data-pop="sound" title="Dźwięk — klik: wyjście i aplikacje · środkowy klik: wycisz · kółko: głośność">${icon(st.muted ? 'mute' : 'volume', 16)}<span class="v">${st.muted ? '—' : st.volume + '%'}</span></button>`,
+  bluetooth: (st) => !st.btPresent ? '' : `<button class="st" data-pop="bt" title="Bluetooth: ${st.btConnected} połączonych">${icon('bluetooth', 15)}${st.btConnected ? `<span class="badge">${st.btConnected}</span>` : ''}</button>`,
+  wifi: (st) => `<button class="st" data-pop="wifi" title="${st.wifiSsid ? esc(st.wifiSsid) + ' · ' + st.wifiSignal + '%' : 'Wi‑Fi: brak połączenia'}">${wifiIcon(st.wifiSignal)}</button>`,
   battery: (st) => st.battery == null ? '' : `<button class="st" data-open="ms-settings:batterysaver" title="Bateria${st.charging ? ' · ładuje' : ''}">${batteryIcon(st.battery, st.charging)}<span class="v">${st.battery}%</span></button>`,
 };
 
@@ -194,9 +194,15 @@ function renderStats() {
   if (!stats) return;
   $('stats').innerHTML = statsOrder.filter((k) => ITEMS[k]).map((k) => ITEMS[k](stats)).join('') + '<span class="sep" aria-hidden="true"></span>';
   for (const b of $('stats').querySelectorAll('[data-open]')) b.onclick = () => invoke('open_path', { path: b.dataset.open });
+  for (const b of $('stats').querySelectorAll('[data-pop]')) {
+    b.onclick = () => {
+      const r = b.getBoundingClientRect();
+      invoke('popup_open', { view: b.dataset.pop, from: windowLabel, x: r.left, y: r.top, w: r.width, h: r.height });
+    };
+  }
   const vol = document.getElementById('vol');
   if (vol) {
-    vol.onclick = () => invoke('toggle_mute');
+    vol.onauxclick = (e) => { if (e.button === 1) invoke('toggle_mute'); };
     vol.onwheel = (e) => {
       e.preventDefault();
       const next = Math.max(0, Math.min(100, (stats.volume || 0) + (e.deltaY < 0 ? 2 : -2)));

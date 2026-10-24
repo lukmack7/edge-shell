@@ -240,6 +240,8 @@ pub struct Runtime {
     pub badges: HashMap<String, u32>,
     /// Uruchomione aplikacje z oknami, których nie ma w docku (w kolejności otwarcia).
     pub open_apps: Vec<OpenApp>,
+    /// Który widok pokazuje okno kart przy pasku (cpu, wifi, bt, sound, power).
+    pub popup_view: String,
 }
 
 #[derive(Clone, Debug, Default, Serialize, PartialEq)]

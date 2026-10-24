@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>Edge Shell — karta</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+  body { padding: 6px; }
+  .pop { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 16px; background: rgba(20,20,24,0.98); border: 1px solid var(--line-strong); box-shadow: 0 6px 16px -6px rgba(0,0,0,0.6); }
+  h3 { margin: 0; font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  h3 .sub { margin-left: auto; font-size: 12px; font-weight: 400; color: var(--muted); }
+  .seg { display: flex; gap: 4px; padding: 3px; border-radius: 10px; background: rgba(255,255,255,0.05); }
+  .seg button { flex: 1; height: 28px; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); font-size: 12px; }
+  .seg button.on { background: rgba(255,255,255,0.12); color: var(--text); font-weight: 600; }
+  .rows { display: flex; flex-direction: column; gap: 2px; max-height: 360px; overflow-y: auto; scrollbar-width: thin; }
+  .r { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 4px 8px; border-radius: 10px; border: 0; background: transparent; text-align: left; color: var(--text); width: 100%; }
+  button.r:hover { background: rgba(255,255,255,0.07); }
+  .r .n { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .r .n b { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .r .n span { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .r .v { font-family: var(--mono); font-size: 12px; color: var(--text-2); min-width: 54px; text-align: right; }
+  .kill { height: 26px; padding: 0 10px; border-radius: 8px; border: 1px solid rgba(248,113,113,0.4); background: transparent; color: #fca5a5; font-size: 12px; }
+  .kill:hover { background: #7f1d1d; color: #fff; }
+  .kill.confirm { background: #b91c1c; color: #fff; border-color: #b91c1c; }
+  .kill:disabled { opacity: 0.3; pointer-events: none; }
+  .bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.1); overflow: hidden; margin-top: 3px; }
+  .bar i { display: block; height: 100%; }
+  .foot { display: flex; gap: 8px; }
+  .foot .btn { flex: 1; height: 34px; font-size: 12px; }
+  .chk { color: #4ade80; display: flex; }
+  .pw { display: flex; gap: 6px; padding: 0 8px 6px; }
+  .pw input { flex: 1; height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line-strong); background: #0f0f11; color: var(--text); font-size: 13px; outline: none; user-select: text; }
+  .pw input:focus { border-color: var(--accent); }
+  .msg { font-size: 12px; color: var(--muted); line-height: 1.5; padding: 4px 8px; }
+  .msg.err { color: #fca5a5; }
+  .slider { flex: 1; accent-color: var(--accent); }
+  .ic { width: 28px; height: 28px; flex: none; border-radius: 8px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); color: var(--text-2); }
+  .ic img { width: 20px; height: 20px; }
+  .mute { width: 30px; height: 30px; flex: none; border: 0; border-radius: 8px; background: transparent; color: var(--text-2); display: flex; align-items: center; justify-content: center; }
+  .mute:hover { background: rgba(255,255,255,0.08); }
+  .mute.on { color: #fca5a5; }
+  .power .r { min-height: 42px; font-size: 13px; gap: 12px; }
+  .power .r.danger.confirm { background: #b91c1c; color: #fff; }
+  .power .hint { margin-left: auto; font-size: 11px; color: var(--muted); }
+  .power .r.confirm .hint { color: #fff; }
+  .sep { height: 1px; background: var(--line); margin: 4px 0; }
+</style>
+</head>
+<body>
+<div class="pop" id="pop"></div>
+<script type="module">
+import { invoke, listen, esc, icon, toast } from './shared.js';
+
+const pop = document.getElementById('pop');
+let view = '';
+let token = 0;
+
+function fit() {
+  requestAnimationFrame(() => invoke('popup_resize', { height: pop.getBoundingClientRect().height + 12 }));
+}
+
+function set(html) {
+  pop.innerHTML = html;
+  fit();
+}
+
+// Kliknij dwa razy w 3 s, żeby potwierdzić (wyłączenie, zakończenie procesu).
+function confirmTwice(btn, label, run) {
+  if (btn.classList.contains('confirm')) { run(); return; }
+  btn.classList.add('confirm');
+  const old = btn.dataset.label;
+  const hint = btn.querySelector('.hint');
+  if (hint) hint.textContent = label; else btn.textContent = label;
+  setTimeout(() => {
+    btn.classList.remove('confirm');
+    if (hint) hint.textContent = ''; else if (old) btn.textContent = old;
+  }, 3000);
+}
+
+// ------------------------------------------------------------------ zasilanie
+
+function power() {
+  const A = [
+    ['lock', 'lock', 'Zablokuj', false],
+    ['sleep', 'moon', 'Uśpij', false],
+    ['hibernate', 'snow', 'Hibernuj', false],
+    ['restart', 'restart', 'Uruchom ponownie', true],
+    ['shutdown', 'power', 'Wyłącz', true],
+    ['logout', 'logout', 'Wyloguj', true],
+  ];
+  set(`<div class="power"><h3>Zasilanie</h3><div class="rows">${A.map(([a, ic, l, danger], i) =>
+    `${i === 3 ? '<div class="sep"></div>' : ''}<button class="r ${danger ? 'danger' : ''}" data-a="${a}">${icon(ic, 17)}<span>${l}</span><span class="hint"></span></button>`).join('')}</div>
+    <div class="msg" id="pmsg">Uruchom ponownie, Wyłącz i Wyloguj wymagają drugiego kliknięcia.</div></div>`);
+  for (const b of pop.querySelectorAll('[data-a]')) {
+    const run = () => invoke('power_action', { action: b.dataset.a }).catch((e) => { document.getElementById('pmsg').className = 'msg err'; document.getElementById('pmsg').textContent = String(e); fit(); });
+    b.onclick = () => (b.classList.contains('danger') ? confirmTwice(b, 'kliknij jeszcze raz', run) : run());
+  }
+}
+
+// ------------------------------------------------------------------ procesy
+
+let procSort = 'cpu';
+async function procs(sortBy) {
+  procSort = sortBy;
+  const my = ++token;
+  set(`<h3>${sortBy === 'cpu' ? 'Co obciąża procesor' : 'Co zajmuje pamięć'}<span class="sub">mierzę…</span></h3>`);
+  const list = await invoke('sys_processes').catch(() => []);
+  if (my !== token) return;
+  render();
+  function render() {
+    const rows = [...list].sort((a, b) => (procSort === 'cpu' ? b.cpu - a.cpu : b.memMb - a.memMb)).slice(0, 8);
+    const max = Math.max(1, ...rows.map((p) => (procSort === 'cpu' ? p.cpu : p.memMb)));
+    set(`<h3>${procSort === 'cpu' ? 'Co obciąża procesor' : 'Co zajmuje pamięć'}</h3>
+      <div class="seg"><button data-s="cpu" class="${procSort === 'cpu' ? 'on' : ''}">Procesor</button><button data-s="mem" class="${procSort === 'mem' ? 'on' : ''}">Pamięć</button></div>
+      <div class="rows">${rows.map((p, i) => {
+        const val = procSort === 'cpu' ? p.cpu : p.memMb;
+        const color = procSort === 'cpu' ? (p.cpu > 50 ? '#f87171' : p.cpu > 20 ? '#fbbf24' : '#4ade80') : '#60a5fa';
+        return `<div class="r"><span class="n"><b>${esc(p.name)}</b><span>${p.pids.length > 1 ? `${p.pids.length} procesów · ` : ''}${p.cpu.toFixed(1)}% CPU · ${p.memMb >= 1024 ? (p.memMb / 1024).toFixed(1) + ' GB' : Math.round(p.memMb) + ' MB'}</span>
+          <span class="bar"><i style="width:${(val / max) * 100}%;background:${color}"></i></span></span>
+          <button class="kill" data-i="${i}" data-label="Zakończ" ${p.protected ? 'disabled title="Proces systemowy"' : ''}>Zakończ</button></div>`;
+      }).join('')}</div>
+      <div class="foot"><button class="btn" id="tm">Menedżer zadań</button><button class="btn" id="again">Odśwież</button></div>`);
+    for (const b of pop.querySelectorAll('[data-s]')) b.onclick = () => { procSort = b.dataset.s; render(); };
+    for (const b of pop.querySelectorAll('.kill')) {
+      const p = rows[+b.dataset.i];
+      b.onclick = () => confirmTwice(b, 'Na pewno?', async () => {
+        const n = await invoke('sys_kill', { pids: p.pids });
+        toast(n ? `Zakończono: ${p.name}` : 'Nie udało się zakończyć (brak uprawnień?)');
+        procs(procSort);
+      });
+    }
+    document.getElementById('tm').onclick = () => { invoke('open_path', { path: 'taskmgr.exe' }); invoke('popup_hide'); };
+    document.getElementById('again').onclick = () => procs(procSort);
+  }
+}
+
+// ------------------------------------------------------------------ Wi‑Fi
+
+async function wifi(msg) {
+  const my = ++token;
+  set(`<h3>${icon('wifi', 16)} Wi‑Fi<span class="sub">szukam sieci…</span></h3>`);
+  const nets = await invoke('wifi_list').catch(() => []);
+  if (my !== token) return;
+  const bars = (s) => `${s}%`;
+  set(`<h3>${icon('wifi', 16)} Wi‑Fi</h3>
+    ${msg ? `<div class="msg ${msg.err ? 'err' : ''}">${esc(msg.text)}</div>` : ''}
+    <div class="rows">${nets.map((n, i) => `
+      <button class="r" data-i="${i}">
+        <span class="n"><b>${esc(n.ssid)}</b><span>${n.connected ? 'Połączono' : n.known ? 'Zapisana' : n.secure ? 'Zabezpieczona' : 'Otwarta'}</span></span>
+        ${n.secure ? `<span style="color:var(--muted);display:flex">${icon('lock', 13)}</span>` : ''}
+        <span class="v">${bars(n.signal)}</span>
+        ${n.connected ? `<span class="chk">${icon('check', 16, 2.4)}</span>` : ''}
+      </button>
+      <div class="pw" id="pw${i}" style="display:none"><input type="password" placeholder="Hasło sieci" data-pw="${i}"><button class="btn primary" data-go="${i}">Połącz</button></div>`).join('') || '<div class="msg">Nie widzę sieci Wi‑Fi.</div>'}
+    </div>
+    <div class="foot"><button class="btn" id="dis">Rozłącz</button><button class="btn" id="set">Ustawienia Wi‑Fi</button></div>`);
+  const connect = async (n, password) => {
+    set(`<h3>${icon('wifi', 16)} Wi‑Fi<span class="sub">łączę z ${esc(n.ssid)}…</span></h3>`);
+    try {
+      await invoke('wifi_connect', { ssid: n.ssid, password: password || null });
+      setTimeout(() => wifi({ text: `Połączono z ${n.ssid}` }), 2500);
+    } catch (e) {
+      wifi({ text: String(e) === 'needs-password' ? 'Podaj hasło sieci.' : `Nie połączono: ${e}`, err: true });
+    }
+  };
+  for (const b of pop.querySelectorAll('[data-i]')) {
+    const n = nets[+b.dataset.i];
+    b.onclick = () => {
+      if (n.connected) return;
+      if (n.known || !n.secure) { connect(n); return; }
+      const box = document.getElementById(`pw${b.dataset.i}`);
+      box.style.display = 'flex';
+      box.querySelector('input').focus();
+      fit();
+    };
+  }
+  for (const b of pop.querySelectorAll('[data-go]')) {
+    const n = nets[+b.dataset.go];
+    const input = pop.querySelector(`[data-pw="${b.dataset.go}"]`);
+    b.onclick = () => connect(n, input.value);
+    input.onkeydown = (e) => { if (e.key === 'Enter') connect(n, input.value); };
+  }
+  document.getElementById('dis').onclick = async () => { await invoke('wifi_disconnect'); wifi({ text: 'Rozłączono' }); };
+  document.getElementById('set').onclick = () => { invoke('open_path', { path: 'ms-settings:network-wifi' }); invoke('popup_hide'); };
+}
+
+// ------------------------------------------------------------------ Bluetooth
+
+async function bt() {
+  const my = ++token;
+  set(`<h3>${icon('bluetooth', 15)} Bluetooth<span class="sub">wczytuję…</span></h3>`);
+  const devs = await invoke('bt_list').catch(() => []);
+  if (my !== token) return;
+  const draw = (bat) => {
+    set(`<h3>${icon('bluetooth', 15)} Bluetooth<span class="sub">${devs.filter((d) => d.connected).length} połączonych</span></h3>
+      <div class="rows">${devs.map((d) => {
+        const b = bat.find(([n]) => n === d.name || n.includes(d.name) || d.name.includes(n));
+        const pct = b ? b[1] : null;
+        return `<div class="r"><span class="n"><b>${esc(d.name)}</b><span>${d.connected ? 'Połączone' : 'Sparowane'}</span></span>
+          ${pct != null ? `<span class="v" style="color:${pct <= 20 ? '#f87171' : 'var(--text-2)'}">${icon('battery', 14)} ${pct}%</span>` : ''}</div>`;
+      }).join('') || '<div class="msg">Brak sparowanych urządzeń.</div>'}</div>
+      <div class="foot"><button class="btn" id="set">Ustawienia Bluetooth</button></div>`);
+    document.getElementById('set').onclick = () => { invoke('open_path', { path: 'ms-settings:bluetooth' }); invoke('popup_hide'); };
+  };
+  draw([]);
+  const bat = await invoke('bt_batteries').catch(() => []);
+  if (my === token && bat.length) draw(bat);
+}
+
+// ------------------------------------------------------------------ dźwięk
+
+const appIcons = {};
+async function sound() {
+  const my = ++token;
+  const st = await invoke('audio_state').catch(() => null);
+  if (my !== token || !st) return;
+  set(`<h3>${icon('volume', 16)} Dźwięk</h3>
+    <div class="r" style="padding:0 4px"><button class="mute ${st.muted ? 'on' : ''}" id="mMaster">${icon(st.muted ? 'mute' : 'volume', 16)}</button>
+      <input class="slider" type="range" min="0" max="100" value="${st.volume ?? 0}" id="master"><span class="v" id="mv">${st.volume ?? 0}%</span></div>
+    <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;color:var(--muted);padding:2px 4px">WYJŚCIE</span>
+    <div class="rows" style="max-height:150px">${st.outputs.map((o) => `
+      <button class="r" data-out="${esc(o.id)}"><span class="n"><b>${esc(o.name)}</b></span>${o.default ? `<span class="chk">${icon('check', 16, 2.4)}</span>` : ''}</button>`).join('')}</div>
+    <span style="font-size:11px;font-weight:600;letter-spacing:0.08em;color:var(--muted);padding:2px 4px">APLIKACJE</span>
+    <div class="rows" style="max-height:200px">${st.apps.map((a) => `
+      <div class="r"><span class="ic" data-ico="${esc(a.exe)}">${esc(a.name[0] || '?')}</span>
+        <span class="n" style="flex:0 0 96px"><b>${esc(a.name)}</b></span>
+        <input class="slider" type="range" min="0" max="100" value="${a.volume}" data-app="${a.pid}">
+        <button class="mute ${a.muted ? 'on' : ''}" data-mute="${a.pid}" aria-label="Wycisz">${icon(a.muted ? 'mute' : 'volume', 14)}</button></div>`).join('') || '<div class="msg">Żadna aplikacja teraz nie gra.</div>'}</div>
+    <div class="foot"><button class="btn" id="mixer">Mikser Windows</button></div>`);
+  const master = document.getElementById('master');
+  master.oninput = () => { document.getElementById('mv').textContent = `${master.value}%`; invoke('set_volume', { level: +master.value }); };
+  document.getElementById('mMaster').onclick = async () => { await invoke('toggle_mute'); sound(); };
+  for (const b of pop.querySelectorAll('[data-out]')) {
+    b.onclick = async () => {
+      try { await invoke('audio_set_output', { id: b.dataset.out }); sound(); } catch (e) { toast(String(e), 3500); }
+    };
+  }
+  let t = null;
+  for (const s of pop.querySelectorAll('[data-app]')) {
+    s.oninput = () => { clearTimeout(t); t = setTimeout(() => invoke('audio_app', { pid: +s.dataset.app, volume: +s.value, mute: null }), 60); };
+  }
+  for (const b of pop.querySelectorAll('[data-mute]')) {
+    b.onclick = async () => { await invoke('audio_app', { pid: +b.dataset.mute, volume: null, mute: !b.classList.contains('on') }); sound(); };
+  }
+  document.getElementById('mixer').onclick = () => { invoke('open_path', { path: 'ms-settings:apps-volume' }); invoke('popup_hide'); };
+  // Ikony aplikacji (z pliku .exe procesu, zapamiętane).
+  for (const el of pop.querySelectorAll('[data-ico]')) {
+    const app = st.apps.find((a) => a.exe === el.dataset.ico);
+    if (!app) continue;
+    if (!(app.exe in appIcons)) appIcons[app.exe] = invoke('process_icon', { pid: app.pid }).catch(() => null);
+    appIcons[app.exe].then((url) => { if (url) el.innerHTML = `<img src="${url}" alt="">`; });
+  }
+}
+
+// ------------------------------------------------------------------
+
+listen('popup-view', (v) => {
+  view = v;
+  token++;
+  if (v === 'power') power();
+  else if (v === 'cpu') procs('cpu');
+  else if (v === 'mem') procs('mem');
+  else if (v === 'wifi') wifi();
+  else if (v === 'bt') bt();
+  else if (v === 'sound') sound();
+});
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') invoke('popup_hide'); });
+</script>
+</body>
+</html>

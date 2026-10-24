@@ -260,6 +260,20 @@
         "resizable": false,
         "shadow": false,
         "visible": false
+      },
+      {
+        "label": "popup",
+        "url": "popup.html",
+        "title": "Edge Shell — karta",
+        "width": 340,
+        "height": 400,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "resizable": false,
+        "shadow": false,
+        "visible": false
       }
     ]
   },

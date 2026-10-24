@@ -29,6 +29,7 @@
   <span class="line" aria-hidden="true"></span>
   <button class="tool" id="capture" aria-label="Wrzuć myśl"></button>
   <button class="tool" id="settings" aria-label="Ustawienia"></button>
+  <button class="tool" id="power" aria-label="Zasilanie"></button>
 </div>
 <script type="module">
 import { invoke, listen, onSnapshot, esc, icon } from './shared.js';
@@ -59,6 +60,12 @@ document.getElementById('capture').innerHTML = icon('note', 19);
 document.getElementById('capture').onclick = () => invoke('show_capture');
 document.getElementById('settings').innerHTML = icon('settings', 19);
 document.getElementById('settings').onclick = () => invoke('open_settings');
+document.getElementById('power').innerHTML = icon('power', 19);
+document.getElementById('power').title = 'Zablokuj, uśpij, hibernuj, uruchom ponownie, wyłącz';
+document.getElementById('power').onclick = (e) => {
+  const r = e.currentTarget.getBoundingClientRect();
+  invoke('popup_open', { view: 'power', from: 'rail', x: r.left, y: r.top, w: r.width, h: r.height });
+};
 
 function renderTray(items) {
   tray.innerHTML = items.map((t) => `

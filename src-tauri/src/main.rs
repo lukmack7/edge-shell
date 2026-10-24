@@ -21,6 +21,8 @@ mod tray;
 mod watchdog;
 mod palette;
 mod player;
+mod popup;
+mod sysx;
 mod automations;
 mod backup;
 mod stacks;
@@ -88,6 +90,7 @@ fn main() {
             stacks::init(&handle);
             palette::init(&handle);
             player::init(&handle);
+            popup::init(&handle);
             automations::start(handle.clone());
 
             // Szuflada i Teraz chowają się, gdy klikniesz gdzie indziej.
@@ -197,6 +200,21 @@ fn main() {
             backup::backup_import,
             palette::palette_query,
             player::player_toggle,
+            popup::popup_open,
+            popup::popup_resize,
+            popup::popup_hide,
+            popup::sys_processes,
+            popup::sys_kill,
+            popup::wifi_list,
+            popup::wifi_connect,
+            popup::wifi_disconnect,
+            popup::bt_list,
+            popup::bt_batteries,
+            popup::audio_state,
+            popup::audio_set_output,
+            popup::audio_app,
+            popup::power_action,
+            popup::process_icon,
             player::player_hide,
             player::player_mode,
             player::player_pin,
