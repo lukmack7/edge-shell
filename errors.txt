@@ -1,0 +1,30 @@
+error[E0277]: the trait bound `shot::Preview: Clone` is not satisfied
+    --> src\shot.rs:169:51
+     |
+ 169 |     let _ = app.emit_to("quicklook", "quicklook", pv);
+     |                 -------                           ^^ the trait `Clone` is not implemented for `shot::Preview`
+     |                 |
+     |                 required by a bound introduced by this call
+     |
+note: required by a bound in `emit_to`
+    --> C:\Users\runneradmin\.cargo\registry\src\index.crates.io-1949cf8c6b5b557f\tauri-2.12.5\src\lib.rs:1012:20
+     |
+1009 |   fn emit_to<I, S>(&self, target: I, event: &str, payload: S) -> Result<()>
+     |      ------- required by a bound in this associated function
+...
+1012 |     S: Serialize + Clone,
+     |                    ^^^^^ required by this bound in `Emitter::emit_to`
+help: consider annotating `shot::Preview` with `#[derive(Clone)]`
+     |
+  98 + #[derive(Clone)]
+  99 | pub struct Preview {
+     |
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `edge-shell` (bin "edge-shell") due to 1 previous error
+failed to build app: failed to build app
+       Error failed to build app: failed to build app
+
+error: could not compile `edge-shell` (bin "edge-shell") due to 1 previous error
+failed to build app: failed to build app
+       Error failed to build app: failed to build app
