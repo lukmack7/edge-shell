@@ -71,6 +71,32 @@
   .n-deep button { height: 28px; padding: 0 11px; border-radius: 999px; border: 0; background: rgba(255,255,255,0.05); color: #d4d4d8; font-size: 12px; display: flex; align-items: center; gap: 6px; }
   .n-b2 { height: 30px; padding: 0 12px; border-radius: 999px; border: 0; font-size: 12px; font-weight: 600; background: rgba(255,255,255,0.1); color: #fff; }
   .n-b2.w { background: #fff; color: #000; }
+  .n-bell { position: relative; }
+  .n-bell .bd { position: absolute; top: 1px; right: 0; min-width: 14px; height: 14px; padding: 0 3px; box-sizing: border-box; border-radius: 7px; background: #fbbf24; color: #1c1917; font-size: 9.5px; font-weight: 800; line-height: 14px; text-align: center; }
+  .n-head { display: flex; align-items: center; gap: 10px; }
+  .n-head b { font-size: 14px; font-weight: 600; }
+  .n-head .back { height: 26px; padding: 0 11px; border-radius: 999px; border: 0; background: rgba(255,255,255,0.06); color: #d4d4d8; font-size: 12px; }
+  .n-head .back:hover { background: rgba(255,255,255,0.12); }
+  .n-head .meta { margin-left: auto; font-size: 11.5px; color: #8b8b98; }
+  .n-msgs { margin-top: 12px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .n-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; max-height: 360px; overflow-y: auto; scrollbar-width: thin; }
+  .n-col .lbl { font-size: 10.5px; font-weight: 700; letter-spacing: 0.1em; color: #71717a; display: flex; align-items: center; gap: 8px; height: 22px; flex: none; }
+  .n-col .lbl button { margin-left: auto; height: 22px; padding: 0 9px; border-radius: 999px; border: 0; background: rgba(255,255,255,0.06); color: #d4d4d8; font-size: 11px; letter-spacing: 0; font-weight: 600; }
+  .n-col .lbl button:hover { background: rgba(255,255,255,0.12); }
+  .n-msg { border-radius: 14px; background: rgba(255,255,255,0.05); padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; text-align: left; border: 1px solid transparent; color: #e4e4e7; }
+  .n-msg.top { border-color: rgba(251,191,36,0.35); background: rgba(251,191,36,0.08); }
+  button.n-msg:hover { background: rgba(255,255,255,0.09); }
+  .n-msg .hd { display: flex; align-items: center; gap: 7px; min-width: 0; }
+  .n-msg .hd .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+  .n-msg .hd b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .n-msg .hd .src { color: #8b8b98; font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-msg .hd .tm { margin-left: auto; font-family: var(--mono); font-size: 11px; color: #71717a; flex: none; }
+  .n-msg .bd { color: #d4d4d8; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+  .n-msg .ac { display: flex; gap: 6px; margin-top: 2px; flex-wrap: wrap; }
+  .n-msg .ac button { height: 24px; padding: 0 10px; border-radius: 999px; border: 0; background: rgba(255,255,255,0.1); color: #fff; font-size: 11.5px; font-weight: 600; }
+  .n-msg .ac button.w { background: #fff; color: #000; }
+  .n-msg .ac input { flex: 1 1 100%; height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.35); color: #fff; font-size: 12.5px; outline: none; user-select: text; }
+  .n-empty { color: #71717a; font-size: 12.5px; padding: 6px 2px; }
   .fade { animation: fade 0.25s ease-out 0.15s both; }
   @keyframes fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 </style>
@@ -86,6 +112,7 @@ let s = null;
 let stats = null;
 let hotCount = 0;
 let openState = false;
+let view = 'main';           // 'main' | 'msgs' — co pokazuje rozwinięty notch
 let hover = false;
 let hoverTimer = null;
 let leaveTimer = null;
@@ -164,6 +191,8 @@ function batteryIcon(pct, charging) {
 function statusHtml() {
   const st = stats || {};
   const parts = [];
+  const unread = (s?.radio?.waiting || 0) + (s?.missed || []).length;
+  parts.push(`<button class="n-sb n-bell" id="bellBtn" title="Powiadomienia i komunikaty${unread ? ` · ${unread} do przejrzenia` : ''}">${icon('bell', 15)}${unread ? `<span class="bd">${unread > 9 ? '9+' : unread}</span>` : ''}</button>`);
   parts.push(`<button class="n-sb" data-pop="wifi" title="${st.wifiSsid ? esc(st.wifiSsid) + ' · ' + st.wifiSignal + '%' : 'Wi‑Fi: brak połączenia'}">${wifiIcon(st.wifiSignal)}</button>`);
   if (st.volume != null) parts.push(`<button class="n-sb" id="vol" data-pop="sound" title="Dźwięk ${st.muted ? '— wyciszony' : st.volume + '%'} · kółko: głośność · środkowy klik: wycisz">${icon(st.muted ? 'mute' : 'volume', 16)}</button>`);
   if (st.btPresent && st.btConnected) parts.push(`<button class="n-sb" data-pop="bt" title="Bluetooth: ${st.btConnected} połączonych">${icon('bluetooth', 15)}</button>`);
@@ -189,7 +218,7 @@ function midHtml(st) {
       ? `<button class="n-act" id="mYes">${esc(m.yesLabel || 'Tak')}</button><button class="n-act g" id="mNo">${esc(m.noLabel || 'Nie')}</button>`
       : `${canReply ? '<button class="n-act" id="mReply">Odpowiedz</button>' : ''}${m.openTarget ? '<button class="n-act g" id="mOpen">Otwórz</button>' : ''}<button class="n-act g" id="mOk">OK</button>`;
     return `<span class="n-ic" style="background:#fbbf24;color:#1c1917">${esc(m.number || '!')}</span>
-      <span class="t"><b style="color:#fde68a">${esc(m.name)}</b> <span class="dim">„${esc(m.message)}”</span></span>${btns}`;
+      <span class="t" id="msgText" title="Klik: wszystkie powiadomienia" style="cursor:pointer"><b style="color:#fde68a">${esc(m.name)}</b> <span class="dim">„${esc(m.message)}”</span></span>${btns}`;
   }
   if (st === 'done') {
     const [col, label, how] = DONE[done.kind];
@@ -258,7 +287,7 @@ function render() {
         ${focus ? '' : statusHtml()}
         <button class="n-clock" id="clockBtn" title="Kalendarz">${focus ? '' : `<span id="date">${esc(dateText())}</span><span class="sep"></span>`}<span class="tm" id="time">${timeText()}</span></button>
       </div>
-      ${msg && replying ? replyHtml(msg) : ''}
+      ${msg && replying && st !== 'open' ? replyHtml(msg) : ''}
       ${st === 'open' ? panelHtml() : ''}`;
     wire(st, msg);
   } else {
@@ -286,7 +315,7 @@ function midKey(st) {
 }
 function statusKey() {
   const st = stats || {};
-  return [st.wifiSignal != null ? Math.floor(st.wifiSignal / 20) : -1, st.volume == null ? -1 : st.muted, st.btConnected, st.battery, st.charging, dateText()];
+  return [(s?.radio?.waiting || 0) + (s?.missed || []).length, st.wifiSignal != null ? Math.floor(st.wifiSignal / 20) : -1, st.volume == null ? -1 : st.muted, st.btConnected, st.battery, st.charging, dateText()];
 }
 
 // Tylko teksty, które zmieniają się co sekundę (bez przerysowania notcha).
@@ -305,6 +334,10 @@ function replyHtml(m) {
 }
 
 function openKey() {
+  if (view === 'msgs') {
+    const r = s.radio;
+    return JSON.stringify(['msgs', (r.showingList || []).map((m) => m.id), (r.waitingList || []).map((m) => m.id), (s.missed || []).length, r.nextBatch, replying]);
+  }
   return JSON.stringify([s.focus?.title, s.paused, s.oneThing, s.music.title, s.music.playing, (s.missed || []).length, s.next?.title, firstStep.step, s.mode.id, (s.presence || []).map((p) => p.state).join()]);
 }
 
@@ -320,7 +353,54 @@ function peopleHtml() {
   }).join('')}</span>`;
 }
 
+const ago = (iso) => (iso ? new Date(iso).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }) : '');
+
+function msgCard(m, opts = {}) {
+  const color = esc(m.color || '#a1a1aa');
+  const src = m.source || m.app || '';
+  let actions = '';
+  if (opts.current) {
+    if (m.ask) {
+      actions = `<button class="w" id="lYes">${esc(m.yesLabel || 'Tak')}</button><button id="lNo">${esc(m.noLabel || 'Nie')}</button>`;
+    } else {
+      const canReply = m.openTarget || m.replyUrl || m.reply;
+      actions = `${canReply ? '<button class="w" id="lReply">Odpowiedz</button>' : ''}${m.openTarget ? '<button id="lOpen">Otwórz</button>' : ''}<button id="lOk">OK</button>`;
+      if (replying) actions += `<input id="rIn" placeholder="${m.replyUrl ? 'Odpowiedź — Enter wysyła' : 'Odpowiedź — Enter: do schowka i otwiera rozmowę'}" value="${esc(m.reply || '')}">`;
+    }
+  } else if (opts.missed != null && m.openTarget) {
+    actions = `<button data-miss="${opts.missed}">Otwórz</button>`;
+  }
+  const tag = opts.missed != null && !m.openTarget ? 'div' : 'div';
+  return `<${tag} class="n-msg${opts.current ? ' top' : ''}">
+    <span class="hd"><span class="dot" style="background:${color}"></span><b style="color:${color}">${esc(m.name)}</b>${src ? `<span class="src">· ${esc(src)}</span>` : ''}<span class="tm">${ago(m.at)}</span></span>
+    <span class="bd">${esc(m.message)}</span>
+    ${actions ? `<span class="ac">${actions}</span>` : ''}</${tag}>`;
+}
+
+function msgsHtml() {
+  const r = s.radio;
+  const showing = r.showingList || [];
+  const waiting = r.waitingList || [];
+  const missed = s.missed || [];
+  const notif = r.notifications;
+  const meta = notif && notif !== 'ok' && typeof notif === 'string' ? `Powiadomienia Windows: ${esc(notif)}` : r.nextBatch ? `Następna paczka o ${esc(r.nextBatch)}` : '';
+  return `<div class="n-pn" id="pn">
+    <div class="n-head fade"><button class="back" id="backBtn">← Panel</button><b>Powiadomienia i komunikaty</b><span class="meta">${meta}</span></div>
+    <div class="n-msgs fade">
+      <div class="n-col"><span class="lbl">TERAZ${showing.length > 1 ? ` · ${showing.length}` : ''}</span>
+        ${showing.map((m, i) => msgCard(m, { current: i === 0 })).join('') || '<span class="n-empty">Nic nie czeka na odpowiedź.</span>'}
+      </div>
+      <div class="n-col"><span class="lbl">CZEKA NA PACZKĘ${r.waiting ? ` · ${r.waiting}` : ''}${r.waiting ? '<button id="releaseBtn">Pokaż teraz</button>' : ''}</span>
+        ${waiting.map((m) => msgCard(m)).join('') || '<span class="n-empty">Pusto — nic nie jest odłożone.</span>'}
+      </div>
+      <div class="n-col"><span class="lbl">CO PRZEGAPIŁEŚ${missed.length ? ` · ${missed.length}<button id="clrMissed">Wyczyść</button>` : ''}</span>
+        ${missed.map((m, i) => msgCard(m, { missed: i })).join('') || '<span class="n-empty">Nic — jesteś na bieżąco.</span>'}
+      </div>
+    </div></div>`;
+}
+
 function panelHtml() {
+  if (view === 'msgs') return msgsHtml();
   const t = focusTiming(s);
   const acc = s.mode.accent;
   let main;
@@ -365,7 +445,7 @@ function panelHtml() {
         <div class="n-box"><span class="lbl">DALEJ</span>
           ${upcoming.map((i) => `<span class="n-it"><span class="tm">${hhmm(i.start)}</span><span class="tx">${esc(i.title)}</span></span>`).join('') || '<span class="n-it" style="color:#71717a">nic więcej dziś</span>'}
         </div>
-        <div class="n-box"><span class="lbl">CO PRZEGAPIŁEŚ${missed.length ? '<button id="clrMissed" style="margin-left:auto;border:0;background:transparent;color:#71717a;font-size:10.5px">wyczyść</button>' : ''}</span>
+        <div class="n-box"><span class="lbl">CO PRZEGAPIŁEŚ<button id="allMsgs" style="margin-left:auto;border:0;background:transparent;color:#a1a1aa;font-size:10.5px;font-weight:700;letter-spacing:0.05em">WSZYSTKIE →</button></span>
           ${missed.map((m, i) => `<button class="n-it" data-miss="${i}" title="${esc(m.message)}"><span class="dot" style="background:${esc(m.color)}"></span><span class="tx"><b style="color:${esc(m.color)}">${esc(m.name)}</b> ${esc(m.message)}</span>${m.openTarget ? '<b>Otwórz</b>' : ''}</button>`).join('') || '<span class="n-it" style="color:#71717a">nic — jesteś na bieżąco</span>'}
         </div>
         <div class="n-quick">
@@ -393,7 +473,9 @@ function wire(st, msg) {
   const on = (id, fn) => { const el = $(id); if (el) el.onclick = (e) => { e.stopPropagation(); fn(e); }; };
   on('modeBtn', () => setOpen(!openState));
   on('clockBtn', () => invoke('toggle_calendar'));
-  on('waitBtn', () => invoke('radio_show_waiting'));
+  on('waitBtn', () => showMsgs());
+  on('bellBtn', () => (openState && view === 'msgs' ? setOpen(false) : showMsgs()));
+  on('msgText', () => showMsgs());
   on('meetBtn', () => invoke('toggle_calendar'));
   on('hotBtn', (e) => popup(e.currentTarget.dataset.view, e.currentTarget));
   on('mTitle', () => invoke('player_toggle'));
@@ -437,7 +519,31 @@ function wire(st, msg) {
       on('rSend', send);
     }
   }
-  if (st === 'open') {
+  if (st === 'open' && view === 'msgs') {
+    const cur = (s.radio.showingList || [])[0];
+    on('backBtn', () => { view = 'main'; replying = false; render(); });
+    on('releaseBtn', () => invoke('radio_show_waiting'));
+    on('clrMissed', () => invoke('notch_clear_missed', { index: null }));
+    on('lYes', () => invoke('automation_answer', { yes: true }));
+    on('lNo', () => invoke('automation_answer', { yes: false }));
+    on('lOk', () => { replying = false; invoke('radio_next'); });
+    on('lOpen', () => invoke('radio_open'));
+    on('lReply', () => { replying = true; invoke('notch_focus'); lastKey = ''; render(); setTimeout(() => $('rIn')?.focus(), 60); });
+    const input = $('rIn');
+    if (input && cur) {
+      input.onclick = (e) => e.stopPropagation();
+      input.onkeydown = async (e) => {
+        if (e.key === 'Escape') { replying = false; lastKey = ''; render(); return; }
+        if (e.key !== 'Enter') return;
+        const text = input.value.trim();
+        if (!text) return;
+        try { await invoke('radio_quick_reply', { text }); replying = false; if (cur.replyUrl) invoke('radio_next'); lastKey = ''; render(); }
+        catch (err) { input.value = ''; input.placeholder = String(err); }
+      };
+    }
+    for (const b of notch.querySelectorAll('[data-miss]')) b.onclick = (e) => { e.stopPropagation(); invoke('notch_open_missed', { index: +b.dataset.miss }); };
+  } else if (st === 'open') {
+    on('allMsgs', () => showMsgs());
     on('pDone', () => invoke('focus_finish'));
     on('pPause', () => invoke('focus_toggle_pause'));
     on('pOne', () => invoke('one_thing_toggle'));
@@ -479,8 +585,19 @@ function resize(w, h) {
 
 function setOpen(v) {
   clearTimeout(hoverTimer);
+  if (!v) { view = 'main'; }
   if (openState === v) return;
   openState = v;
+  if (v) clearTimeout(msgTimer);
+  render();
+}
+
+function showMsgs() {
+  clearTimeout(hoverTimer);
+  clearTimeout(msgTimer);
+  view = 'msgs';
+  openState = true;
+  lastKey = '';
   render();
 }
 

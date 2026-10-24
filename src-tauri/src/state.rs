@@ -516,6 +516,9 @@ pub fn snapshot(app: &AppHandle) -> Value {
             "current": rt.showing.front(),
             "showingCount": rt.showing.len(),
             "waiting": rt.store.waiting.len(),
+            // Listy do widoku „Powiadomienia i komunikaty” w rozwiniętym notchu.
+            "showingList": rt.showing.iter().take(10).collect::<Vec<_>>(),
+            "waitingList": rt.store.waiting.iter().rev().take(15).collect::<Vec<_>>(),
             "nextBatch": next_batch,
             "notifications": rt.notif_status,
         },
