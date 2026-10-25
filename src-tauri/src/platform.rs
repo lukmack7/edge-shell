@@ -234,10 +234,20 @@ mod imp {
     pub fn battery() -> Option<(u8, bool)> {
         let mut s = SYSTEM_POWER_STATUS::default();
         unsafe { GetSystemPowerStatus(&mut s).ok()? };
-        if s.BatteryFlag == 128 || s.BatteryLifePercent == 255 {
+        if s.BatteryFlag == 128 {
             return None; // komputer stacjonarny — brak baterii
         }
+        if s.BatteryLifePercent > 100 {
+            // Stan nieznany (255) — spróbuje WMI w engine.
+            return None;
+        }
         Some((s.BatteryLifePercent, s.ACLineStatus == 1))
+    }
+
+    /// System wprost mówi, że baterii nie ma (komputer stacjonarny).
+    pub fn no_battery() -> bool {
+        let mut s = SYSTEM_POWER_STATUS::default();
+        unsafe { GetSystemPowerStatus(&mut s).is_ok() && s.BatteryFlag == 128 }
     }
 
     pub fn set_taskbar_visible(visible: bool) {
@@ -371,6 +381,7 @@ mod imp {
     pub fn minimize(_: isize) {}
     pub fn restore(_: isize) -> bool { false }
     pub fn battery() -> Option<(u8, bool)> { None }
+    pub fn no_battery() -> bool { true }
     pub fn set_taskbar_visible(_: bool) {}
     pub fn fullscreen_monitor() -> Option<Rect> { None }
     pub fn idle_secs() -> u64 { 0 }

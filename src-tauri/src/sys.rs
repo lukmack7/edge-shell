@@ -447,6 +447,23 @@ mod imp {
         })()
     }
 
+    /// Bateria z WMI (Win32_Battery) — zapas, gdy GetSystemPowerStatus nie zna stanu
+    /// (część laptopów zgłasza wtedy 255 %). BatteryStatus 2 = zasilanie z sieci.
+    pub fn wmi_battery() -> Option<(u8, bool)> {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let script = "Get-CimInstance Win32_Battery | Select-Object -First 1 | ForEach-Object { \"$($_.EstimatedChargeRemaining);$($_.BatteryStatus)\" }";
+        let out = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", script])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .ok()?;
+        let text = String::from_utf8_lossy(&out.stdout);
+        let (pct, status) = text.trim().split_once(';')?;
+        let pct: u8 = pct.trim().parse().ok()?;
+        let status: u32 = status.trim().parse().unwrap_or(0);
+        Some((pct.min(100), matches!(status, 2 | 6 | 7 | 8 | 9)))
+    }
+
     /// Przyjazne nazwy podłączonych monitorów (z EDID przez WMI), np. `DELL U3423WE`.
     pub fn monitor_names() -> Vec<String> {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
@@ -706,6 +723,7 @@ mod imp {
     pub fn thumb_unregister(_: isize) {}
     pub fn explorer_tray() -> Option<isize> { None }
     pub fn monitor_names() -> Vec<String> { Vec::new() }
+    pub fn wmi_battery() -> Option<(u8, bool)> { None }
     pub fn close_windows_of(_: &str) {}
     pub fn file_description(_: &str) -> Option<String> { None }
     pub fn shortcut_target(_: &str) -> Option<String> { None }

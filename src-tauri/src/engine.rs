@@ -41,7 +41,8 @@ pub fn start(app: AppHandle) {
                 running(&app);
             }
             if n % 30 == 1 {
-                let b = platform::battery();
+                // WMI jest wolne — pytamy je tylko, gdy szybka ścieżka nie zna stanu.
+                let b = platform::battery().or_else(|| if platform::no_battery() { None } else { crate::sys::wmi_battery() });
                 let changed = state::read(&app, |rt| rt.battery != b);
                 if changed {
                     state::update(&app, false, |rt| rt.battery = b);
