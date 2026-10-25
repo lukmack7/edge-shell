@@ -193,12 +193,13 @@ function statusHtml() {
   const parts = [];
   const unread = (s?.radio?.waiting || 0) + (s?.missed || []).length;
   parts.push(`<button class="n-sb n-bell" id="bellBtn" title="Powiadomienia i komunikaty${unread ? ` · ${unread} do przejrzenia` : ''}">${icon('bell', 15)}${unread ? `<span class="bd">${unread > 9 ? '9+' : unread}</span>` : ''}</button>`);
-  parts.push(`<button class="n-sb" data-pop="wifi" title="${st.wifiSsid ? esc(st.wifiSsid) + ' · ' + st.wifiSignal + '%' : 'Wi‑Fi: brak połączenia'}">${wifiIcon(st.wifiSignal)}</button>`);
-  if (st.volume != null) parts.push(`<button class="n-sb" id="vol" data-pop="sound" title="Dźwięk ${st.muted ? '— wyciszony' : st.volume + '%'} · kółko: głośność · środkowy klik: wycisz">${icon(st.muted ? 'mute' : 'volume', 16)}</button>`);
-  if (st.btPresent && st.btConnected) parts.push(`<button class="n-sb" data-pop="bt" title="Bluetooth: ${st.btConnected} połączonych">${icon('bluetooth', 15)}</button>`);
+  const on = (k) => !s?.barStats || s.barStats.includes(k);
+  if (on('wifi')) parts.push(`<button class="n-sb" data-pop="wifi" title="${st.wifiSsid ? esc(st.wifiSsid) + ' · ' + st.wifiSignal + '%' : 'Wi‑Fi: brak połączenia'}">${wifiIcon(st.wifiSignal)}</button>`);
+  if (on('volume') && st.volume != null) parts.push(`<button class="n-sb" id="vol" data-pop="sound" title="Dźwięk ${st.muted ? '— wyciszony' : st.volume + '%'} · kółko: głośność · środkowy klik: wycisz">${icon(st.muted ? 'mute' : 'volume', 16)}</button>`);
+  if (on('bluetooth') && st.btPresent && st.btConnected) parts.push(`<button class="n-sb" data-pop="bt" title="Bluetooth: ${st.btConnected} połączonych">${icon('bluetooth', 15)}</button>`);
   const bat = st.battery ?? s?.battery?.percent;
   const chg = st.battery != null ? st.charging : s?.battery?.charging;
-  if (bat != null) parts.push(`<button class="n-sb" data-open="ms-settings:batterysaver" title="Bateria${chg ? ' · ładuje' : ''}">${bat}%${batteryIcon(bat, chg)}</button>`);
+  if (on('battery') && bat != null) parts.push(`<button class="n-sb" data-open="ms-settings:batterysaver" title="Bateria${chg ? ' · ładuje' : ''}">${bat}%${batteryIcon(bat, chg)}</button>`);
   return `<span class="n-st">${parts.join('')}</span>`;
 }
 
@@ -233,8 +234,9 @@ function midHtml(st) {
   }
   if (st === 'hot') {
     const st2 = stats || {};
-    const what = st2.cpu >= 85 ? `CPU ${Math.round(st2.cpu)}%` : `RAM ${Math.round(st2.mem)}%`;
-    const view = st2.cpu >= 85 ? 'cpu' : 'mem';
+    const cpuHot = st2.cpu >= 85 && (!s.barStats || s.barStats.includes('cpu'));
+    const what = cpuHot ? `CPU ${Math.round(st2.cpu)}%` : `RAM ${Math.round(st2.mem)}%`;
+    const view = cpuHot ? 'cpu' : 'mem';
     return `<span class="n-ic" style="background:#ef4444;color:#fff">!</span>
       <span class="t"><b>${what}</b> <span class="dim">· system jest przeciążony</span></span>
       <button class="n-act" id="hotBtn" data-view="${view}">Pokaż</button>`;
@@ -640,7 +642,8 @@ function trackDone() {
 
 listen('stats', (st) => {
   stats = st;
-  hotCount = (st.cpu ?? 0) >= 85 || (st.mem ?? 0) >= 90 ? hotCount + 1 : 0;
+  const watch = (k) => !s?.barStats || s.barStats.includes(k);
+  hotCount = (watch('cpu') && (st.cpu ?? 0) >= 85) || (watch('memory') && (st.mem ?? 0) >= 90) ? hotCount + 1 : 0;
   render();
 });
 invoke('get_stats').then((st) => { stats = st; render(); });

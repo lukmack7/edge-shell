@@ -604,11 +604,47 @@ impl Default for Contact {
     }
 }
 
+/// Ctrl+Alt+litera to na polskiej klawiaturze AltGr+litera, czyli polski znak
+/// (ą ć ę ł ń ó ś ź ż, AltGr+U = €). Taki skrót odpalałby się przy pisaniu.
+pub fn altgr_conflict(combo: &str) -> bool {
+    let parts: Vec<String> = combo.split('+').map(|p| p.trim().to_lowercase()).collect();
+    let has = |m: &[&str]| parts.iter().any(|p| m.contains(&p.as_str()));
+    if !has(&["ctrl", "control", "ctrlleft", "ctrlright"]) || !has(&["alt", "altleft", "altright", "option"]) {
+        return false;
+    }
+    if has(&["super", "win", "meta", "cmd", "command"]) {
+        return false;
+    }
+    let key = parts.last().map(|k| k.trim_start_matches("key").to_string()).unwrap_or_default();
+    matches!(key.as_str(), "a" | "c" | "e" | "l" | "n" | "o" | "s" | "x" | "z" | "u")
+}
+
+impl Hotkeys {
+    /// Zamienia skróty kolidujące z polskimi znakami na domyślne. Zwraca, czy coś zmieniło.
+    pub fn fix_altgr(&mut self) -> bool {
+        let d = Hotkeys::default();
+        let mut changed = false;
+        for (cur, def) in [
+            (&mut self.one_thing, d.one_thing), (&mut self.screenshot, d.screenshot), (&mut self.player, d.player),
+            (&mut self.drawer, d.drawer), (&mut self.now, d.now), (&mut self.capture, d.capture),
+            (&mut self.focus, d.focus), (&mut self.search, d.search), (&mut self.radio, d.radio),
+        ] {
+            if altgr_conflict(cur) {
+                log::warn!("skrót {cur} koliduje z polskimi znakami (AltGr) — zamieniam na {def}");
+                *cur = def;
+                changed = true;
+            }
+        }
+        changed
+    }
+}
+
 impl Default for Hotkeys {
     fn default() -> Self {
         Self {
             one_thing: "Ctrl+Alt+J".into(),
-            screenshot: "Ctrl+Alt+S".into(),
+            // Nie Ctrl+Alt+S: to AltGr+S = „ś” na polskiej klawiaturze.
+            screenshot: "Ctrl+Alt+P".into(),
             player: "Ctrl+Alt+M".into(),
             drawer: "Ctrl+Alt+ArrowLeft".into(),
             now: "Ctrl+Alt+ArrowRight".into(),
@@ -807,6 +843,10 @@ impl Config {
                         renamed = true;
                     }
                     if renamed {
+                        cfg.save();
+                    }
+                    // Skróty Ctrl+Alt+S itp. łapały polskie znaki przy pisaniu.
+                    if cfg.hotkeys.fix_altgr() {
                         cfg.save();
                     }
                     cfg

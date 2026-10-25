@@ -1,5 +1,6 @@
 //! Globalne skróty klawiszowe. Domyślnie Ctrl+Alt+…, bo Win+strzałki,
-//! Win+K i Win+Space są zajęte przez Windows.
+//! Win+K i Win+Space są zajęte przez Windows. Ctrl+Alt+A/C/E/L/N/O/S/U/X/Z
+//! odpadają: na polskiej klawiaturze to AltGr, czyli ą ć ę ł ń ó ś € ź ż.
 
 use crate::{layout, state};
 use std::sync::Mutex;
@@ -70,6 +71,10 @@ pub fn register(app: &AppHandle) {
     let mut actions = Vec::new();
     for (combo, action) in pairs {
         if combo.trim().is_empty() {
+            continue;
+        }
+        if crate::config::altgr_conflict(combo) {
+            log::warn!("pomijam skrót {combo}: na polskiej klawiaturze to AltGr (polski znak)");
             continue;
         }
         match combo.parse::<Shortcut>() {

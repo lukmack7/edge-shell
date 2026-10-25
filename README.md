@@ -142,7 +142,7 @@ Dzień jest osią czasu — blok przeciągasz na inną godzinę albo na dzień w
 
 - **Podgląd**: `Shift+Spacja` na pliku w palecie, `Spacja` w stosie — obrazy, tekst, a PDF / Office / wideo jako miniatura z Eksploratora.
 - **Historia schowka**: `cb` w palecie (+ tekst do wyszukania). Enter wkleja w okno, w którym byłeś; Tab: przypnij, usuń. Hasła z menedżerów haseł są pomijane.
-- **Zrzut z adnotacją**: `Ctrl+Alt+S` albo `zr` — zaznacz obszar (klik = cały ekran), dorysuj strzałkę / ramkę / pisak / zakreślacz, Enter zapisuje do *Obrazy\Screenshots*, kopiuje obraz do schowka i kładzie plik na półce.
+- **Zrzut z adnotacją**: `Ctrl+Alt+P` albo `zr` — zaznacz obszar (klik = cały ekran), dorysuj strzałkę / ramkę / pisak / zakreślacz, Enter zapisuje do *Obrazy\Screenshots*, kopiuje obraz do schowka i kładzie plik na półce.
 
 ## Okna: strefy i układy
 

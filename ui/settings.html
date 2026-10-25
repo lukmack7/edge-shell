@@ -156,7 +156,7 @@ const iconCache = new Map();
 
 const PAGES = [
   ['general', 'Ogólne', 'sliders'],
-  ['bar', 'Górny pasek', 'layers'],
+  ['bar', 'Notch i pasek', 'layers'],
   ['dock', 'Dock', 'apps'],
   ['modes', 'Tryby', 'clock'],
   ['auto', 'Automatyzacje', 'replan'],
@@ -248,7 +248,7 @@ const render = {
   general() {
     return `
       <h2>Ogólne</h2>
-      <p class="lead">Połączenie z Horologiem, start razem z Windows i zachowanie krawędzi ekranu.</p>
+      <p class="lead">Połączenie z Horologiem, co jest na ekranie, start z Windows i krawędzie.</p>
       <div class="card">
         <h3>Horolog</h3>
         <div class="grid2">
@@ -258,22 +258,22 @@ const render = {
         <div class="row"><button class="btn" id="testHorolog">Sprawdź połączenie</button><span class="hint" id="testResult"></span></div>
       </div>
       <div class="card">
+        <h3>Ekran</h3>
+        <div class="row"><div class="txt"><b>Notch zamiast górnego paska</b><span>Tryb, bieżący blok, muzyka, wiadomości, status i zegar w jednym kształcie, który zmienia kolor zależnie od sytuacji. Wyłącz, żeby wrócić do klasycznego paska, okna radia i dymków.</span></div>${sw(cfg.shell.notch, 'shell.notch')}</div>
+        ${cfg.shell.notch ? `<div class="row"><div class="txt"><b>Prawa szyna z planem dnia</b><span>Pionowa oś dnia z Horologa przy prawej krawędzi. Klik otwiera panel Dziś.</span></div>${sw(cfg.shell.dayRail, 'shell.dayRail')}</div>` : ''}
+        <div class="row"><div class="txt"><b>Stały lewy pasek</b><span>Paleta, szuflada, zasobnik systemowy, ustawienia i zasilanie zawsze pod ręką.</span></div>${sw(cfg.shell.showRail, 'shell.showRail')}</div>
+        <div class="row"><div class="txt"><b>Zasobnik systemowy na lewym pasku</b><span>Ikony programów działających w tle. Zmiana działa po ponownym uruchomieniu Edge Shell.</span></div>${sw(cfg.shell.trayInRail, 'shell.trayInRail')}</div>
+        <div class="row"><div class="txt"><b>Pokazuj dock</b><span>Wyłącz, jeśli wolisz inny dock.</span></div>${sw(cfg.shell.showDock, 'shell.showDock')}</div>
+        <div class="row"><div class="txt"><b>Autoukrywanie docka</b><span>Dock chowa się i wysuwa od razu, gdy dotkniesz kursorem dolnej krawędzi pod nim.</span></div>${sw(cfg.shell.dockAutohide, 'shell.dockAutohide')}</div>
+        <div class="row"><div class="txt"><b>Rezerwuj miejsce dla okien</b><span>Zmaksymalizowane okna nie wchodzą pod ${cfg.shell.notch ? 'notch, boczne paski' : 'górny pasek, lewy pasek'} ani stały dock (przy autoukrywaniu dock wysuwa się nad oknami).</span></div>${sw(cfg.shell.reserveTopBar, 'shell.reserveTopBar')}</div>
+        <div class="row"><div class="txt"><b>Pasek na pozostałych monitorach</b><span>Na dodatkowych ekranach klasyczny pasek z zegarem i statusem. Dock${cfg.shell.notch ? ', notch' : ''} i panele zostają na głównym.</span></div>${sw(cfg.shell.barOnAllMonitors, 'shell.barOnAllMonitors')}</div>
+        ${cfg.shell.notch ? '' : `<div class="row"><div class="txt"><b>Dymki przy prawej krawędzi</b><span>Timer i muzyka, gdy panel Teraz jest schowany.</span></div>${sw(cfg.shell.showBubbles, 'shell.showBubbles')}</div>`}
+      </div>
+      <div class="card">
         <h3>Windows</h3>
         <div class="row"><div class="txt"><b>Uruchamiaj z Windows</b><span>Edge Shell startuje po zalogowaniu.</span></div>${sw(cfg.shell.autostart, 'shell.autostart')}</div>
         <div class="row"><div class="txt"><b>Chowaj pasek zadań Windows</b><span>Pasek znika po starcie i wraca, gdy zamkniesz Edge Shell.</span></div>${sw(cfg.shell.hideTaskbar, 'shell.hideTaskbar')}</div>
-        <div class="row"><div class="txt"><b>Rezerwuj miejsce na paski i dock</b><span>Zmaksymalizowane okna nie wchodzą pod górny pasek, lewy pasek ani stały dock (przy autoukrywaniu dock wysuwa się nad oknami).</span></div>${sw(cfg.shell.reserveTopBar, 'shell.reserveTopBar')}</div>
-        <div class="row"><div class="txt"><b>Pokazuj dock</b><span>Wyłącz, jeśli wolisz inny dock.</span></div>${sw(cfg.shell.showDock, 'shell.showDock')}</div>
-        <div class="row"><div class="txt"><b>Notch zamiast górnego paska</b><span>Tryb, bieżący blok, muzyka, wiadomości, status i zegar w jednym kształcie, który zmienia kolor zależnie od sytuacji. Wyłącz, żeby wrócić do klasycznego paska, okna radia i dymków.</span></div>${sw(cfg.shell.notch, 'shell.notch')}</div>
-        <div class="row"><div class="txt"><b>Prawa szyna z planem dnia</b><span>Pionowa oś dnia z Horologa przy prawej krawędzi (działa razem z notchem). Klik otwiera panel Dziś.</span></div>${sw(cfg.shell.dayRail, 'shell.dayRail')}</div>
-        <div class="row"><div class="txt"><b>Autoukrywanie docka</b><span>Dock chowa się i wysuwa od razu, gdy dotkniesz kursorem dolnej krawędzi pod nim.</span></div>${sw(cfg.shell.dockAutohide, 'shell.dockAutohide')}</div>
-        <div class="row"><div class="txt"><b>Chowaj wszystko przy pełnym ekranie</b><span>Gra, film albo prezentacja: pasek, dock i dymki znikają, krawędzie nie wysuwają paneli.</span></div>${sw(cfg.shell.hideInFullscreen, 'shell.hideInFullscreen')}</div>
-        <div class="row"><div class="txt"><b>Dymki przy prawej krawędzi</b><span>Timer i muzyka, gdy panel Teraz jest schowany.</span></div>${sw(cfg.shell.showBubbles, 'shell.showBubbles')}</div>
-      </div>
-      <div class="card">
-        <h3>Lewy pasek i monitory</h3>
-        <div class="row"><div class="txt"><b>Stały lewy pasek</b><span>Szuflada, zasobnik systemowy i szybkie akcje zawsze pod ręką.</span></div>${sw(cfg.shell.showRail, 'shell.showRail')}</div>
-        <div class="row"><div class="txt"><b>Zasobnik systemowy na lewym pasku</b><span>Ikony programów działających w tle. Zmiana działa po ponownym uruchomieniu Edge Shell.</span></div>${sw(cfg.shell.trayInRail, 'shell.trayInRail')}</div>
-        <div class="row"><div class="txt"><b>Pasek na każdym monitorze</b><span>Dock i panele zostają na głównym ekranie.</span></div>${sw(cfg.shell.barOnAllMonitors, 'shell.barOnAllMonitors')}</div>
+        <div class="row"><div class="txt"><b>Chowaj wszystko przy pełnym ekranie</b><span>Gra, film albo prezentacja: ${cfg.shell.notch ? 'notch, boczne paski' : 'pasek, dymki'} i dock znikają, krawędzie nie wysuwają paneli.</span></div>${sw(cfg.shell.hideInFullscreen, 'shell.hideInFullscreen')}</div>
       </div>
       <div class="card">
         <h3>Raport tygodnia</h3>
@@ -295,23 +295,21 @@ const render = {
         </div>
       </div>
       <div class="card">
-        <h3>Krawędzie i fokus</h3>
-        <div class="row"><div class="txt"><b>Wysuwanie paneli po dotknięciu krawędzi</b><span>Ile kursor musi stać przy krawędzi: <span data-out="shell.edgeDelayMs">${cfg.shell.edgeDelayMs}</span> ms</span></div><input type="range" min="50" max="800" step="10" data-num="shell.edgeDelayMs" style="width:240px"></div>
-        <div class="row"><div class="txt"><b>Świecąca krawędź przed spotkaniem</b><span><span data-out="shell.edgeGlowMinutes">${cfg.shell.edgeGlowMinutes}</span> minut wcześniej</span></div><input type="range" min="0" max="60" step="5" data-num="shell.edgeGlowMinutes" style="width:240px"></div>
-        <div class="row"><div class="txt"><b>Długość własnej sesji fokusu</b><span><span data-out="focus.adhocMinutes">${cfg.focus.adhocMinutes}</span> minut</span></div><input type="range" min="10" max="120" step="5" data-num="focus.adhocMinutes" style="width:240px"></div>
-        <div class="row"><div class="txt"><b>Tygodniowy cel fokusu</b><span><span data-out="focus.weeklyGoalHours">${cfg.focus.weeklyGoalHours}</span> godzin</span></div><input type="range" min="1" max="40" step="1" data-num="focus.weeklyGoalHours" style="width:240px"></div>
+        <h3>Krawędzie ekranu</h3>
+        <div class="row"><div class="txt"><b>Wysuwanie po dotknięciu krawędzi</b><span>${cfg.shell.notch ? 'Lewa krawędź wysuwa szufladę' : 'Lewa krawędź wysuwa szufladę, prawa — panel Teraz'}. Ile kursor musi przy niej stać: <span data-out="shell.edgeDelayMs">${cfg.shell.edgeDelayMs}</span> ms</span></div><input type="range" min="50" max="800" step="10" data-num="shell.edgeDelayMs" style="width:240px"></div>
+        <div class="row"><div class="txt"><b>Świecąca krawędź przed spotkaniem</b><span><span data-out="shell.edgeGlowMinutes">${cfg.shell.edgeGlowMinutes}</span> minut wcześniej (0 = wyłączone)</span></div><input type="range" min="0" max="60" step="5" data-num="shell.edgeGlowMinutes" style="width:240px"></div>
       </div>`;
   },
 
   bar() {
     const STATS = [
-      ['network', 'Prędkość internetu', 'Pobieranie i wysyłanie na żywo'],
-      ['cpu', 'Procesor', 'Obciążenie w procentach'],
-      ['memory', 'Pamięć RAM', 'Zajęta pamięć'],
-      ['volume', 'Dźwięk', 'Kliknięcie wycisza, kółko myszy zmienia głośność'],
-      ['bluetooth', 'Bluetooth', 'Liczba połączonych urządzeń'],
-      ['wifi', 'Wi‑Fi', 'Siła sygnału, nazwa sieci po najechaniu'],
-      ['battery', 'Bateria', 'Tylko w laptopie'],
+      ['network', 'Prędkość internetu', 'Pobieranie i wysyłanie na żywo — tylko na klasycznym pasku'],
+      ['cpu', 'Procesor', cfg.shell.notch ? 'W notchu tylko przy przeciążeniu (od 85%) — czerwony notch z przyciskiem Pokaż' : 'Obciążenie w procentach'],
+      ['memory', 'Pamięć RAM', cfg.shell.notch ? 'W notchu tylko przy przeciążeniu (od 90%)' : 'Zajęta pamięć'],
+      ['volume', 'Dźwięk', 'Klik: wyjście i aplikacje · kółko: głośność · środkowy klik: wycisz'],
+      ['bluetooth', 'Bluetooth', cfg.shell.notch ? 'W notchu, gdy coś jest połączone' : 'Liczba połączonych urządzeń'],
+      ['wifi', 'Wi‑Fi', 'Siła sygnału, nazwa sieci po najechaniu; klik: lista sieci'],
+      ['battery', 'Bateria', 'Procent i ikona jak w Windows — tylko w laptopie'],
     ];
     const rows = STATS.map(([k, name, desc]) => `
       <div class="row"><div class="txt"><b>${name}</b><span>${desc}</span></div>${sw(cfg.bar.stats.includes(k), 'stat:' + k)}</div>`).join('');
@@ -325,8 +323,8 @@ const render = {
         <button class="mini" data-pindel="${n}" aria-label="Usuń">${icon('trash', 16)}</button>
       </div>`).join('');
     return `
-      <h2>Górny pasek</h2>
-      <p class="lead">Wybierz, co ma być widać po prawej stronie paska. Kolejność jest stała: od sieci do baterii.</p>
+      <h2>Notch i pasek</h2>
+      <p class="lead">Co widać po prawej stronie ${cfg.shell.notch ? 'notcha (i klasycznego paska na pozostałych monitorach)' : 'paska'}. Kolejność jest stała. Dzwonek z powiadomieniami, data i godzina są zawsze.</p>
       <div class="card"><h3>Statystyki</h3>${rows}</div>
       <div class="card">
         <h3>Przypięte foldery w szufladzie</h3>
@@ -413,11 +411,11 @@ const render = {
     const times = cfg.radio.batchTimes.map((t, n) => `<span class="chip">${esc(t)}<button class="mini" style="width:22px;height:22px" data-btdel="${n}" aria-label="Usuń ${esc(t)}">${icon('close', 10, 2.4)}</button></span>`).join('');
     return `
       <h2>Radio i kontakty</h2>
-      <p class="lead">Kontakty z numerem 1–9 przechodzą przez ciszę od razu. Numer i kolor widzisz na karcie radia.</p>
+      <p class="lead">Kontakty z numerem 1–9 przechodzą przez ciszę od razu. Numer i kolor widzisz w notchu i na liście powiadomień (dzwonek).</p>
       <div class="card"><h3>Kontakty</h3><div class="list">${contacts || '<span class="hint">Brak kontaktów.</span>'}</div>
         <div><button class="btn" id="ctAdd">${icon('plus', 16, 2)}Dodaj kontakt</button></div></div>
       <div class="card"><h3>Paczki powiadomień</h3>
-        <span class="hint">O tych godzinach w trybie cichym przychodzi wszystko, co czekało.</span>
+        <span class="hint">O tych godzinach w trybie cichym przychodzi wszystko, co czekało. Do tego czasu wiadomości leżą w notchu w „Czeka na paczkę” — możesz je otworzyć wcześniej.</span>
         <div class="chips">${times}</div>
         <div class="row"><input type="time" class="in" id="btNew" style="width:140px"><button class="btn" id="btAdd">Dodaj godzinę</button></div>
       </div>
@@ -447,10 +445,10 @@ const render = {
     const status = snap?.radio?.notifications;
     return `
       <h2>Powiadomienia</h2>
-      <p class="lead">Edge Shell zbiera powiadomienia wszystkich aplikacji Windows i pokazuje je jako radio.</p>
+      <p class="lead">Edge Shell zbiera powiadomienia wszystkich aplikacji Windows i pokazuje je w notchu (bez notcha — jako karty radia).</p>
       <div class="card">
         <div class="row"><div class="txt"><b>Przechwytuj powiadomienia Windows</b><span>${status === 'ok' ? 'Działa — baza powiadomień jest czytana.' : status ? 'Problem: ' + esc(status) : 'Uruchamianie…'}</span></div>${sw(cfg.notifications.enabled, 'notifications.enabled')}</div>
-        <div class="row"><div class="txt"><b>Włącz w Windows „Nie przeszkadzać”</b><span>Wtedy systemowe dymki znikają, a powiadomienia widzisz tylko jako radio.</span></div><button class="btn" id="openNotif">Otwórz ustawienia Windows</button></div>
+        <div class="row"><div class="txt"><b>Włącz w Windows „Nie przeszkadzać”</b><span>Wtedy systemowe dymki znikają, a powiadomienia widzisz tylko w Edge Shell.</span></div><button class="btn" id="openNotif">Otwórz ustawienia Windows</button></div>
       </div>
       <div class="card"><h3>Reguły dla aplikacji</h3>
         <span class="hint">„Pilne” przechodzi od razu nawet w ciszy, „Pomijaj” ukrywa całkiem.</span>
@@ -519,6 +517,11 @@ const render = {
       <h2>Fokus i ludzie</h2>
       <p class="lead">Pomoc przy skupieniu: delikatne przypomnienia, start bloku z pierwszym krokiem, wieczorne zamknięcie dnia i praca „razem” z innymi.</p>
       <div class="card">
+        <h3>Sesje</h3>
+        <div class="row"><div class="txt"><b>Długość własnej sesji fokusu</b><span><span data-out="focus.adhocMinutes">${cfg.focus.adhocMinutes}</span> minut — gdy startujesz fokus bez bloku z Horologa</span></div><input type="range" min="10" max="120" step="5" data-num="focus.adhocMinutes" style="width:240px"></div>
+        <div class="row"><div class="txt"><b>Tygodniowy cel fokusu</b><span><span data-out="focus.weeklyGoalHours">${cfg.focus.weeklyGoalHours}</span> godzin (raport tygodnia)</span></div><input type="range" min="1" max="40" step="1" data-num="focus.weeklyGoalHours" style="width:240px"></div>
+      </div>
+      <div class="card">
         <h3>Rozproszenia</h3>
         <div class="row"><div class="txt"><b>Karta „wracamy?”</b><span>Gdy w trakcie fokusu siedzisz w rozpraszaczu dłużej niż <span data-out="focus.distractionMinutes">${cfg.focus.distractionMinutes}</span> min. Bez blokowania.</span></div>${sw(cfg.focus.distractionAlert, 'focus.distractionAlert')}</div>
         <input type="range" min="1" max="15" step="1" data-num="focus.distractionMinutes">
@@ -528,7 +531,7 @@ const render = {
       <div class="card">
         <h3>Start bloku i jedna rzecz</h3>
         <div class="row"><div class="txt"><b>„Jadę” włącza tryb jedna rzecz</b><span>Na starcie bloku z Horologa. Wszystko poza aktywnym oknem przygasa, kończy się samo z końcem fokusu.</span></div>${sw(cfg.focus.oneThingOnStart, 'focus.oneThingOnStart')}</div>
-        <span class="hint">Pierwszy krok dla zadania ustawiasz w panelu Teraz (pole pod bieżącym blokiem). Bez niego karta podpowiada: „otwórz to, czego potrzebujesz, i zrób najmniejszy ruch”.</span>
+        <span class="hint">Pierwszy krok dla zadania ustawiasz w panelu ${cfg.shell.notch ? 'Dziś (klik w prawą szynę)' : 'Teraz'} — pole pod bieżącym blokiem. Bez niego karta podpowiada: „otwórz to, czego potrzebujesz, i zrób najmniejszy ruch”.</span>
       </div>
       <div class="card">
         <h3>Zamknięcie dnia</h3>
@@ -536,7 +539,7 @@ const render = {
       </div>
       <div class="card">
         <h3>Praca razem (body doubling)</h3>
-        <span class="hint">Serwer obecności to mały program na home serwerze — w repozytorium: server/presence (docker compose up -d). Każdy, kto poda ten sam adres i token, widzi pozostałych w górnym pasku.</span>
+        <span class="hint">Serwer obecności to mały program na home serwerze — w repozytorium: server/presence (docker compose up -d). Każdy, kto poda ten sam adres i token, widzi pozostałych ${cfg.shell.notch ? 'w rozwiniętym notchu' : 'w górnym pasku'}.</span>
         <div class="row"><div class="txt"><b>Pokazuj, że pracuję, i widzę innych</b></div>${sw(cfg.presence.enabled, 'presence.enabled')}</div>
         <div class="grid2">
           <label class="field-l">Adres serwera<input class="in" data-bind="presence.url" placeholder="http://homeserver.local:7320"></label>
@@ -571,14 +574,16 @@ const render = {
 
   hotkeys() {
     const KEYS = [
-      ['drawer', 'Szuflada'], ['now', 'Panel Teraz'], ['capture', 'Wrzuć myśl'],
-      ['focus', 'Start / pauza fokusu'], ['player', 'Odtwarzacz na wierzchu'], ['oneThing', 'Jedna rzecz'], ['screenshot', 'Zrzut z adnotacją'], ['search', 'Paleta poleceń'], ['radio', 'Pokaż radio z paczki'],
+      ['search', 'Paleta poleceń'], ['capture', 'Wrzuć myśl'], ['focus', 'Start / pauza fokusu'], ['oneThing', 'Jedna rzecz'],
+      ['drawer', 'Szuflada'], ['now', cfg.shell.notch ? 'Panel Dziś' : 'Panel Teraz'], ['player', 'Odtwarzacz na wierzchu'], ['screenshot', 'Zrzut z adnotacją'], ['radio', 'Pokaż wiadomości z paczki'],
     ];
     return `
       <h2>Skróty klawiszowe</h2>
-      <p class="lead">Kliknij pole i naciśnij nowy skrót. Backspace czyści skrót. Skróty z klawiszem Windows mogą być zajęte przez system.</p>
-      <div class="card">${KEYS.map(([k, name]) => `
-        <div class="row"><div class="txt"><b>${name}</b></div><button class="kbdrec" data-hk="${k}">${esc(cfg.hotkeys[k] || '—')}</button></div>`).join('')}
+      <p class="lead">Kliknij pole i naciśnij nowy skrót. Backspace czyści skrót, Esc anuluje. Skróty z klawiszem Windows mogą być zajęte przez system.</p>
+      <div class="card">
+        <span class="hint">Ctrl+Alt to na polskiej klawiaturze AltGr — dlatego Ctrl+Alt z literami A, C, E, L, N, O, S, U, X, Z jest zablokowany (to ą, ć, ę, ł, ń, ó, ś, €, ź, ż i skrót odpalałby się przy pisaniu).</span>
+        ${KEYS.map(([k, name]) => `
+        <div class="row"><div class="txt"><b>${name}</b><span class="hkwarn" data-hkw="${k}"></span></div><button class="kbdrec" data-hk="${k}">${esc(cfg.hotkeys[k] || '—')}</button></div>`).join('')}
       </div>
       <div class="card">
         <h3>Paleta poleceń — szybkie klawisze</h3>
@@ -595,10 +600,19 @@ const render = {
   },
 };
 
+/** Ctrl+Alt+litera = AltGr+litera = polski znak (jak config::altgr_conflict w Rust). */
+function altgrConflict(combo) {
+  const p = combo.toLowerCase().split('+');
+  if (!p.includes('ctrl') || !p.includes('alt') || p.includes('super')) return false;
+  return /^(key)?[acelnosuxz]$/.test(p[p.length - 1]);
+}
+
 // ------------------------------------------------------------ akcje stron
 
 const after = {
   general(root) {
+    // Notch zmienia, które opcje mają sens — przerysuj stronę po przełączeniu.
+    root.querySelector('[data-sw="shell.notch"]')?.addEventListener('click', () => setTimeout(() => show(page), 0));
     $('repDay').onchange = (e) => { cfg.focus.reportWeekday = Number(e.target.value); markDirty(); };
     $('testHorolog').onclick = async () => {
       $('testResult').textContent = 'Sprawdzam…';
@@ -811,6 +825,13 @@ const after = {
             const mods = [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Super'].filter(Boolean);
             combo = [...mods, e.code].join('+');
           }
+          const warn = root.querySelector(`[data-hkw="${b.dataset.hk}"]`);
+          if (altgrConflict(combo)) {
+            b.textContent = cfg.hotkeys[b.dataset.hk] || '—';
+            if (warn) { warn.textContent = `${combo} to AltGr = polski znak — wybierz inny klawisz.`; warn.style.color = '#fca5a5'; }
+            return;
+          }
+          if (warn) warn.textContent = '';
           cfg.hotkeys[b.dataset.hk] = combo;
           b.textContent = combo || '—';
           markDirty();
