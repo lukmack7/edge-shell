@@ -84,13 +84,34 @@ pub fn toast_texts(xml: &str) -> Vec<String> {
         }
         let body = &after[open_end + 1..];
         let Some(close) = body.find("</text>") else { break };
-        let text = decode_xml(body[..close].trim());
+        let text = clean_text(&decode_xml(body[..close].trim()));
         if !text.is_empty() && !attrs.contains("placement=\"attribution\"") {
             out.push(text);
         }
         rest = &body[close + 7..];
     }
     out
+}
+
+/// Porządkuje tekst z powiadomienia: składa polskie litery zapisane jako litera +
+/// znak diakrytyczny (NFC), usuwa niewidoczne znaki sterujące, które newslettery
+/// wstawiają w tytuły (zero-width, soft hyphen, CGJ…), i znaki zastępcze „�”
+/// z uszkodzonych bajtów — inaczej w notchu wychodzi „ZARZĄ�DZASZ”.
+pub fn clean_text(s: &str) -> String {
+    use unicode_normalization::UnicodeNormalization;
+    let cleaned: String = s
+        .nfc()
+        .filter(|c| {
+            !matches!(
+                *c,
+                '\u{FFFD}' | '\u{00AD}' | '\u{034F}' | '\u{061C}' | '\u{115F}' | '\u{1160}' | '\u{17B4}' | '\u{17B5}'
+                    | '\u{180E}' | '\u{200B}'..='\u{200F}' | '\u{202A}'..='\u{202E}' | '\u{2060}'..='\u{206F}'
+                    | '\u{3164}' | '\u{FE00}'..='\u{FE0F}' | '\u{FEFF}' | '\u{FFA0}'
+            ) && (!c.is_control() || *c == '\n')
+        })
+        .collect();
+    // Wielokrotne spacje po usunięciu znaków → jedna.
+    cleaned.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn decode_xml(s: &str) -> String {

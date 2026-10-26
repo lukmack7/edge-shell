@@ -9,6 +9,7 @@ default-run = "edge-shell"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+unicode-normalization = "0.1"
 tauri = { version = "2", features = [] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-clipboard-manager = "2"

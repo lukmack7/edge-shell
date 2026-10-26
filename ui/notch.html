@@ -97,6 +97,49 @@
   .n-msg .ac button.w { background: #fff; color: #000; }
   .n-msg .ac input { flex: 1 1 100%; height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.35); color: #fff; font-size: 12.5px; outline: none; user-select: text; }
   .n-empty { color: #71717a; font-size: 12.5px; padding: 6px 2px; }
+  /* muzyka (dawny pływający odtwarzacz) */
+  .n-mus { margin-top: 12px; display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 12px; }
+  .n-mcard { position: relative; overflow: hidden; border-radius: 18px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-height: 300px; box-sizing: border-box;
+             background: linear-gradient(160deg, rgba(76,29,149,0.92), rgba(157,23,77,0.8)); }
+  .n-mcard .bgart { position: absolute; inset: 0; background: center/cover; opacity: 0.18; filter: blur(18px); transform: scale(1.2); pointer-events: none; }
+  .n-mcard > * { position: relative; }
+  .n-mtop { display: flex; gap: 14px; align-items: center; min-width: 0; }
+  .n-mtop .art { width: 92px; height: 92px; border-radius: 14px; flex: none; background: #222 center/cover; box-shadow: 0 10px 24px -10px rgba(0,0,0,0.7); }
+  .n-mtop .tt { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+  .n-mtop .tt b { font-size: 17px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-mtop .tt span { font-size: 13px; color: rgba(255,255,255,0.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-mtop .tt small { font-size: 11.5px; color: rgba(255,255,255,0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-like { width: 34px; height: 34px; border-radius: 50%; border: 0; background: rgba(255,255,255,0.12); color: #fff; display: flex; align-items: center; justify-content: center; flex: none; }
+  .n-like.on { background: #fff; color: #db2777; }
+  .n-seek { position: relative; height: 16px; cursor: pointer; touch-action: none; }
+  .n-seek .tr { position: absolute; left: 0; right: 0; top: 6px; height: 4px; border-radius: 2px; background: rgba(255,255,255,0.25); }
+  .n-seek .br { position: absolute; left: 0; top: 6px; height: 4px; border-radius: 2px; background: #fff; }
+  .n-seek .kn { position: absolute; top: 2px; width: 12px; height: 12px; margin-left: -6px; border-radius: 50%; background: #fff; opacity: 0; transition: opacity 0.15s; }
+  .n-seek:hover .kn, .n-seek.drag .kn { opacity: 1; }
+  .n-times { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: rgba(255,255,255,0.7); margin-top: -6px; }
+  .n-ctl { display: flex; align-items: center; justify-content: center; gap: 18px; }
+  .n-ctl button { width: 36px; height: 36px; border-radius: 50%; border: 0; background: transparent; color: rgba(255,255,255,0.85); display: flex; align-items: center; justify-content: center; }
+  .n-ctl button:hover { background: rgba(255,255,255,0.14); }
+  .n-ctl button.on { color: #fff; background: rgba(255,255,255,0.18); }
+  .n-ctl button.big { width: 48px; height: 48px; background: #fff; color: #000; }
+  .n-vol { display: flex; align-items: center; gap: 10px; color: rgba(255,255,255,0.75); font-size: 11.5px; }
+  .n-vol input { flex: 1; accent-color: #fff; }
+  .n-mside { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .n-tabs { display: flex; gap: 6px; align-items: center; }
+  .n-tabs button { height: 28px; padding: 0 12px; border-radius: 999px; border: 0; background: rgba(255,255,255,0.05); color: #d4d4d8; font-size: 12px; font-weight: 600; }
+  .n-tabs button.on { background: rgba(255,255,255,0.16); color: #fff; }
+  .n-find { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.3); color: #fff; font-size: 12.5px; outline: none; user-select: text; }
+  .n-list { display: flex; flex-direction: column; gap: 2px; height: 262px; overflow-y: auto; scrollbar-width: thin; }
+  .n-li { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 10px; border: 0; background: transparent; color: #e4e4e7; text-align: left; min-width: 0; }
+  .n-li:hover { background: rgba(255,255,255,0.07); }
+  .n-li .no { width: 16px; font-family: var(--mono); font-size: 11px; color: #71717a; flex: none; text-align: right; }
+  .n-li img, .n-li .ph { width: 34px; height: 34px; border-radius: 7px; flex: none; object-fit: cover; background: #27272a; }
+  .n-li .tx { display: flex; flex-direction: column; min-width: 0; }
+  .n-li .tx b { font-size: 12.5px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-li .tx span { font-size: 11.5px; color: #8b8b98; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .n-note { color: #8b8b98; font-size: 12.5px; padding: 8px; line-height: 1.5; }
+  .n-mini-seek { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.25); overflow: hidden; }
+  .n-mini-seek i { display: block; height: 100%; background: #fff; }
   .fade { animation: fade 0.25s ease-out 0.15s both; }
   @keyframes fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 </style>
@@ -112,7 +155,13 @@ let s = null;
 let stats = null;
 let hotCount = 0;
 let openState = false;
-let view = 'main';           // 'main' | 'msgs' — co pokazuje rozwinięty notch
+let view = 'main';           // 'main' | 'msgs' | 'music' — co pokazuje rozwinięty notch
+let mtab = 'queue';          // muzyka: 'queue' | 'playlists'
+let playlistCache = null;
+let findText = '';
+let seekMs = null;
+let seekHold = null;
+let volTimer = null;
 let hover = false;
 let hoverTimer = null;
 let leaveTimer = null;
@@ -329,6 +378,24 @@ function tickText(st) {
   if (cd && s.focus && t) cd.textContent = s.paused ? 'pauza' : mmss(t.left);
   const bc = $('bigClock');
   if (bc && t) bc.textContent = mmss(t.left);
+  tickMusic();
+}
+
+function elapsed(m) {
+  const e = m.playing ? m.progressMs + (Date.now() - m.fetchedAtMs) : m.progressMs;
+  return Math.max(0, Math.min(e, m.durationMs || e));
+}
+const short = (ms) => mmss(ms).replace(/^0(\d:)/, '$1');
+
+function tickMusic() {
+  const m = s?.music;
+  if (!m || !m.durationMs) return;
+  const e = seekMs != null ? seekMs : elapsed(m);
+  const pct = `${(e / m.durationMs) * 100}%`;
+  const br = $('mBar');
+  if (br) { br.style.width = pct; $('mKnob').style.left = pct; $('mPos').textContent = short(e); $('mLen').textContent = short(m.durationMs); }
+  const mini = $('miniBar');
+  if (mini) mini.style.width = pct;
 }
 
 function replyHtml(m) {
@@ -336,6 +403,10 @@ function replyHtml(m) {
 }
 
 function openKey() {
+  if (view === 'music') {
+    const m = s.music;
+    return JSON.stringify(['music', m.title, m.artist, m.art, m.playing, m.shuffle, m.repeat, m.liked, m.connected, mtab]);
+  }
   if (view === 'msgs') {
     const r = s.radio;
     return JSON.stringify(['msgs', (r.showingList || []).map((m) => m.id), (r.waitingList || []).map((m) => m.id), (s.missed || []).length, r.nextBatch, replying]);
@@ -379,6 +450,105 @@ function msgCard(m, opts = {}) {
     ${actions ? `<span class="ac">${actions}</span>` : ''}</${tag}>`;
 }
 
+function musicHtml() {
+  const m = s.music;
+  const head = `<div class="n-head fade"><button class="back" id="backBtn">← Panel</button><b>Muzyka</b><span class="meta">${m.device ? `Gra na: ${esc(m.device)}` : ''}</span></div>`;
+  if (!s.spotifyEnabled) {
+    return `<div class="n-pn" id="pn">${head}<div class="n-note">Spotify nie jest skonfigurowane — wpisz Client ID w Ustawieniach → Spotify.</div></div>`;
+  }
+  if (!m.connected) {
+    return `<div class="n-pn" id="pn">${head}<div class="n-note">${m.error ? esc(m.error) : 'Spotify nie jest połączone.'}<br><button class="n-b2 w" id="mLogin" style="margin-top:8px">Połącz ze Spotify</button></div></div>`;
+  }
+  const rep = m.repeat || 'off';
+  const card = m.title
+    ? `<div class="n-mcard fade"><span class="bgart" style="background-image:url('${esc(m.art)}')"></span>
+        <div class="n-mtop"><span class="art" style="background-image:url('${esc(m.art)}')"></span>
+          <span class="tt"><b>${esc(m.title)}</b><span>${esc(m.artist)}</span>${m.album ? `<small>${esc(m.album)}</small>` : ''}</span>
+          ${m.liked == null ? '' : `<button class="n-like${m.liked ? ' on' : ''}" id="mLike" title="${m.liked ? 'Usuń z polubionych' : 'Dodaj do polubionych'}">${icon('heart', 16)}</button>`}</div>
+        <div class="n-seek" id="mSeek" title="Kliknij albo przeciągnij, żeby przewinąć"><span class="tr"></span><span class="br" id="mBar"></span><span class="kn" id="mKnob"></span></div>
+        <div class="n-times"><span id="mPos">0:00</span><span id="mLen">${m.durationMs ? short(m.durationMs) : ''}</span></div>
+        <div class="n-ctl">
+          <button id="mShuf" class="${m.shuffle ? 'on' : ''}" title="Losowo">${icon('shuffle', 16)}</button>
+          <button id="mvPrev" title="Poprzedni">${icon('prev', 15)}</button>
+          <button id="mvPlay" class="big" title="${m.playing ? 'Pauza' : 'Graj'}">${icon(m.playing ? 'pause' : 'play', 18)}</button>
+          <button id="mvNext" title="Następny">${icon('next', 15)}</button>
+          <button id="mRep" class="${rep !== 'off' ? 'on' : ''}" title="${rep === 'track' ? 'Powtarzaj utwór' : rep === 'context' ? 'Powtarzaj playlistę' : 'Bez powtarzania'}">${icon('repeat', 16)}${rep === 'track' ? '<sup style="font-size:9px;margin-left:-2px">1</sup>' : ''}</button>
+        </div>
+        ${m.volume == null ? '' : `<label class="n-vol">${icon('volume', 14)}<input type="range" min="0" max="100" step="1" id="mVol" value="${m.volume}"><span id="mVolV" style="width:30px;text-align:right">${m.volume}%</span></label>`}
+      </div>`
+    : `<div class="n-mcard fade" style="justify-content:center;align-items:center"><span class="n-note" style="color:#fff">Nic nie gra — wybierz playlistę obok.</span></div>`;
+  return `<div class="n-pn" id="pn">${head}
+    <div class="n-mus">${card}
+      <div class="n-mside fade">
+        <div class="n-tabs"><button data-mtab="queue" class="${mtab === 'queue' ? 'on' : ''}">Kolejka</button><button data-mtab="playlists" class="${mtab === 'playlists' ? 'on' : ''}">Playlisty</button></div>
+        ${mtab === 'playlists' ? `<input class="n-find" id="mFind" placeholder="Szukaj playlisty…" value="${esc(findText)}">` : ''}
+        <div class="n-list" id="mList"><div class="n-note">Wczytuję…</div></div>
+      </div>
+    </div></div>`;
+}
+
+async function loadMusicList() {
+  const list = $('mList');
+  if (!list) return;
+  try {
+    if (mtab === 'queue') {
+      const q = await invoke('player_queue');
+      if (!$('mList')) return;
+      list.innerHTML = q.length
+        ? q.map((t, i) => `<button class="n-li" data-skip="${i + 1}" title="Przejdź do tego utworu"><span class="no">${i + 1}</span>${t.art ? `<img src="${esc(t.art)}" alt="">` : '<span class="ph"></span>'}<span class="tx"><b>${esc(t.title)}</b><span>${esc(t.artist)}</span></span></button>`).join('')
+        : '<div class="n-note">Kolejka jest pusta.</div>';
+      for (const b of list.querySelectorAll('[data-skip]')) b.onclick = (e) => { e.stopPropagation(); invoke('player_skip', { count: +b.dataset.skip }).then(() => setTimeout(loadMusicList, 900)).catch(() => {}); };
+    } else {
+      if (!playlistCache) playlistCache = await invoke('player_playlists');
+      renderPlaylists();
+    }
+  } catch (err) {
+    list.innerHTML = `<div class="n-note">${esc(String(err))}</div>`;
+  }
+}
+
+function renderPlaylists() {
+  const list = $('mList');
+  if (!list || !playlistCache) return;
+  const q = findText.trim().toLowerCase();
+  const items = playlistCache.items.filter((p) => !q || String(p.name || '').toLowerCase().includes(q));
+  list.innerHTML = (playlistCache.needsLogin
+    ? `<div class="n-note">${playlistCache.items.length ? 'Widać tylko część playlist.' : 'Spotify nie pozwala jeszcze czytać Twoich playlist.'} Połącz Spotify jeszcze raz i zatwierdź nowe uprawnienie.<br><button class="n-b2 w" id="mRelogin" style="margin-top:6px">Połącz ponownie</button></div>` : '')
+    + (items.map((p) => `<button class="n-li" data-uri="${esc(p.uri)}">${p.art ? `<img src="${esc(p.art)}" alt="">` : '<span class="ph"></span>'}<span class="tx"><b>${esc(p.name)}</b><span>${esc(p.owner || '')}${p.tracks != null ? ` · ${p.tracks} utw.` : ''}</span></span></button>`).join('')
+      || '<div class="n-note">Brak playlist.</div>');
+  for (const b of list.querySelectorAll('[data-uri]')) b.onclick = (e) => { e.stopPropagation(); invoke('player_play', { uri: b.dataset.uri }).catch(() => {}); };
+  const re = $('mRelogin');
+  if (re) re.onclick = (e) => { e.stopPropagation(); invoke('spotify_login'); };
+}
+
+function wireSeek(el) {
+  if (!el) return;
+  const at = (x) => { const r = el.getBoundingClientRect(); return Math.round(Math.max(0, Math.min(1, (x - r.left) / r.width)) * (s.music.durationMs || 0)); };
+  el.onpointerdown = (e) => {
+    if (!s?.music?.durationMs) return;
+    e.preventDefault();
+    e.stopPropagation();
+    el.setPointerCapture(e.pointerId);
+    el.classList.add('drag');
+    clearTimeout(seekHold);
+    seekMs = at(e.clientX);
+    tickMusic();
+    el.onpointermove = (ev) => { seekMs = at(ev.clientX); tickMusic(); };
+    el.onpointerup = async () => {
+      el.onpointermove = null;
+      el.onpointerup = null;
+      el.classList.remove('drag');
+      const target = seekMs;
+      try {
+        await invoke('spotify_control', { action: `seek:${target}` });
+        s.music.progressMs = target;
+        s.music.fetchedAtMs = Date.now();
+      } catch { /* zostaw pasek */ }
+      seekHold = setTimeout(() => { seekMs = null; tickMusic(); }, 1200);
+    };
+  };
+}
+
 function msgsHtml() {
   const r = s.radio;
   const showing = r.showingList || [];
@@ -403,6 +573,7 @@ function msgsHtml() {
 
 function panelHtml() {
   if (view === 'msgs') return msgsHtml();
+  if (view === 'music') return musicHtml();
   const t = focusTiming(s);
   const acc = s.mode.accent;
   let main;
@@ -423,7 +594,9 @@ function panelHtml() {
   } else if (s.spotifyEnabled && s.music.connected && s.music.title) {
     main = `<div class="n-card fade" style="flex-direction:column;align-items:stretch;justify-content:space-between;background:linear-gradient(160deg, rgba(76,29,149,0.9), rgba(157,23,77,0.75))">
       <span style="display:flex;gap:14px;align-items:center"><span style="width:70px;height:70px;border-radius:14px;flex:none;background:#222 url('${esc(s.music.art)}') center/cover"></span>
-        <span style="display:flex;flex-direction:column;gap:3px;min-width:0"><b style="font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.music.title)}</b><span style="font-size:13px;color:rgba(255,255,255,0.75)">${esc(s.music.artist)}</span></span></span>
+        <span style="display:flex;flex-direction:column;gap:3px;min-width:0;flex:1"><b style="font-size:17px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(s.music.title)}</b><span style="font-size:13px;color:rgba(255,255,255,0.75)">${esc(s.music.artist)}</span></span>
+        <button class="n-b2" id="pMore" title="Przewijanie, kolejka, playlisty, głośność">Więcej ›</button></span>
+      <span class="n-mini-seek"><i id="miniBar" style="width:0"></i></span>
       <span style="display:flex;justify-content:center;gap:30px;align-items:center">
         <button class="n-b2" id="pPrev">${icon('prev', 14)}</button>
         <button class="n-b2 w" id="pPlay" style="width:44px;height:44px;border-radius:50%;padding:0">${icon(s.music.playing ? 'pause' : 'play', 16)}</button>
@@ -480,7 +653,7 @@ function wire(st, msg) {
   on('msgText', () => showMsgs());
   on('meetBtn', () => invoke('toggle_calendar'));
   on('hotBtn', (e) => popup(e.currentTarget.dataset.view, e.currentTarget));
-  on('mTitle', () => invoke('player_toggle'));
+  on('mTitle', () => showMusic());
   on('mPrev', () => invoke('spotify_control', { action: 'previous' }));
   on('mNext', () => invoke('spotify_control', { action: 'next' }));
   on('mPlay', () => invoke('spotify_control', { action: 'pause' }));
@@ -521,7 +694,35 @@ function wire(st, msg) {
       on('rSend', send);
     }
   }
-  if (st === 'open' && view === 'msgs') {
+  if (st === 'open' && view === 'music') {
+    on('backBtn', () => { view = 'main'; render(); });
+    on('mLogin', () => invoke('spotify_login'));
+    on('mLike', () => invoke('player_like', { on: !s.music.liked }).catch(() => {}));
+    on('mShuf', () => invoke('player_shuffle', { on: !s.music.shuffle }).catch(() => {}));
+    on('mRep', () => invoke('player_repeat', { mode: { off: 'context', context: 'track', track: 'off' }[s.music.repeat || 'off'] }).catch(() => {}));
+    on('mvPrev', () => invoke('spotify_control', { action: 'previous' }).then(() => setTimeout(loadMusicList, 900)));
+    on('mvNext', () => invoke('spotify_control', { action: 'next' }).then(() => setTimeout(loadMusicList, 900)));
+    on('mvPlay', () => invoke('spotify_control', { action: s.music.playing ? 'pause' : 'play' }));
+    wireSeek($('mSeek'));
+    const vol = $('mVol');
+    if (vol) {
+      vol.onclick = (e) => e.stopPropagation();
+      vol.oninput = () => {
+        $('mVolV').textContent = `${vol.value}%`;
+        clearTimeout(volTimer);
+        volTimer = setTimeout(() => { volTimer = null; invoke('player_volume', { volume: +vol.value }).catch(() => {}); }, 250);
+      };
+    }
+    for (const b of notch.querySelectorAll('[data-mtab]')) b.onclick = (e) => { e.stopPropagation(); mtab = b.dataset.mtab; render(); };
+    const find = $('mFind');
+    if (find) {
+      find.onclick = (e) => e.stopPropagation();
+      find.onfocus = () => invoke('notch_focus');
+      find.oninput = () => { findText = find.value; renderPlaylists(); };
+    }
+    loadMusicList();
+    tickMusic();
+  } else if (st === 'open' && view === 'msgs') {
     const cur = (s.radio.showingList || [])[0];
     on('backBtn', () => { view = 'main'; replying = false; render(); });
     on('releaseBtn', () => invoke('radio_show_waiting'));
@@ -558,7 +759,8 @@ function wire(st, msg) {
     on('qOne', () => invoke('one_thing_toggle'));
     on('qShot', () => { setOpen(false); setTimeout(() => invoke('shot_start'), 300); });
     on('qReplan', () => invoke('replan'));
-    on('dMusic', () => { setOpen(false); invoke('player_toggle'); });
+    on('dMusic', () => showMusic());
+    on('pMore', () => showMusic());
     on('dShelf', () => { setOpen(false); invoke('notch_drawer', { view: 'clip' }); });
     on('dCal', () => { setOpen(false); invoke('toggle_calendar'); });
     on('dSys', (e) => popup('cpu', e.currentTarget));
@@ -591,6 +793,14 @@ function setOpen(v) {
   if (openState === v) return;
   openState = v;
   if (v) clearTimeout(msgTimer);
+  render();
+}
+
+function showMusic() {
+  clearTimeout(hoverTimer);
+  view = 'music';
+  openState = true;
+  lastKey = '';
   render();
 }
 
@@ -657,6 +867,8 @@ onSnapshot((snap) => {
 });
 onTick((snap) => { s = snap; render(); });
 listen('notch-wake', () => render());
+// Ctrl+Alt+M, „sp” w palecie itd. — muzyka otwiera się w notchu, nie w osobnym oknie.
+listen('notch-music', () => { if (openState && view === 'music') setOpen(false); else showMusic(); });
 listen('notch-layout', () => { size = { w: 0, h: 0 }; render(); });
 </script>
 </body>

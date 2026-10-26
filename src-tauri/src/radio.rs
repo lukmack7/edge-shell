@@ -38,7 +38,10 @@ fn new_id() -> String {
     format!("{:x}{:04x}", Local::now().timestamp_millis(), rand::random::<u16>())
 }
 
-pub fn from_incoming(app: &AppHandle, inc: Incoming) -> RadioMsg {
+pub fn from_incoming(app: &AppHandle, mut inc: Incoming) -> RadioMsg {
+    // Ten sam porządek z tekstem co dla powiadomień Windows (polskie znaki, śmieci).
+    inc.from = crate::notifications::clean_text(&inc.from);
+    inc.message = crate::notifications::clean_text(&inc.message);
     let cfg = state::cfg(app);
     let contact = cfg.contacts.iter().find(|c| {
         c.matches.iter().any(|m| m.eq_ignore_ascii_case(inc.from.trim()))

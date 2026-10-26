@@ -26,7 +26,8 @@ fn size_of(p: &state::PlayerState) -> (f64, f64) {
 pub fn sync(app: &AppHandle) {
     let Some(w) = app.get_webview_window("player") else { return };
     let st = state::read(app, |rt| rt.store.player.clone());
-    if !st.visible {
+    // Z notchem odtwarzacz mieszka w notchu — pływające okno się nie pokazuje.
+    if !st.visible || state::cfg(app).shell.notch {
         let _ = w.hide();
         return;
     }
@@ -67,6 +68,10 @@ fn set(app: &AppHandle, f: impl FnOnce(&mut state::PlayerState)) {
 
 /// Pokaż / schowaj (pasek, dymek, paleta, Ctrl+Alt+M).
 pub fn toggle(app: &AppHandle) {
+    if state::cfg(app).shell.notch {
+        let _ = app.emit_to("notch", "notch-music", ());
+        return;
+    }
     set(app, |p| p.visible = !p.visible);
     if state::read(app, |rt| rt.store.player.visible) {
         let _ = app.emit_to("player", "player-open", ());
@@ -74,6 +79,10 @@ pub fn toggle(app: &AppHandle) {
 }
 
 pub fn show(app: &AppHandle) {
+    if state::cfg(app).shell.notch {
+        let _ = app.emit_to("notch", "notch-music", ());
+        return;
+    }
     set(app, |p| p.visible = true);
     let _ = app.emit_to("player", "player-open", ());
 }
