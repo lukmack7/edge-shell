@@ -127,11 +127,25 @@ fn lighten(hex: &str) -> String {
     format!("#{:02x}{:02x}{:02x}", mix(p(0)), mix(p(2)), mix(p(4)))
 }
 
+/// Wiadomości odłożone tylko dlatego, że trwał fokus — wracają zaraz po nim.
+static FOCUS_HELD: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+
+/// Czy właśnie się skupiasz: własna sesja, „jedna rzecz” albo blok typu fokus z Horologa.
+pub fn in_focus(app: &AppHandle) -> bool {
+    state::read(app, |rt| {
+        rt.adhoc.is_some()
+            || rt.one_thing
+            || state::current_item(&rt.plan, Local::now()).is_some_and(|c| c.kind == "focus")
+    })
+}
+
 pub fn deliver(app: &AppHandle, msg: RadioMsg) {
     let cfg = state::cfg(app);
     let mode = state::read(app, |rt| rt.store.mode.clone());
     let quiet_override = state::read(app, |rt| rt.store.quiet_until.is_some_and(|t| t > Local::now()));
-    let quiet = cfg.mode(&mode).quiet || quiet_override;
+    let focus = in_focus(app);
+    let mode_quiet = cfg.mode(&mode).quiet && (!cfg.radio.quiet_only_focus || focus);
+    let quiet = mode_quiet || quiet_override;
     let vip = msg.number.parse::<u8>().is_ok_and(|n| (1..=9).contains(&n));
     // Cisza nocna: tylko kontakty z numerem (i pytania automatyzacji, które ktoś właśnie wywołał).
     if is_night(&cfg) && !vip && msg.ask.is_none() {
@@ -142,6 +156,11 @@ pub fn deliver(app: &AppHandle, msg: RadioMsg) {
         state::update(app, false, |rt| rt.showing.push_back(msg));
         show_cards(app);
     } else {
+        if cfg.radio.quiet_only_focus && focus && !quiet_override {
+            if let Ok(mut h) = FOCUS_HELD.lock() {
+                h.push(msg.id.clone());
+            }
+        }
         state::update(app, true, |rt| rt.store.waiting.push(msg));
     }
 }
@@ -257,6 +276,21 @@ pub fn is_night(cfg: &crate::config::Config) -> bool {
 pub fn tick(app: &AppHandle) {
     let now = Local::now();
     let cfg = state::cfg(app);
+    // Koniec fokusu: to, co czekało tylko z jego powodu, pokazuje się od razu.
+    let held = FOCUS_HELD.lock().map(|h| !h.is_empty()).unwrap_or(false);
+    if held && !in_focus(app) {
+        let ids: Vec<String> = FOCUS_HELD.lock().map(|mut h| std::mem::take(&mut *h)).unwrap_or_default();
+        let any = state::update(app, true, |rt| {
+            let (back, keep): (Vec<RadioMsg>, Vec<RadioMsg>) = std::mem::take(&mut rt.store.waiting).into_iter().partition(|m| ids.contains(&m.id));
+            rt.store.waiting = keep;
+            let any = !back.is_empty();
+            rt.showing.extend(back);
+            any
+        });
+        if any {
+            show_cards(app);
+        }
+    }
     let hhmm = format!("{:02}:{:02}", now.hour(), now.minute());
     // Koniec ciszy nocnej: to, co przyszło w nocy, czeka na pierwszą paczkę —
     // chyba że tryb nie jest cichy, wtedy wychodzi od razu rano.

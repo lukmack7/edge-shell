@@ -501,6 +501,9 @@ pub struct RadioCfg {
     pub night_quiet: bool,
     pub night_start: String,
     pub night_end: String,
+    /// Cisza trybu (paczki) tylko w trakcie fokusu: własna sesja, „jedna rzecz”
+    /// albo blok typu fokus. Poza tym powiadomienia pokazują się od razu.
+    pub quiet_only_focus: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -705,6 +708,7 @@ impl Default for RadioCfg {
             night_quiet: true,
             night_start: "22:00".into(),
             night_end: "07:00".into(),
+            quiet_only_focus: true,
         }
     }
 }

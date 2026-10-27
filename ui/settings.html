@@ -377,7 +377,7 @@ const render = {
           <input class="in" style="flex:1;font-weight:600" value="${esc(m.label)}" data-mode="${n}.label" aria-label="Nazwa trybu">
           <button class="mini" data-modedel="${n}" aria-label="Usuń tryb" ${cfg.modes.length < 2 ? 'disabled' : ''}>${icon('trash', 16)}</button>
         </div>
-        <div class="row"><div class="txt"><b>Cisza</b><span>Zwykłe powiadomienia czekają na paczkę.</span></div>${sw(m.quiet, `modes.${n}.quiet`)}</div>
+        <div class="row"><div class="txt"><b>Cisza</b><span>Zwykłe powiadomienia czekają na paczkę${cfg.radio.quietOnlyFocus ? ' — tylko w trakcie fokusu (Radio i kontakty)' : ''}.</span></div>${sw(m.quiet, `modes.${n}.quiet`)}</div>
         <label class="field-l">Playlista Spotify (spotify:playlist:…)<input class="in" value="${esc(m.playlist)}" data-mode="${n}.playlist" placeholder="spotify:playlist:…"></label>
         <div class="grid2">
           <label class="field-l">Tapeta trybu
@@ -415,6 +415,9 @@ const render = {
       <p class="lead">Kontakty z numerem 1–9 przechodzą przez ciszę od razu. Numer i kolor widzisz w notchu i na liście powiadomień (dzwonek).</p>
       <div class="card"><h3>Kontakty</h3><div class="list">${contacts || '<span class="hint">Brak kontaktów.</span>'}</div>
         <div><button class="btn" id="ctAdd">${icon('plus', 16, 2)}Dodaj kontakt</button></div></div>
+      <div class="card"><h3>Kiedy działa cisza</h3>
+        <div class="row"><div class="txt"><b>Cisza tylko w trakcie fokusu</b><span>W trybie z ciszą zwykłe powiadomienia i maile czekają na paczkę tylko wtedy, gdy się skupiasz (własna sesja, „jedna rzecz” albo blok typu fokus z Horologa). Poza tym pokazują się od razu w notchu, a po fokusie wraca to, co czekało. Wyłącz, żeby cisza trwała cały czas.</span></div>${sw(cfg.radio.quietOnlyFocus, 'radio.quietOnlyFocus')}</div>
+      </div>
       <div class="card"><h3>Paczki powiadomień</h3>
         <span class="hint">O tych godzinach w trybie cichym przychodzi wszystko, co czekało. Do tego czasu wiadomości leżą w notchu w „Czeka na paczkę” — możesz je otworzyć wcześniej.</span>
         <div class="chips">${times}</div>
