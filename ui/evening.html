@@ -26,6 +26,12 @@
   textarea:focus { border-color: var(--accent); }
   .foot { display: flex; gap: 8px; justify-content: flex-end; }
   .empty { color: var(--muted); font-size: 13px; padding: 8px 2px; }
+  #mailBox { display: flex; flex-direction: column; gap: 6px; }
+  #mailBox[hidden] { display: none; }
+  #mail { max-height: 132px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; }
+  .it .fl { color: #f87171; flex: none; }
+  .it .who { color: var(--muted); font-size: 12px; white-space: nowrap; }
+  .it button.ok { border-color: rgba(34,197,94,0.4); color: #86efac; }
 </style>
 </head>
 <body>
@@ -35,12 +41,13 @@
     <div class="col"><span class="lbl">ZROBIONE DZIŚ</span><div class="list" id="done"></div></div>
     <div class="col"><span class="lbl">NIEDOKOŃCZONE — CO Z NIMI?</span><div class="list" id="open"></div></div>
   </div>
+  <div id="mailBox" hidden><span class="lbl">OFLAGOWANE MAILE · NA JUTRO</span><div id="mail"></div></div>
   <span class="lbl">JEDNO ZDANIE O DNIU</span>
   <textarea id="note" placeholder="Co poszło dobrze, co jutro na start…"></textarea>
   <div class="foot"><button class="btn" id="replan">Przeplanuj resztę tygodnia</button><button class="btn primary" id="finish">Zamknij dzień</button></div>
 </div>
 <script type="module">
-import { invoke, listen, esc, icon, hhmm, toast } from './shared.js';
+import { invoke, listen, esc, icon, hhmm, toast, onSnapshot } from './shared.js';
 const $ = (id) => document.getElementById(id);
 const COLOR = { early: '#a855f7', ontime: '#22c55e', late: '#eab308' };
 $('close').innerHTML = icon('close', 14, 2.4);
@@ -71,6 +78,32 @@ async function load() {
   }
   for (const b of document.querySelectorAll('[data-skip]')) b.onclick = () => b.closest('.it').classList.add('gone');
 }
+
+// Oflagowane maile z Thunderbirda: „Do planu” = blok na jutro w Horologu (mail zostaje z flagą).
+function renderMail(snap) {
+  const list = snap?.mail?.connected ? snap.mail.flagged || [] : [];
+  $('mailBox').hidden = !list.length;
+  $('mail').innerHTML = list.slice(0, 12).map((m, i) => `<div class="it"><span class="fl">⚑</span><span class="t">${esc(m.subject || '(bez tematu)')}</span><span class="who">${esc(m.fromName || '')}</span>
+      ${m.planned ? '<button class="ok" disabled>W planie ✓</button>' : `<button data-plan="${i}">Do planu</button>`}<button data-unflag="${i}" title="Zdejmij flagę w Thunderbirdzie">Odflaguj</button></div>`).join('');
+  for (const b of document.querySelectorAll('[data-plan]')) {
+    const m = list[+b.dataset.plan];
+    b.onclick = async () => {
+      b.disabled = true;
+      b.textContent = '…';
+      try { await invoke('mail_task', { id: m.id, mid: m.mid, when: 'jutro', archive: false }); b.textContent = 'W planie ✓'; b.classList.add('ok'); }
+      catch (e) { toast(String(e), 4000); b.disabled = false; b.textContent = 'Do planu'; }
+    };
+  }
+  for (const b of document.querySelectorAll('[data-unflag]')) {
+    const m = list[+b.dataset.unflag];
+    b.onclick = () => { invoke('mail_action', { id: m.id, mid: m.mid, action: 'unflag' }).catch((e) => toast(String(e), 4000)); b.closest('.it').classList.add('gone'); };
+  }
+}
+let lastMail = '';
+onSnapshot((snap) => {
+  const key = JSON.stringify(snap?.mail?.flagged || []) + snap?.mail?.connected;
+  if (key !== lastMail) { lastMail = key; renderMail(snap); }
+});
 
 $('note').onchange = () => invoke('evening_note', { text: $('note').value });
 $('replan').onclick = async () => { try { await invoke('replan'); toast('Horolog przeplanował'); } catch (e) { toast(String(e), 4000); } };

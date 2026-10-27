@@ -176,6 +176,7 @@ fn card(message: String, ask: &str, yes: &str, no: &str) -> RadioMsg {
         at: Local::now(),
         app: None,
         open_target: None,
+        mail: None,
         ask: Some(ask.to_string()),
         yes_label: Some(yes.to_string()),
         no_label: Some(no.to_string()),

@@ -1,0 +1,31 @@
+{
+  "manifest_version": 2,
+  "name": "Edge Shell Bridge",
+  "description": "Łączy Thunderbirda z Edge Shell: nowa poczta w notchu, akcje (archiwizuj, odpowiedz, zadanie), licznik w docku, wyszukiwanie z palety. Działa tylko lokalnie (127.0.0.1).",
+  "version": "1.0.0",
+  "author": "Edge Shell",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "edge-shell-bridge@edge-shell.local",
+      "strict_min_version": "115.0"
+    }
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "options_ui": {
+    "page": "options.html"
+  },
+  "permissions": [
+    "accountsRead",
+    "messagesRead",
+    "messagesModify",
+    "messagesMove",
+    "messagesDelete",
+    "compose",
+    "compose.send",
+    "addressBooks",
+    "storage",
+    "http://127.0.0.1/*"
+  ]
+}

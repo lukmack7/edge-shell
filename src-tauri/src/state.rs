@@ -99,6 +99,32 @@ pub struct RadioMsg {
     pub yes_label: Option<String>,
     #[serde(default)]
     pub no_label: Option<String>,
+    /// Mail z Thunderbirda (przez dodatek) — notch pokazuje wtedy akcje poczty.
+    #[serde(default)]
+    pub mail: Option<MailRef>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct MailRef {
+    /// Id w Thunderbirdzie (ważne do restartu Thunderbirda).
+    pub id: i64,
+    /// Message-ID — pozwala znaleźć mail po restarcie.
+    pub mid: String,
+    pub account: String,
+    pub from_name: String,
+    pub from_email: String,
+    pub subject: String,
+    pub snippet: String,
+}
+
+/// Zadanie w Horologu zrobione z maila (klik w blok → ten mail).
+#[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct MailTask {
+    pub intent_id: String,
+    pub title: String,
+    pub mail: MailRef,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -156,6 +182,10 @@ pub struct Store {
     pub clips: Vec<Clip>,
     /// Zapamiętane układy okien (nazwa → okna).
     pub layouts: Vec<WinLayout>,
+    /// Zadania zrobione z maili (ostatnie 50).
+    pub mail_tasks: Vec<MailTask>,
+    /// Oflagowane maile już wstawione do planu (Message-ID).
+    pub mail_planned: Vec<String>,
     /// „Co przegapiłeś” — wiadomości, które notch pokazał i schował (ostatnie 10).
     pub missed: Vec<Missed>,
 }
@@ -171,6 +201,8 @@ pub struct Missed {
     pub open_target: Option<String>,
     #[serde(default)]
     pub app: Option<String>,
+    #[serde(default)]
+    pub mail: Option<MailRef>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -455,6 +487,20 @@ pub fn snapshot(app: &AppHandle) -> Value {
         }
     }
 
+    // Licznik nieprzeczytanych z Thunderbirda na jego ikonie (w fokusie wyciszony).
+    if cfg.mail.enabled && cfg.mail.badge {
+        let unread = crate::mail::unread();
+        let muted = cfg.mail.badge_mute_focus && (rt.adhoc.is_some() || current_item(&rt.plan, now).is_some_and(|c| !crate::mail::mail_block(&cfg, &c.title) && c.kind != "buffer"));
+        for d in dock.iter_mut() {
+            let is_tb = d["exe"].as_str().is_some_and(|e| e.to_lowercase().contains("thunderbird"))
+                || d["name"].as_str().is_some_and(|n| n.to_lowercase().contains("thunderbird"));
+            if is_tb && unread > 0 {
+                d["badge"] = json!(if muted { 0 } else { unread });
+                d["badgeMuted"] = json!(muted);
+            }
+        }
+    }
+
     let day: Vec<Value> = rt
         .plan
         .iter()
@@ -539,6 +585,9 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "missed": rt.store.missed,
         "notch": cfg.shell.notch,
         "dayRail": cfg.shell.notch && cfg.shell.day_rail,
+        "mail": crate::mail::snapshot(&cfg, &rt.store.mail_planned),
+        "mailTasks": rt.store.mail_tasks.iter().map(|t| t.intent_id.clone()).collect::<Vec<_>>(),
+        "mailBlock": current_item(&rt.plan, now).is_some_and(|c| crate::mail::mail_block(&cfg, &c.title)),
         "windowTitles": rt.window_titles,
         "fgExe": rt.foreground_exe,
         "presence": rt.presence,

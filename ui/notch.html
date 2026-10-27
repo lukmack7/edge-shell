@@ -140,6 +140,31 @@
   .n-note { color: #8b8b98; font-size: 12.5px; padding: 8px; line-height: 1.5; }
   .n-mini-seek { height: 3px; border-radius: 2px; background: rgba(255,255,255,0.25); overflow: hidden; }
   .n-mini-seek i { display: block; height: 100%; background: #fff; }
+  /* poczta */
+  .n-av { width: 22px; height: 22px; flex: none; border-radius: 50%; background: #38bdf8; color: #082f49; font-size: 10px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .n-drop { padding: 0 14px 12px; display: flex; flex-direction: column; gap: 8px; width: 640px; box-sizing: border-box; margin: 0 auto; }
+  .n-drop .snip { font-size: 12.5px; color: rgba(255,255,255,0.85); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; }
+  .n-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+  .n-acts button { height: 26px; padding: 0 11px; border-radius: 999px; border: 0; background: rgba(255,255,255,0.14); color: #fff; font-size: 11.5px; font-weight: 700; }
+  .n-acts button:hover { background: rgba(255,255,255,0.22); }
+  .n-acts button.w { background: #fff; color: #000; }
+  .n-rep { display: flex; gap: 8px; }
+  .n-rep input { flex: 1; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.3); background: rgba(0,0,0,0.3); color: #fff; font-size: 12.5px; outline: none; user-select: text; }
+  .n-rep .hint { font-size: 11px; color: rgba(255,255,255,0.6); }
+  .n-tri { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+  .n-tri .bar { height: 5px; border-radius: 3px; background: rgba(255,255,255,0.12); overflow: hidden; }
+  .n-tri .bar i { display: block; height: 100%; background: #38bdf8; border-radius: 3px; transition: width 0.3s; }
+  .n-tri .card { border-radius: 16px; background: rgba(255,255,255,0.06); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-height: 120px; box-sizing: border-box; }
+  .n-tri .card .who { display: flex; gap: 8px; align-items: center; font-size: 12.5px; }
+  .n-tri .card .who span { color: #8b8b98; }
+  .n-tri .card b.sub { font-size: 15px; font-weight: 600; }
+  .n-tri .card .txt { font-size: 12.5px; color: #d4d4d8; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .n-tri .dec { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .n-tri .dec button { height: 52px; border-radius: 14px; border: 0; background: rgba(255,255,255,0.07); color: #fff; font-size: 12.5px; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+  .n-tri .dec button:hover { background: rgba(255,255,255,0.13); }
+  .n-tri .dec button.p { background: rgba(56,189,248,0.25); }
+  .n-tri .dec button small { font-size: 10.5px; font-weight: 500; color: rgba(255,255,255,0.6); }
+  .n-msg .ac button.mail { background: rgba(56,189,248,0.2); }
   .fade { animation: fade 0.25s ease-out 0.15s both; }
   @keyframes fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 </style>
@@ -186,6 +211,16 @@ const TINT = {
   early: { bg: 'linear-gradient(90deg, #3b0764, #7e22ce)', edge: 'rgba(192,132,252,0.45)' },
   late: { bg: 'linear-gradient(90deg, #713f12, #a16207)', edge: 'rgba(250,204,21,0.45)' },
 };
+TINT.mail = { bg: 'linear-gradient(90deg, #0c4a6e, #0369a1)', edge: 'rgba(56,189,248,0.45)' };
+TINT.flash = { bg: 'linear-gradient(90deg, #14532d, #15803d)', edge: 'rgba(74,222,128,0.45)' };
+let flash = null;            // { text, until } — krótkie potwierdzenie (np. „W planie: …”)
+let tri = { items: null, i: 0, total: 0, loading: false, err: '', replying: false, force: false };
+function showFlash(text) {
+  flash = { text, until: Date.now() + 3200 };
+  lastKey = '';
+  render();
+  setTimeout(() => { lastKey = ''; render(); }, 3300);
+}
 const DONE = { early: ['#c084fc', 'Fioletowy sektor', 'ponad plan'], ontime: ['#4ade80', 'Zielony sektor', 'w czasie'], late: ['#facc15', 'Żółty sektor', 'po czasie'] };
 
 // ------------------------------------------------------------------ stan
@@ -209,6 +244,7 @@ function stateOf() {
   if (!s) return 'rest';
   if (openState) return 'open';
   if (currentMsg()) return 'msg';
+  if (flash && Date.now() < flash.until) return 'flash';
   if (done && Date.now() < done.until) return 'done';
   if (s.oneThing) return 'focus';
   if (meetingSoon()) return 'meet';
@@ -261,6 +297,16 @@ const timeText = () => new Date().toLocaleTimeString('pl-PL', { hour: '2-digit',
 
 function midHtml(st) {
   const t = focusTiming(s);
+  if (st === 'flash') {
+    return `<span class="n-ic" style="background:#4ade80;color:#052e16">${icon('check', 12, 3)}</span><span class="t"><b>${esc(flash.text)}</b></span>`;
+  }
+  if (st === 'msg' && currentMsg()?.mail) {
+    const m = currentMsg();
+    const r = m.mail;
+    const ini = (r.fromName || r.fromEmail || '?').split(/\s+/).map((x) => x[0]).join('').slice(0, 2).toUpperCase();
+    return `<span class="n-av" style="${m.number && /^[1-9]$/.test(m.number) ? `background:${esc(m.color)}` : ''}">${esc(m.number && /^[1-9]$/.test(m.number) ? m.number : ini)}</span>
+      <span class="t" id="msgText" title="Klik: wszystkie powiadomienia" style="cursor:pointer"><b style="color:#bae6fd">${esc(m.name)}</b> <span class="dim">${esc(r.subject || m.message)}</span></span>`;
+  }
   if (st === 'msg') {
     const m = currentMsg();
     const canReply = !m.ask && (m.openTarget || m.replyUrl || m.reply);
@@ -318,7 +364,8 @@ function render() {
   if (!s) return;
   const st = stateOf();
   const focus = st === 'focus';
-  const tint = st === 'done' ? TINT[done.kind] : TINT[st] || MAT;
+  const mailMsg = st === 'msg' && currentMsg()?.mail ? currentMsg() : null;
+  const tint = st === 'done' ? TINT[done.kind] : mailMsg ? TINT.mail : TINT[st] || MAT;
   notch.style.setProperty('--bg', tint.bg);
   notch.style.setProperty('--edge', tint.edge);
   notch.style.setProperty('--accent', s.mode.accent);
@@ -326,7 +373,7 @@ function render() {
   notch.style.setProperty('--modeFg', tint === MAT ? '#fca5a5' : '#fff');
 
   const msg = st === 'msg' ? currentMsg() : null;
-  const key = JSON.stringify([st, midKey(st), focus, replying, msg?.id, statusKey(), st === 'open' ? openKey() : '']);
+  const key = JSON.stringify([st, midKey(st), focus, replying, msg?.id, statusKey(), st === 'open' ? openKey() : '', flash?.text]);
   if (key !== lastKey) {
     lastKey = key;
     notch.innerHTML = `
@@ -338,7 +385,7 @@ function render() {
         ${focus ? '' : statusHtml()}
         <button class="n-clock" id="clockBtn" title="Kalendarz">${focus ? '' : `<span id="date">${esc(dateText())}</span><span class="sep"></span>`}<span class="tm" id="time">${timeText()}</span></button>
       </div>
-      ${msg && replying && st !== 'open' ? replyHtml(msg) : ''}
+      ${mailMsg ? mailDropHtml(mailMsg) : msg && replying && st !== 'open' ? replyHtml(msg) : ''}
       ${st === 'open' ? panelHtml() : ''}`;
     wire(st, msg);
   } else {
@@ -348,6 +395,10 @@ function render() {
   let w = Math.max(focus ? 150 : 260, Math.ceil(row.scrollWidth) + 2);
   let h = 40;
   if (msg && replying) h = 86;
+  if (mailMsg) {
+    w = Math.max(w, 642);
+    h = 40 + ($('drop')?.offsetHeight || 80);
+  }
   const r = st === 'open' ? 26 : 18;
   if (st === 'open') {
     w = Math.max(w, 942);
@@ -398,11 +449,102 @@ function tickMusic() {
   if (mini) mini.style.width = pct;
 }
 
+function mailDropHtml(m) {
+  const r = m.mail;
+  return `<div class="n-drop fade" id="drop">
+    ${r.snippet ? `<span class="snip">„${esc(r.snippet)}”</span>` : ''}
+    ${replying
+      ? `<span class="n-rep"><input id="mlIn" placeholder="Odpowiedź do ${esc(r.fromName || r.fromEmail)} — Enter wysyła, Esc anuluje"><button class="n-act" id="mlSend">Wyślij</button></span><span class="n-rep"><span class="hint">Wyśle Thunderbird z konta ${esc(r.account || '')} i zapisze w Wysłanych.</span></span>`
+      : `<span class="n-acts">
+          <button class="w" id="mlReply">Odpowiedz</button>
+          <button id="mlTask" title="Blok w Horologu z linkiem do maila; mail do archiwum">📋 Zrób zadanie</button>
+          <button id="mlArch">Archiwizuj</button>
+          <button id="mlRead">Przeczytane</button>
+          <button id="mlLater" title="Wróci w następnej paczce">Odłóż${s.radio.nextBatch ? ` na ${esc(s.radio.nextBatch)}` : ''}</button>
+          <button id="mlOpen">Otwórz</button>
+        </span>`}
+  </div>`;
+}
+
+function triageHtml() {
+  const head = `<div class="n-head fade"><b>Blok poczty</b><span class="meta" style="margin-left:8px">jedna decyzja na mail · klawisze R Z A spacja</span>
+    <span class="meta" style="margin-left:auto;color:#bae6fd;font-weight:600">${tri.items ? `zostało ${tri.items.length}` : ''}</span>
+    <button class="back" id="triPanel" style="margin-left:8px">Panel →</button></div>`;
+  if (tri.err) return `<div class="n-pn" id="pn">${head}<div class="n-note">${esc(tri.err)}</div></div>`;
+  if (!tri.items) return `<div class="n-pn" id="pn">${head}<div class="n-note">Wczytuję skrzynkę…</div></div>`;
+  if (!tri.items.length) {
+    return `<div class="n-pn" id="pn">${head}<div class="n-tri"><div class="card" style="align-items:center;justify-content:center;text-align:center">
+      <b class="sub">Skrzynka czysta ✓</b><span class="txt">Wszystkie nieprzeczytane mają decyzję. Możesz zamknąć blok wcześniej.</span>
+      <span style="display:flex;gap:6px;margin-top:6px"><button class="n-b2 w" id="pDone">✓ Skończone</button></span></div></div></div>`;
+  }
+  const it = tri.items[tri.i % tri.items.length];
+  const doneN = Math.max(0, tri.total - tri.items.length);
+  const when = it.date ? new Date(it.date).toLocaleString('pl-PL', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) : '';
+  return `<div class="n-pn" id="pn">${head}
+    <div class="n-tri fade">
+      <span class="bar"><i style="width:${tri.total ? (doneN / tri.total) * 100 : 0}%"></i></span>
+      <div class="card" id="triCard">
+        <span class="who"><b>${esc(it.fromName || it.fromEmail)}</b><span>· ${esc(it.accountName || '')} · ${esc(when)}</span>
+          <button class="n-b2" id="triOpen" style="margin-left:auto;height:24px;font-size:11px">Otwórz w Thunderbirdzie</button></span>
+        <b class="sub">${esc(it.subject || '(bez tematu)')}</b>
+        ${it.snippet ? `<span class="txt">„${esc(it.snippet)}”</span>` : ''}
+        ${tri.replying ? `<span class="n-rep" style="margin-top:4px"><input id="triIn" placeholder="Odpowiedź — Enter wysyła, Esc anuluje"><button class="n-act" id="triSend">Wyślij</button></span>` : ''}
+      </div>
+      <div class="dec">
+        <button class="p" id="triR">Odpowiedz<small>R</small></button>
+        <button id="triZ">Zadanie<small>Z</small></button>
+        <button id="triA">Archiwum<small>A</small></button>
+        <button id="triL">Później<small>spacja</small></button>
+      </div>
+    </div></div>`;
+}
+
+async function loadTriage(fresh) {
+  if (tri.loading) return;
+  tri.loading = true;
+  tri.err = '';
+  try {
+    const items = await invoke('mail_inbox', { fresh: !!fresh });
+    if (!tri.items || fresh) tri.total = items.length;
+    tri.items = items;
+    tri.i = 0;
+  } catch (e) {
+    tri.err = String(e);
+  }
+  tri.loading = false;
+  lastKey = '';
+  render();
+}
+
+function triageOn() {
+  return view === 'main' && !tri.force && s?.mailBlock && s?.mail?.connected;
+}
+
+async function triAct(kind) {
+  if (!tri.items?.length) return;
+  const it = tri.items[tri.i % tri.items.length];
+  const drop = () => { tri.items.splice(tri.i % tri.items.length, 1); if (tri.i >= tri.items.length) tri.i = 0; tri.replying = false; lastKey = ''; render(); };
+  try {
+    if (kind === 'later') { tri.i = (tri.i + 1) % tri.items.length; lastKey = ''; render(); return; }
+    if (kind === 'reply') { tri.replying = true; invoke('notch_focus'); lastKey = ''; render(); setTimeout(() => $('triIn')?.focus(), 60); return; }
+    if (kind === 'open') { await invoke('mail_action', { id: it.id, mid: it.mid, action: 'open' }); return; }
+    if (kind === 'archive') { await invoke('mail_action', { id: it.id, mid: it.mid, action: 'archive' }); drop(); return; }
+    if (kind === 'task') { const t = await invoke('mail_task', { id: it.id, mid: it.mid, when: null, archive: true }); drop(); showFlash(`W planie: ${t}`); }
+  } catch (e) {
+    tri.err = String(e); lastKey = ''; render();
+    setTimeout(() => { tri.err = ''; lastKey = ''; render(); }, 3000);
+  }
+}
+
 function replyHtml(m) {
   return `<div class="n-reply fade"><input id="rIn" placeholder="${m.replyUrl ? 'Odpowiedź — Enter wysyła' : 'Odpowiedź — Enter: do schowka i otwiera rozmowę'}" value="${esc(m.reply || '')}"><button class="n-act" id="rSend">Wyślij</button></div>`;
 }
 
 function openKey() {
+  if (triageOn()) {
+    const it = tri.items?.[tri.i % (tri.items.length || 1)];
+    return JSON.stringify(['tri', tri.items?.length, it?.mid, tri.replying, tri.err, !!tri.items]);
+  }
   if (view === 'music') {
     const m = s.music;
     return JSON.stringify(['music', m.title, m.artist, m.art, m.playing, m.shuffle, m.repeat, m.liked, m.connected, mtab]);
@@ -442,6 +584,10 @@ function msgCard(m, opts = {}) {
     }
   } else if (opts.missed != null && m.openTarget) {
     actions = `<button data-miss="${opts.missed}">Otwórz</button>`;
+  }
+  if (m.mail && !m.ask) {
+    const a = `data-id="${m.mail.id}" data-mid="${esc(m.mail.mid)}"`;
+    actions = `<button class="mail" data-mact="open" ${a}>Otwórz</button><button class="mail" data-mact="task" ${a}>Zadanie</button><button class="mail" data-mact="archive" ${a}>Archiwizuj</button>${opts.current ? '<button id="lOk">OK</button>' : ''}`;
   }
   const tag = opts.missed != null && !m.openTarget ? 'div' : 'div';
   return `<${tag} class="n-msg${opts.current ? ' top' : ''}">
@@ -555,7 +701,8 @@ function msgsHtml() {
   const waiting = r.waitingList || [];
   const missed = s.missed || [];
   const notif = r.notifications;
-  const meta = notif && notif !== 'ok' && typeof notif === 'string' ? `Powiadomienia Windows: ${esc(notif)}` : r.nextBatch ? `Następna paczka o ${esc(r.nextBatch)}` : '';
+  const skipped = s.mail?.skippedToday ? ` · pominięte newslettery dziś: ${s.mail.skippedToday}` : '';
+  const meta = (notif && notif !== 'ok' && typeof notif === 'string' ? `Powiadomienia Windows: ${esc(notif)}` : r.nextBatch ? `Następna paczka o ${esc(r.nextBatch)}` : '') + skipped;
   return `<div class="n-pn" id="pn">
     <div class="n-head fade"><button class="back" id="backBtn">← Panel</button><b>Powiadomienia i komunikaty</b><span class="meta">${meta}</span></div>
     <div class="n-msgs fade">
@@ -574,6 +721,7 @@ function msgsHtml() {
 function panelHtml() {
   if (view === 'msgs') return msgsHtml();
   if (view === 'music') return musicHtml();
+  if (triageOn()) return triageHtml();
   const t = focusTiming(s);
   const acc = s.mode.accent;
   let main;
@@ -621,7 +769,7 @@ function panelHtml() {
           ${upcoming.map((i) => `<span class="n-it"><span class="tm">${hhmm(i.start)}</span><span class="tx">${esc(i.title)}</span></span>`).join('') || '<span class="n-it" style="color:#71717a">nic więcej dziś</span>'}
         </div>
         <div class="n-box"><span class="lbl">CO PRZEGAPIŁEŚ<button id="allMsgs" style="margin-left:auto;border:0;background:transparent;color:#a1a1aa;font-size:10.5px;font-weight:700;letter-spacing:0.05em">WSZYSTKIE →</button></span>
-          ${missed.map((m, i) => `<button class="n-it" data-miss="${i}" title="${esc(m.message)}"><span class="dot" style="background:${esc(m.color)}"></span><span class="tx"><b style="color:${esc(m.color)}">${esc(m.name)}</b> ${esc(m.message)}</span>${m.openTarget ? '<b>Otwórz</b>' : ''}</button>`).join('') || '<span class="n-it" style="color:#71717a">nic — jesteś na bieżąco</span>'}
+          ${missed.map((m, i) => `<button class="n-it" ${m.mail ? `data-mact="open" data-id="${m.mail.id}" data-mid="${esc(m.mail.mid)}"` : `data-miss="${i}"`} title="${esc(m.message)}"><span class="dot" style="background:${esc(m.color)}"></span><span class="tx"><b style="color:${esc(m.color)}">${esc(m.name)}</b> ${esc(m.message)}</span>${m.openTarget || m.mail ? '<b>Otwórz</b>' : ''}</button>`).join('') || '<span class="n-it" style="color:#71717a">nic — jesteś na bieżąco</span>'}
         </div>
         <div class="n-quick">
           <button class="n-q" id="qCap" title="Wrzuć myśl">${icon('note', 16)}</button>
@@ -676,7 +824,44 @@ function wire(st, msg) {
     mid.onmouseenter = () => { if (!openState) { clearTimeout(hoverTimer); hoverTimer = setTimeout(() => setOpen(true), 420); } };
     mid.onmouseleave = () => clearTimeout(hoverTimer);
   }
-  if (msg) {
+  // Akcje poczty na kartach (lista powiadomień, przegapione).
+  for (const b of notch.querySelectorAll('[data-mact]')) {
+    b.onclick = async (e) => {
+      e.stopPropagation();
+      const id = +b.dataset.id;
+      const mid = b.dataset.mid;
+      try {
+        if (b.dataset.mact === 'task') showFlash(`W planie: ${await invoke('mail_task', { id, mid, when: null, archive: true })}`);
+        else await invoke('mail_action', { id, mid, action: b.dataset.mact });
+      } catch (err) { b.textContent = 'Błąd'; b.title = String(err); }
+    };
+  }
+  if (msg?.mail) {
+    const r = msg.mail;
+    const act = (action) => invoke('mail_action', { id: r.id, mid: r.mid, action }).catch((e) => showFlash(String(e)));
+    on('mlOpen', () => act('open'));
+    on('mlArch', () => act('archive'));
+    on('mlRead', () => act('read'));
+    on('mlLater', () => { replying = false; invoke('radio_later'); });
+    on('mlTask', async () => {
+      try { const t = await invoke('mail_task', { id: r.id, mid: r.mid, when: null, archive: true }); showFlash(`W planie: ${t}`); }
+      catch (e) { showFlash(String(e)); }
+    });
+    on('mlReply', () => { replying = true; clearTimeout(msgTimer); invoke('notch_focus'); lastKey = ''; render(); setTimeout(() => $('mlIn')?.focus(), 60); });
+    const input = $('mlIn');
+    if (input) {
+      input.onclick = (e) => e.stopPropagation();
+      const send = async () => {
+        const text = input.value.trim();
+        if (!text) return;
+        input.disabled = true;
+        try { await invoke('mail_reply', { id: r.id, mid: r.mid, text }); replying = false; showFlash('Wysłano'); }
+        catch (err) { input.disabled = false; input.value = ''; input.placeholder = String(err); }
+      };
+      input.onkeydown = (e) => { if (e.key === 'Enter') send(); if (e.key === 'Escape') { replying = false; lastKey = ''; render(); } };
+      on('mlSend', send);
+    }
+  } else if (msg) {
     on('mYes', () => invoke('automation_answer', { yes: true }));
     on('mNo', () => invoke('automation_answer', { yes: false }));
     on('mOk', () => { replying = false; invoke('radio_next'); });
@@ -692,6 +877,36 @@ function wire(st, msg) {
       };
       input.onkeydown = (e) => { if (e.key === 'Enter') send(); if (e.key === 'Escape') { replying = false; lastKey = ''; render(); } };
       on('rSend', send);
+    }
+  }
+  if (st === 'open' && triageOn()) {
+    if (!tri.items && !tri.loading && !tri.err) loadTriage(true);
+    on('triPanel', () => { tri.force = true; lastKey = ''; render(); });
+    on('triOpen', () => triAct('open'));
+    on('triR', () => triAct('reply'));
+    on('triZ', () => triAct('task'));
+    on('triA', () => triAct('archive'));
+    on('triL', () => triAct('later'));
+    on('pDone', () => invoke('focus_finish'));
+    const card = $('triCard');
+    if (card) card.onclick = () => invoke('notch_focus');
+    const input = $('triIn');
+    if (input) {
+      input.onclick = (e) => e.stopPropagation();
+      input.onkeydown = async (e) => {
+        e.stopPropagation();
+        if (e.key === 'Escape') { tri.replying = false; lastKey = ''; render(); return; }
+        if (e.key !== 'Enter' || !input.value.trim()) return;
+        const it = tri.items[tri.i % tri.items.length];
+        input.disabled = true;
+        try {
+          await invoke('mail_reply', { id: it.id, mid: it.mid, text: input.value.trim() });
+          tri.items.splice(tri.i % tri.items.length, 1);
+          if (tri.i >= tri.items.length) tri.i = 0;
+          tri.replying = false;
+          showFlash('Wysłano');
+        } catch (err) { input.disabled = false; input.placeholder = String(err); input.value = ''; }
+      };
     }
   }
   if (st === 'open' && view === 'music') {
@@ -789,8 +1004,9 @@ function resize(w, h) {
 
 function setOpen(v) {
   clearTimeout(hoverTimer);
-  if (!v) { view = 'main'; }
+  if (!v) { view = 'main'; tri.force = false; tri.replying = false; }
   if (openState === v) return;
+  if (v && !tri.loading) tri.items = null;
   openState = v;
   if (v) clearTimeout(msgTimer);
   render();
@@ -822,7 +1038,16 @@ document.addEventListener('mouseleave', () => {
   if (document.activeElement?.tagName === 'INPUT') return;
   leaveTimer = setTimeout(() => { if (openState) setOpen(false); armMsgTimer(true); }, 420);
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && openState) setOpen(false); });
+document.addEventListener('keydown', (e) => {
+  if (openState && triageOn() && tri.items?.length && !tri.replying && document.activeElement?.tagName !== 'INPUT') {
+    const k = e.key.toLowerCase();
+    if (k === 'r') { e.preventDefault(); return triAct('reply'); }
+    if (k === 'z') { e.preventDefault(); return triAct('task'); }
+    if (k === 'a') { e.preventDefault(); return triAct('archive'); }
+    if (k === ' ') { e.preventDefault(); return triAct('later'); }
+  }
+  if (e.key === 'Escape' && openState) setOpen(false);
+});
 
 // Wiadomość: widać ją ~6 s, potem ląduje w „Co przegapiłeś” (chyba że to pytanie albo kursor jest nad nią).
 function armMsgTimer(force) {

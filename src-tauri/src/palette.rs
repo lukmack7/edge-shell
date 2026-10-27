@@ -83,6 +83,8 @@ enum Cmd {
     DockApp(String),
     StartApp(String),
     Plan { title: String, minutes: i64, intent: Option<String>, kind: String },
+    MailCompose { to: String, subject: String },
+    MailOpen { id: i64, mid: String },
 }
 
 static LAST: Mutex<Option<HashMap<String, Cmd>>> = Mutex::new(None);
@@ -459,6 +461,8 @@ const CMD_NAMES: &[(&str, &str)] = &[
     ("layout_save", "zapisz układ okien"),
     ("layout_restore", "przywróć układ okien"),
     ("evening", "zamknięcie dnia"),
+    ("mail_compose", "nowy mail (@ adresat temat)"),
+    ("mail_search", "szukaj w poczcie"),
 ];
 
 fn cmd_label(cfg: &Config, cmd: &str) -> String {
@@ -480,6 +484,12 @@ fn keys(cfg: &Config) -> Vec<(String, String)> {
         }
     }
     out.retain(|(c, _)| !c.starts_with("mode:") || cfg.modes.iter().any(|m| format!("mode:{}", m.id) == *c));
+    // Poczta doszła później — starsze konfiguracje nie mają tych klawiszy.
+    for (c, k) in [("mail_compose", "@"), ("mail_search", "ms")] {
+        if !cfg.palette.keys.iter().any(|q| q.cmd == c) {
+            out.push((c.into(), k.into()));
+        }
+    }
     out
 }
 
@@ -644,6 +654,10 @@ fn add_command(b: &mut Builder, app: &AppHandle, cfg: &Config, cmd: &str, key: &
                 b.add("Okna", "U", BLUE, "Nie masz zapisanych układów".into(), "Ułóż okna i wpisz „uz”".into(), key, pv("Układy okien", "Najpierw zapisz układ poleceniem „uz”.", ""), &[], Cmd::LayoutSave(String::new()));
             }
         }
+        "mail_compose" => b.add("Poczta", "@", BLUE, "Nowy mail".into(), "Wpisz @ i początek nazwiska, potem temat, np. @ jan oferta Q4".into(), key,
+            pv("Nowy mail", "Adres podpowiada książka adresowa Thunderbirda. Enter otwiera okno pisania z adresem i tematem.", "• Thunderbird: nowa wiadomość"), &[], Cmd::MailCompose { to: String::new(), subject: String::new() }),
+        "mail_search" => b.add("Poczta", "✉", BLUE, "Szukaj w poczcie".into(), format!("Wpisz {key} i słowa, np. {key} faktura"), key,
+            pv("Szukaj w poczcie", "Temat, nadawca i treść we wszystkich kontach Thunderbirda. Enter otwiera mail, Tab: zadanie, archiwum.", ""), &[], Cmd::MailCompose { to: String::new(), subject: String::new() }),
         "evening" => b.add(g, "K", AMBER, "Zamknięcie dnia".into(), "Co zrobione, co na jutro, jedno zdanie".into(), key,
             pv("Zamknięcie dnia", "Karta z dzisiejszymi sektorami i niedokończonymi zadaniami — każde jednym kliknięciem na jutro.", ""), &[], Cmd::Evening),
         _ => {}
@@ -654,12 +668,99 @@ fn add_command(b: &mut Builder, app: &AppHandle, cfg: &Config, cmd: &str, key: &
 // Zapytanie
 // ---------------------------------------------------------------------------
 
+/// „@ jan oferta Q4” → nowe maile do pasujących kontaktów z tematem.
+async fn mail_compose_rows(app: &AppHandle, key: &str, arg: &str) -> Answer {
+    let mut b = Builder { rows: Vec::new() };
+    let arg = arg.trim();
+    if arg.is_empty() {
+        let cfg = state::cfg(app);
+        add_command(&mut b, app, &cfg, "mail_compose", key, "");
+        return b.finish("Nowy mail".into());
+    }
+    let (who, subject) = match arg.split_once(char::is_whitespace) {
+        Some((w, s)) => (w.to_string(), s.trim().to_string()),
+        None => (arg.to_string(), String::new()),
+    };
+    let topic = if subject.is_empty() { "bez tematu".to_string() } else { format!("temat: „{subject}”") };
+    if who.contains('@') {
+        b.add("Poczta", "@", BLUE, format!("Nowy mail do: {who}"), topic.clone(), key,
+            pv(format!("Do: {who}"), format!("Temat: {subject}"), "• Thunderbird: nowa wiadomość"), &[], Cmd::MailCompose { to: who.clone(), subject: subject.clone() });
+    }
+    match crate::mail::contacts(&who).await {
+        Ok(list) => {
+            for c in list {
+                let name = c["name"].as_str().unwrap_or_default().to_string();
+                let email = c["email"].as_str().unwrap_or_default().to_string();
+                let to = if name.is_empty() || name == email { email.clone() } else { format!("{name} <{email}>") };
+                b.add("Poczta", "@", BLUE, format!("Nowy mail do: {name}"), format!("{email} · {topic}"), key,
+                    pv(format!("Do: {name}"), format!("{email}\nTemat: {subject}"), "• Thunderbird: nowa wiadomość z adresem i tematem"), &[], Cmd::MailCompose { to, subject: subject.clone() });
+            }
+        }
+        Err(e) => {
+            b.add("Poczta", "!", GREY, "Thunderbird nie odpowiada".into(), e.clone(), key, pv("Poczta", e, ""), &[], Cmd::MailCompose { to: String::new(), subject: String::new() });
+        }
+    }
+    if b.rows.is_empty() {
+        b.add("Poczta", "@", BLUE, format!("Nowy mail — „{who}” nie ma w kontaktach"), topic, key,
+            pv("Nowy mail", "Thunderbird otworzy okno pisania z tematem; adres wpiszesz sam.", ""), &[], Cmd::MailCompose { to: String::new(), subject });
+    }
+    b.finish("Nowy mail".into())
+}
+
+/// „ms faktura” → wyniki z całej poczty.
+async fn mail_search_rows(key: &str, q: &str) -> Answer {
+    let mut b = Builder { rows: Vec::new() };
+    match crate::mail::mail_search(q.to_string()).await {
+        Ok(items) if !items.is_empty() => {
+            for it in items {
+                let r = crate::mail::mail_ref(&it);
+                let date = it["date"].as_str().and_then(|d| DateTime::parse_from_rfc3339(d).ok()).map(|d| ago(d.timestamp())).unwrap_or_default();
+                let who = if r.from_name.is_empty() { r.from_email.clone() } else { r.from_name.clone() };
+                let title = if r.subject.is_empty() { "(bez tematu)".to_string() } else { r.subject.clone() };
+                b.add("Poczta", "✉", BLUE, title.clone(), format!("{who} · {date}{}", if r.account.is_empty() { String::new() } else { format!(" · {}", r.account) }), key,
+                    pv(title, format!("Od: {who} <{}>", r.from_email), "• Enter: otwiera mail w Thunderbirdzie\n• Tab: zrób zadanie, archiwizuj"),
+                    &[("task", "Zrób zadanie w Horologu"), ("archive", "Archiwizuj")], Cmd::MailOpen { id: r.id, mid: r.mid.clone() });
+            }
+        }
+        Ok(_) => b.add("Poczta", "✉", GREY, format!("Nic nie znalazłem: „{q}”"), "Szukam w temacie, nadawcy i treści".into(), key, pv("Szukaj w poczcie", "Spróbuj innego słowa.", ""), &[], Cmd::MailCompose { to: String::new(), subject: String::new() }),
+        Err(e) => b.add("Poczta", "!", GREY, "Thunderbird nie odpowiada".into(), e.clone(), key, pv("Poczta", e, ""), &[], Cmd::MailCompose { to: String::new(), subject: String::new() }),
+    }
+    b.finish("Poczta".into())
+}
+
 #[tauri::command]
-pub fn palette_query(app: AppHandle, query: String) -> Answer {
+pub async fn palette_query(app: AppHandle, query: String) -> Answer {
     let cfg = state::cfg(&app);
     let q = query.trim().to_lowercase();
-    let mut b = Builder { rows: Vec::new() };
     let keys = keys(&cfg);
+
+    // Poczta: „@ adresat temat” i „ms słowa” — pytają Thunderbirda.
+    let mail_key = |c: &str| keys.iter().find(|(k, _)| k == c).map(|(_, v)| v.clone()).unwrap_or_default();
+    let (compose_key, search_key) = (mail_key("mail_compose"), mail_key("mail_search"));
+    if !compose_key.is_empty() {
+        let t = query.trim();
+        let rest = if compose_key == "@" {
+            t.strip_prefix('@')
+        } else {
+            match t.split_once(char::is_whitespace) {
+                Some((h, r)) if h.eq_ignore_ascii_case(&compose_key) => Some(r),
+                None if t.eq_ignore_ascii_case(&compose_key) => Some(""),
+                _ => None,
+            }
+        };
+        if let Some(rest) = rest {
+            return mail_compose_rows(&app, &compose_key, rest).await;
+        }
+    }
+    if !search_key.is_empty() {
+        if let Some((h, rest)) = query.trim().split_once(char::is_whitespace) {
+            if h.eq_ignore_ascii_case(&search_key) && !rest.trim().is_empty() {
+                return mail_search_rows(&search_key, rest.trim()).await;
+            }
+        }
+    }
+
+    let mut b = Builder { rows: Vec::new() };
 
     // Puste pole: podpowiedź — wszystkie szybkie klawisze.
     if q.is_empty() {
@@ -998,6 +1099,22 @@ pub async fn palette_run(app: AppHandle, id: String, action: Option<String>) -> 
                 app.opener().open_path(p, None::<&str>).map_err(|e| e.to_string())?;
             }
         }
+        Cmd::MailCompose { to, subject } => {
+            if !to.is_empty() || !subject.is_empty() {
+                crate::mail::compose(&to, &subject)?;
+            } else {
+                // Podpowiedź bez adresata — wróć do palety z „@ ”.
+                show(&app);
+            }
+        }
+        Cmd::MailOpen { id, mid } => match action.as_str() {
+            "task" => {
+                let title = crate::mail::mail_task(app.clone(), id, mid, None, Some(false)).await?;
+                radio::pit_wall(&app, format!("W planie: {title}"), None);
+            }
+            "archive" => crate::mail::mail_action(app.clone(), id, mid, "archive".into())?,
+            _ => crate::mail::mail_action(app.clone(), id, mid, "open".into())?,
+        },
         Cmd::Plan { title, minutes, intent, kind } => match action.as_str() {
             "done" => {
                 if let Some(id) = intent {

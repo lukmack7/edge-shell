@@ -286,6 +286,26 @@ async fn post_capture(app: &AppHandle, text: &str) -> Result<String, String> {
     }
 }
 
+/// Jak `capture`, ale zwraca (id zadania, tytuł) — do zadań z maili.
+pub async fn capture_intent(app: &AppHandle, text: &str) -> Result<(String, String), String> {
+    let resp = client()
+        .post(format!("{}/api/capture", base(app)))
+        .timeout(Duration::from_secs(60))
+        .json(&serde_json::json!({ "text": text }))
+        .send()
+        .await
+        .map_err(|e| format!("Horolog niedostępny: {e}"))?;
+    let status = resp.status();
+    let body: serde_json::Value = resp.json().await.unwrap_or_default();
+    if !status.is_success() {
+        return Err(body["detail"].as_str().unwrap_or("Horolog nie przyjął zadania").to_string());
+    }
+    let id = body["intent"]["id"].as_str().map(str::to_string).or_else(|| body["intent"]["id"].as_i64().map(|n| n.to_string())).unwrap_or_default();
+    let title = body["intent"]["title"].as_str().unwrap_or(text).to_string();
+    let _ = fetch_plan(app).await;
+    Ok((id, title))
+}
+
 async fn flush_offline(app: &AppHandle) {
     let pending = state::read(app, |rt| rt.store.offline_captures.clone());
     if pending.is_empty() {

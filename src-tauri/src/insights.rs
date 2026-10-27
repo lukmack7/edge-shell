@@ -150,6 +150,7 @@ pub fn record_actual(app: &AppHandle, intent_id: &str, title: &str, planned: i64
         at: Local::now(),
         app: None,
         open_target: None,
+        mail: None,
         ask: Some(format!("dur:{intent_id}:{rounded}")),
         yes_label: Some(format!("Tak, {rounded} min")),
         no_label: Some("Zostaw".into()),

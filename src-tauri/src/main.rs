@@ -31,6 +31,7 @@ mod sysx;
 mod automations;
 mod backup;
 mod stacks;
+mod mail;
 
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
@@ -215,6 +216,13 @@ fn main() {
             palette::palette_query,
             player::player_toggle,
             notch::notch_size,
+            mail::mail_action,
+            mail::mail_reply,
+            mail::mail_task,
+            mail::mail_open_task,
+            mail::mail_inbox,
+            mail::mail_search,
+            mail::mail_addon_path,
             notch::notch_focus,
             notch::notch_missed,
             notch::notch_clear_missed,

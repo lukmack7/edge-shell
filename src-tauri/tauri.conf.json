@@ -394,6 +394,9 @@
       "nsis": {
         "installMode": "currentUser"
       }
-    }
+    },
+    "resources": [
+      "resources/edge-shell-bridge.xpi"
+    ]
   }
 }

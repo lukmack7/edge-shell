@@ -41,6 +41,46 @@ pub struct Config {
     pub automations: Vec<Rule>,
     pub presence: PresenceCfg,
     pub windows: WindowsCfg,
+    pub mail: MailCfg,
+}
+
+/// Poczta z Thunderbirda (przez dodatek Edge Shell Bridge).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct MailCfg {
+    pub enabled: bool,
+    /// Newslettery (nagłówek List-Unsubscribe / List-Id) bez powiadomień.
+    pub skip_newsletters: bool,
+    /// Nazwy kont (jak w Thunderbirdzie), które poza trybem pracy czekają na paczkę.
+    pub work_accounts: Vec<String>,
+    /// Tryb, w którym konta firmowe przychodzą normalnie.
+    pub work_mode: String,
+    /// Ważni nadawcy (adres albo nazwa) — przechodzą przez ciszę.
+    pub vip: Vec<String>,
+    /// Słowa w tytule bloku z Horologa, które włączają tryb „blok poczty”.
+    pub block_words: Vec<String>,
+    /// Licznik nieprzeczytanych na ikonie Thunderbirda w docku.
+    pub badge: bool,
+    /// W fokusie licznik jest szary i bez liczby.
+    pub badge_mute_focus: bool,
+    /// Długość zadania z maila (minuty).
+    pub task_minutes: i64,
+}
+
+impl Default for MailCfg {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            skip_newsletters: true,
+            work_accounts: vec![],
+            work_mode: "praca".into(),
+            vip: vec![],
+            block_words: vec!["poczta".into(), "mail".into(), "maile".into(), "e-mail".into(), "skrzynka".into(), "inbox".into()],
+            badge: true,
+            badge_mute_focus: true,
+            task_minutes: 30,
+        }
+    }
 }
 
 /// Obecność („body doubling”) przez serwer na home serwerze.
@@ -809,6 +849,7 @@ impl Default for Config {
             automations: default_rules(),
             presence: PresenceCfg::default(),
             windows: WindowsCfg::default(),
+            mail: MailCfg::default(),
         }
     }
 }

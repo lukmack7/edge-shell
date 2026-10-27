@@ -71,6 +71,7 @@ pub fn from_incoming(app: &AppHandle, mut inc: Incoming) -> RadioMsg {
         at: Local::now(),
         app: None,
         open_target: None,
+        mail: None,
         ask: None,
         yes_label: None,
         no_label: None,
@@ -107,6 +108,7 @@ pub fn pit_wall(app: &AppHandle, message: String, reply: Option<String>) {
             at: Local::now(),
             app: None,
             open_target: None,
+        mail: None,
             ask: None,
             yes_label: None,
             no_label: None,
@@ -179,7 +181,7 @@ pub fn to_missed(app: &AppHandle) {
         rt.showing.pop_front();
         rt.store.missed.insert(
             0,
-            crate::state::Missed { at: m.at, name: m.name, color: m.color, message: m.message, open_target: m.open_target, app: m.app },
+            crate::state::Missed { at: m.at, name: m.name, color: m.color, message: m.message, open_target: m.open_target, app: m.app, mail: m.mail },
         );
         rt.store.missed.truncate(10);
     });
@@ -311,6 +313,23 @@ pub fn start_server(app: AppHandle) {
                 (401, r#"{"error":"unauthorized"}"#.to_string())
             } else if method == "GET" && path == "/health" {
                 (200, r#"{"status":"ok"}"#.to_string())
+            } else if method == "GET" && path == "/mail/commands" {
+                (200, crate::mail::take_commands(&app))
+            } else if method == "POST" && path.starts_with("/mail/") {
+                let mut text = String::new();
+                let _ = req.as_reader().take(4 * 1024 * 1024).read_to_string(&mut text);
+                match serde_json::from_str::<serde_json::Value>(&text) {
+                    Ok(v) => {
+                        match path.as_str() {
+                            "/mail/event" => crate::mail::on_event(&app, v),
+                            "/mail/state" => crate::mail::on_state(&app, v),
+                            "/mail/result" => crate::mail::on_result(v),
+                            _ => {}
+                        }
+                        (200, r#"{"ok":true}"#.to_string())
+                    }
+                    Err(_) => (400, r#"{"error":"bad json"}"#.to_string()),
+                }
             } else if method == "POST" && path == "/radio" {
                 let mut text = String::new();
                 let _ = req.as_reader().take(64 * 1024).read_to_string(&mut text);

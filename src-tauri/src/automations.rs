@@ -355,6 +355,7 @@ fn card(message: String, ask: Option<String>) -> RadioMsg {
         at: Local::now(),
         app: None,
         open_target: None,
+        mail: None,
         ask,
         yes_label: None,
         no_label: None,

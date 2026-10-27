@@ -136,7 +136,13 @@ async function run(i, action) {
   }
 }
 
-q.addEventListener('input', query);
+// Poczta pyta Thunderbirda — czekamy, aż przestaniesz pisać (reszta od razu).
+let mailTimer = null;
+q.addEventListener('input', () => {
+  clearTimeout(mailTimer);
+  if (/^@|^ms\s/i.test(q.value.trim())) mailTimer = setTimeout(query, 350);
+  else query();
+});
 document.addEventListener('keydown', (e) => {
   const r = rows[sel];
   if (e.key === 'Escape') {

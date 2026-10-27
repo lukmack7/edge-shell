@@ -20,6 +20,7 @@
   .tick { position: absolute; left: 22px; width: 4px; height: 1px; background: rgba(255,255,255,0.14); pointer-events: none; }
   .track { position: absolute; left: 28px; width: 14px; top: 0; bottom: 0; border-radius: 4px; background: rgba(255,255,255,0.04); }
   .seg { position: absolute; left: 28px; width: 14px; border-radius: 4px; transition: filter 0.15s; }
+  .seg.mail { outline: 1.5px solid #38bdf8; outline-offset: 1px; }
   .seg.cur { box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55); }
   .seg.flash { animation: flash 1.2s ease-out 3; }
   @keyframes flash { 0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.9); } 100% { box-shadow: 0 0 0 7px rgba(255,255,255,0); } }
@@ -54,7 +55,12 @@ $('cal').innerHTML = icon('calendar', 18);
 $('cal').title = 'Kalendarz';
 $('cal').onclick = () => invoke('toggle_calendar');
 $('nowBtn').onclick = () => invoke('toggle_panel', { label: 'now' });
-$('axis').onclick = () => invoke('toggle_panel', { label: 'now' });
+$('axis').onclick = (e) => {
+  // Blok zrobiony z maila → otwórz ten mail w Thunderbirdzie.
+  const seg = e.target.closest('[data-intent]');
+  if (seg) { invoke('mail_open_task', { intentId: seg.dataset.intent }).catch(() => invoke('toggle_panel', { label: 'now' })); return; }
+  invoke('toggle_panel', { label: 'now' });
+};
 
 function dayRange() {
   const items = (s?.day || []).filter((i) => i.kind !== 'buffer');
@@ -104,7 +110,8 @@ function render() {
     const bg = isNow ? `linear-gradient(180deg, ${col} ${((now - a) / (b - a)) * 100}%, ${col}50 0)` : (i.status === 'next' ? `${col}b0` : col);
     const flash = i.key === flashKey && now < flashUntil ? ' flash' : '';
     const tip = `${i.title}\n${hhmm(i.start)}–${hhmm(i.end)} · ${STATUS_TXT[i.status] || ''}${isNow ? ` · zostało ${Math.max(0, Math.round((b - now) / 60000))} min` : ''}`;
-    return `<span class="seg${isNow ? ' cur' : ''}${flash}" style="top:${top}%;height:${h}%;background:${bg}" title="${esc(tip)}"></span>`;
+    const fromMail = i.intentId && (s.mailTasks || []).includes(i.intentId);
+    return `<span class="seg${isNow ? ' cur' : ''}${flash}${fromMail ? ' mail' : ''}" ${fromMail ? `data-intent="${esc(i.intentId)}"` : ''} style="top:${top}%;height:${h}%;background:${bg}" title="${esc(tip)}${fromMail ? '\n✉ z maila — klik otwiera mail' : ''}"></span>`;
   }).join('');
   const nowMark = now > from && now < to ? `<span class="nowmark" style="top:calc(${pct(now)}% - 1px)"></span>` : '';
   $('axis').innerHTML = `<span class="track"></span>${marks}${segs}${nowMark}`;

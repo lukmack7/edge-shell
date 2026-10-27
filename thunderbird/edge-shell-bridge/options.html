@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 14px system-ui, sans-serif; padding: 12px; max-width: 460px; }
+  label { display: block; margin: 10px 0 4px; font-weight: 600; }
+  input { width: 100%; padding: 6px 8px; box-sizing: border-box; }
+  p { color: #555; line-height: 1.4; }
+  #st { margin-top: 10px; font-weight: 600; }
+</style>
+</head>
+<body>
+<p>Edge Shell Bridge łączy się z Edge Shell na tym komputerze. Port i token muszą być takie same jak w Edge Shell → Ustawienia → Radio i kontakty → Lokalny endpoint.</p>
+<label for="port">Port</label><input id="port" type="number" min="1" max="65535">
+<label for="token">Token (pusty, jeśli w Edge Shell też jest pusty)</label><input id="token" type="text">
+<div id="st"></div>
+<script src="options.js"></script>
+</body>
+</html>

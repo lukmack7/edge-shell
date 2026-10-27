@@ -208,6 +208,24 @@ Reguły dla aplikacji ustawiasz w `notifications.apps`:
 
 Pole `matches` to fragment identyfikatora aplikacji albo jej nazwa.
 
+## Poczta: Thunderbird
+
+Dodatek **Edge Shell Bridge** (`thunderbird/edge-shell-bridge`, w instalatorze jako `edge-shell-bridge.xpi`)
+łączy Thunderbirda z Edge Shell przez lokalny endpoint radia (127.0.0.1). Instalacja: Ustawienia → Poczta →
+„Pokaż plik dodatku”, potem w Thunderbirdzie *Dodatki i motywy → koło zębate → Zainstaluj dodatek z pliku…*.
+
+- **Mail w notchu** (błękitny): nadawca, temat, początek treści; Odpowiedz (pisane w notchu, wysyła Thunderbird),
+  Zrób zadanie, Archiwizuj, Przeczytane, Odłóż do paczki, Otwórz (dokładnie ten mail).
+- **Reguły**: newslettery (List‑Unsubscribe) pomijane, ważni nadawcy przez ciszę, konta firmowe poza trybem pracy do paczki.
+- **Mail → zadanie** w Horologu; blok z maila na prawej szynie ma błękitną ramkę, klik otwiera mail.
+- **Licznik** nieprzeczytanych na ikonie Thunderbirda w docku; w fokusie szara kropka.
+- **Blok poczty**: blok z Horologa ze słowem „poczta / mail / skrzynka” w tytule — rozwinięty notch prowadzi
+  przez nieprzeczytane: R odpowiedz, Z zadanie, A archiwum, spacja później.
+- **Paleta**: `@ jan oferta` — nowy mail do kontaktu z tematem; `ms faktura` — szukaj w całej poczcie.
+- **Zamknięcie dnia**: oflagowane maile → „Do planu” (blok na jutro).
+
+Systemowe powiadomienia Thunderbirda są pomijane, gdy dodatek jest połączony (bez duplikatów).
+
 ## Spotify
 
 1. Na [developer.spotify.com](https://developer.spotify.com/dashboard) utwórz aplikację. Jako Redirect URI dodaj `http://127.0.0.1:7312/callback`.

@@ -164,6 +164,7 @@ const PAGES = [
   ['windows', 'Okna', 'apps'],
   ['radio', 'Radio i kontakty', 'radio'],
   ['notifications', 'Powiadomienia', 'bell'],
+  ['mail', 'Poczta', 'mail'],
   ['spotify', 'Spotify', 'music'],
   ['hotkeys', 'Skróty', 'keyboard'],
 ];
@@ -454,6 +455,47 @@ const render = {
         <span class="hint">„Pilne” przechodzi od razu nawet w ciszy, „Pomijaj” ukrywa całkiem.</span>
         <div class="list">${rules}</div>
         <div><button class="btn" id="nrAdd">${icon('plus', 16, 2)}Dodaj regułę</button></div>
+      </div>`;
+  },
+
+  mail() {
+    const m = snap?.mail || {};
+    const mc = cfg.mail;
+    const accounts = m.accounts || [];
+    const status = m.connected
+      ? `Połączony · ${accounts.length} ${accounts.length === 1 ? 'konto' : 'konta'} · ${m.unread || 0} nieprzeczytanych`
+      : 'Thunderbird nie jest połączony — zainstaluj dodatek (poniżej) i uruchom Thunderbirda.';
+    const accChips = accounts.map((a) => `<button class="chip ${mc.workAccounts.includes(a.name) ? 'on' : ''}" data-wacc="${esc(a.name)}">${esc(a.name)}</button>`).join('')
+      || '<span class="hint">Konta pojawią się, gdy Thunderbird się połączy.</span>';
+    return `
+      <h2>Poczta</h2>
+      <p class="lead">Thunderbird w Edge Shell: mail w notchu z akcjami, odpowiedź bez otwierania Thunderbirda, mail → zadanie w Horologu, licznik w docku, blok poczty, „@” i „ms” w palecie, oflagowane w wieczornej karcie.</p>
+      <div class="card">
+        <div class="row"><div class="txt"><b>Poczta z Thunderbirda</b><span>${esc(status)}</span></div>${sw(mc.enabled, 'mail.enabled')}</div>
+        <h3>Dodatek „Edge Shell Bridge”</h3>
+        <span class="hint">1. Kliknij „Pokaż plik dodatku”.<br>2. W Thunderbirdzie: menu ≡ → Dodatki i motywy → koło zębate → <b>Zainstaluj dodatek z pliku…</b> → wybierz edge-shell-bridge.xpi.<br>3. W opcjach dodatku port ${cfg.radio.port}${cfg.radio.token ? ' i ten sam token co w „Radio i kontakty”' : ' (token pusty)'}. Dodatek łączy się tylko z tym komputerem (127.0.0.1).</span>
+        <div class="row" style="justify-content:flex-start;gap:8px"><button class="btn" id="mailAddon">${icon('folder', 16)}Pokaż plik dodatku</button><span class="hint" id="mailAddonRes"></span></div>
+      </div>
+      <div class="card">
+        <h3>Mniej szumu</h3>
+        <div class="row"><div class="txt"><b>Pomijaj newslettery</b><span>Maile z nagłówkiem do wypisania się (List‑Unsubscribe) zostają w Thunderbirdzie, ale Edge Shell milczy. Liczba pominiętych jest w liście powiadomień.${m.skippedToday ? ` Dziś: ${m.skippedToday}.` : ''}</span></div>${sw(mc.skipNewsletters, 'mail.skipNewsletters')}</div>
+        <label class="field-l">Ważni nadawcy — przechodzą przez ciszę (adresy albo nazwy, po przecinku). Kontakty z numerem z „Radio i kontakty” też.
+          <input class="in" id="mailVip" value="${esc(mc.vip.join(', '))}" placeholder="np. szef@firma.pl, Kasia"></label>
+        <div class="field-l">Konta firmowe — poza trybem pracy czekają na paczkę
+          <div class="chips">${accChips}</div></div>
+        <div class="row"><div class="txt"><b>Tryb pracy dla kont firmowych</b></div>
+          <select class="in" data-bind="mail.workMode">${cfg.modes.map((x) => `<option value="${esc(x.id)}">${esc(x.label)}</option>`).join('')}</select></div>
+      </div>
+      <div class="card">
+        <h3>Blok poczty i zadania</h3>
+        <label class="field-l">Blok z Horologa jest „blokiem poczty”, gdy w tytule ma jedno z tych słów — wtedy rozwinięty notch prowadzi przez skrzynkę (jeden mail, jedna decyzja)
+          <input class="in" id="mailWords" value="${esc(mc.blockWords.join(', '))}"></label>
+        <div class="row"><div class="txt"><b>Długość zadania z maila</b><span><span data-out="mail.taskMinutes">${mc.taskMinutes}</span> min</span></div><input type="range" min="15" max="120" step="15" data-num="mail.taskMinutes" style="width:220px"></div>
+      </div>
+      <div class="card">
+        <h3>Dock</h3>
+        <div class="row"><div class="txt"><b>Licznik nieprzeczytanych na ikonie Thunderbirda</b><span>Suma skrzynek odbiorczych wszystkich kont.</span></div>${sw(mc.badge, 'mail.badge')}</div>
+        <div class="row"><div class="txt"><b>W fokusie wycisz licznik</b><span>Szara kropka zamiast liczby — wiesz, że coś jest, ale nie kusi. W bloku poczty licznik wraca.</span></div>${sw(mc.badgeMuteFocus, 'mail.badgeMuteFocus')}</div>
       </div>`;
   },
 
@@ -789,6 +831,25 @@ const after = {
       cfg.radio.batchTimes.sort();
       markDirty(); show(page);
     };
+  },
+  mail(root) {
+    $('mailAddon').onclick = async () => {
+      try { const p = await invoke('mail_addon_path'); await invoke('reveal', { path: p }); $('mailAddonRes').textContent = p; }
+      catch (e) { $('mailAddonRes').textContent = String(e); }
+    };
+    const list = (v) => v.split(',').map((x) => x.trim()).filter(Boolean);
+    $('mailVip').oninput = () => { cfg.mail.vip = list($('mailVip').value); markDirty(); };
+    $('mailWords').oninput = () => { cfg.mail.blockWords = list($('mailWords').value); markDirty(); };
+    for (const b of root.querySelectorAll('[data-wacc]')) {
+      b.onclick = () => {
+        const n = b.dataset.wacc;
+        const w = cfg.mail.workAccounts;
+        const i = w.indexOf(n);
+        if (i >= 0) w.splice(i, 1); else w.push(n);
+        b.classList.toggle('on', i < 0);
+        markDirty();
+      };
+    }
   },
   notifications(root) {
     for (const el of root.querySelectorAll('[data-nr]')) {
@@ -1339,7 +1400,7 @@ onSnapshot((s) => {
   const key = JSON.stringify([s.radio?.notifications, s.music?.connected, s.music?.error]);
   if (key === statusKey) return;
   statusKey = key;
-  if (['notifications', 'spotify'].includes(page) && cfg && !document.activeElement?.matches('input, select')) show(page);
+  if (['notifications', 'spotify', 'mail'].includes(page) && cfg && !document.activeElement?.matches('input, select')) show(page);
 });
 listen('config-changed', () => { if (cfg && JSON.stringify(cfg) === saved) load(); });
 load();

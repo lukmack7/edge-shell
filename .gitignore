@@ -3,3 +3,4 @@ src-tauri/target/
 src-tauri/gen/
 package-lock.json
 *.log
+src-tauri/resources/

@@ -315,6 +315,10 @@ fn to_radio(app: &AppHandle, raw: &Raw) -> Option<RadioMsg> {
         return None;
     }
     let source = app_name(&raw.aumid);
+    // Z dodatkiem Edge Shell Bridge poczta przychodzi bogatsza (z akcjami) — systemowy toast byłby duplikatem.
+    if source == "Thunderbird" && cfg.mail.enabled && crate::mail::alive() {
+        return None;
+    }
     let r = rule(&cfg.notifications.apps, &raw.aumid, &source);
     if r.is_some_and(|r| r.ignore) {
         return None;

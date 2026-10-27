@@ -18,6 +18,7 @@
   .app.dim .stripe { background: transparent !important; }
   .dots { position: absolute; top: -4px; right: -2px; display: flex; gap: 2px; }
   .dots i { width: 6px; height: 6px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 1.5px #18181b; }
+  .badge.muted { min-width: 10px; width: 10px; height: 10px; padding: 0; top: -2px; right: -2px; background: #71717a; }
   .badge { position: absolute; top: -5px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; box-shadow: 0 0 0 2px #18181b; }
   .app.stack .tile.real img { width: 46px; height: 46px; }
   @keyframes reveal { from { transform: translateY(70%); opacity: 0.4; } to { transform: none; opacity: 1; } }
@@ -182,7 +183,8 @@ function render(s) {
       ${tile(a)}
       ${card ? `<span class="lbl"><b>${esc(lbl.title)}</b>${lbl.sub ? `<span>${esc(lbl.sub)}</span>` : ''}</span>` : ''}
       <span class="stripe" style="background:${a.stripe}"></span>
-      ${a.badge ? `<span class="badge" aria-label="${a.badge} nowych">${a.badge > 99 ? '99+' : a.badge}</span>`
+      ${a.badgeMuted ? '<span class="badge muted" aria-label="nieprzeczytana poczta — wyciszone w fokusie" title="Poczta czeka — licznik wyciszony w fokusie"></span>'
+        : a.badge ? `<span class="badge" aria-label="${a.badge} nowych">${a.badge > 99 ? '99+' : a.badge}</span>`
         : !card && (a.windows || a.running) ? `<span class="dots" aria-hidden="true">${'<i></i>'.repeat(Math.min(3, Math.max(1, a.windows || 1)))}</span>` : ''}
     </button>${a.separatorAfter ? '<span class="sep" aria-hidden="true"></span>' : ''}`;
   }).join('');
