@@ -147,6 +147,107 @@ fn decode_xml(s: &str) -> String {
     out
 }
 
+/// „Otwórz” przy powiadomieniu. Zwykłe programy (np. Thunderbird) wysyłają
+/// powiadomienia pod identyfikatorem, którego nie ma w `shell:AppsFolder` —
+/// Windows pokazywał wtedy błąd „nie może odnaleźć pliku”. Kolejność:
+/// 1) okno tej aplikacji już działa → przywróć je,
+/// 2) aplikacja ze Sklepu (AUMID z `!`) → `shell:AppsFolder`,
+/// 3) skrót z menu Start o tej nazwie,
+/// 4) dopiero na końcu `shell:AppsFolder` (może się udać, np. Chrome).
+pub fn open_source(app: &AppHandle, target: &str, name: Option<&str>) -> Result<(), String> {
+    use tauri_plugin_opener::OpenerExt;
+    let aumid = target.strip_prefix("shell:AppsFolder\\").unwrap_or("");
+    let name = name.map(str::to_string).filter(|n| !n.is_empty() && n != "Windows").unwrap_or_else(|| app_name(aumid));
+    let key = name.to_lowercase();
+
+    if !key.is_empty() {
+        let wins = crate::platform::app_windows();
+        let hit = wins.iter().find(|w| {
+            let exe = std::path::Path::new(&w.exe).file_stem().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+            !exe.is_empty() && (exe.contains(&key) || key.contains(&exe))
+        });
+        if let Some(w) = hit {
+            if crate::platform::restore(w.hwnd) {
+                return Ok(());
+            }
+        }
+    }
+    if aumid.contains('!') {
+        return app.opener().open_path(target.to_string(), None::<&str>).map_err(|e| e.to_string());
+    }
+    if let Some(lnk) = start_menu_shortcut(&key) {
+        return app.opener().open_path(lnk.to_string_lossy().to_string(), None::<&str>).map_err(|e| e.to_string());
+    }
+    if aumid.is_empty() {
+        return Err(format!("Nie wiem, jak otworzyć {name}"));
+    }
+    // Ostatnia próba — część programów rejestruje swój identyfikator (np. Chrome).
+    if known_aumid(aumid) {
+        return app.opener().open_path(target.to_string(), None::<&str>).map_err(|e| e.to_string());
+    }
+    Err(format!("Nie znalazłem aplikacji {name} — otwórz ją z docka"))
+}
+
+/// Czy `shell:AppsFolder` zna ten identyfikator (skrót w menu Start ma taki AUMID
+/// albo to aplikacja ze Sklepu). Sprawdzane przez listę aplikacji Start.
+fn known_aumid(aumid: &str) -> bool {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let script = format!("[bool](Get-StartApps | Where-Object {{ $_.AppID -eq '{}' }})", aumid.replace('\'', "''"));
+        if let Ok(out) = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+        {
+            return String::from_utf8_lossy(&out.stdout).trim().eq_ignore_ascii_case("true");
+        }
+    }
+    let _ = aumid;
+    false
+}
+
+/// Skrót .lnk z menu Start, którego nazwa zawiera nazwę aplikacji.
+fn start_menu_shortcut(key: &str) -> Option<PathBuf> {
+    if key.len() < 3 {
+        return None;
+    }
+    let mut roots = Vec::new();
+    if let Ok(p) = std::env::var("APPDATA") {
+        roots.push(PathBuf::from(p).join("Microsoft\\Windows\\Start Menu\\Programs"));
+    }
+    if let Ok(p) = std::env::var("ProgramData") {
+        roots.push(PathBuf::from(p).join("Microsoft\\Windows\\Start Menu\\Programs"));
+    }
+    fn walk(dir: &std::path::Path, key: &str, depth: u8, best: &mut Option<PathBuf>) {
+        let Ok(rd) = std::fs::read_dir(dir) else { return };
+        for e in rd.flatten() {
+            let p = e.path();
+            if p.is_dir() {
+                if depth < 3 {
+                    walk(&p, key, depth + 1, best);
+                }
+                continue;
+            }
+            let is_lnk = p.extension().is_some_and(|x| x.eq_ignore_ascii_case("lnk"));
+            let stem = p.file_stem().and_then(|s| s.to_str()).unwrap_or("").to_lowercase();
+            // Pomijamy dezinstalatory, „safe mode” itp.
+            if is_lnk && stem.contains(key) && !stem.contains("uninstall") && !stem.contains("odinstal") && !stem.contains("safe") {
+                // Najkrótsza nazwa wygrywa: „Mozilla Thunderbird” przed „Thunderbird (Profile Manager)”.
+                if best.as_ref().map_or(true, |b| b.as_os_str().len() > p.as_os_str().len()) {
+                    *best = Some(p);
+                }
+            }
+        }
+    }
+    let mut best = None;
+    for r in roots {
+        walk(&r, key, 0, &mut best);
+    }
+    best
+}
+
 /// Przyjazna nazwa aplikacji z identyfikatora AUMID.
 pub fn app_name(aumid: &str) -> String {
     let lower = aumid.to_lowercase();

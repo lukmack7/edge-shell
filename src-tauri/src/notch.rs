@@ -45,13 +45,10 @@ pub fn notch_clear_missed(app: AppHandle, index: Option<usize>) {
 /// Otwiera aplikację, z której przyszła przegapiona wiadomość.
 #[tauri::command]
 pub fn notch_open_missed(app: AppHandle, index: usize) -> Result<(), String> {
-    let target = state::read(&app, |rt| rt.store.missed.get(index).and_then(|m| m.open_target.clone()));
+    let target = state::read(&app, |rt| rt.store.missed.get(index).and_then(|m| m.open_target.clone().map(|t| (t, m.app.clone()))));
     notch_clear_missed(app.clone(), Some(index));
     match target {
-        Some(t) => {
-            use tauri_plugin_opener::OpenerExt;
-            app.opener().open_path(t, None::<&str>).map_err(|e| e.to_string())
-        }
+        Some((t, name)) => crate::notifications::open_source(&app, &t, name.as_deref()),
         None => Ok(()),
     }
 }

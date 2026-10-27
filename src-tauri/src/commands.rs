@@ -449,10 +449,10 @@ pub fn radio_next(app: AppHandle) {
 /// Otwiera aplikację, z której przyszło powiadomienie, i zdejmuje kartę.
 #[tauri::command]
 pub fn radio_open(app: AppHandle) -> Res<()> {
-    let target = state::read(&app, |rt| rt.showing.front().and_then(|m| m.open_target.clone()));
+    let target = state::read(&app, |rt| rt.showing.front().and_then(|m| m.open_target.clone().map(|t| (t, m.app.clone()))));
     radio::dismiss(&app, false);
     match target {
-        Some(t) => app.opener().open_path(t, None::<&str>).map_err(|e| e.to_string()),
+        Some((t, name)) => crate::notifications::open_source(&app, &t, name.as_deref()),
         None => Ok(()),
     }
 }
