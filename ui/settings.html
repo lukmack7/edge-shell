@@ -365,6 +365,15 @@ const render = {
         <button class="btn primary" id="appAdd">${icon('plus', 16, 2)}Dodaj aplikację</button>
         <button class="btn" id="secAdd">${icon('plus', 16, 2)}Nowa sekcja</button>
       </div>
+      <div class="card" style="margin-top:12px"><h3>Widgety</h3>
+        <div class="row">
+          <div class="txt"><b>Żywe kafelki na początku docka</b><span>Osobne wpisy — nie zastępują żadnej aplikacji. Klik otwiera panel Teraz (radio: czekające, muzyka: play/pauza). Widget w edytorze aplikacji zamienia jej ikonę w kafelek, jeśli wolisz tak.</span></div>
+          <span style="display:flex;gap:6px">
+            <select class="in" id="wgAddType" aria-label="Rodzaj widgetu" style="width:auto">${WIDGETS.filter((w) => w[0]).map(([v, l]) => `<option value="${v}">${l}</option>`).join('')}</select>
+            <button class="btn" id="wgAdd">${icon('plus', 16, 2)}Dodaj widget</button>
+          </span>
+        </div>
+      </div>
       <div class="dockgrid">
         <div style="display:flex;flex-direction:column;gap:12px">${lanes}</div>
         <div class="card editor" id="editor"></div>
@@ -423,6 +432,14 @@ const render = {
           <label class="field-l">Długość geograficzna<input class="in" data-bind="weather.lon" placeholder="np. 19.94"></label>
         </div>
         <label class="field-l">Podpis kafelka (miasto)<input class="in" data-bind="weather.label" placeholder="np. Kraków"></label>
+        <label class="field-l">Po najechaniu na kafelek pokazuj
+          <select class="in" data-bind="weather.preview">
+            <option value="h3">prognozę na 3 godziny</option>
+            <option value="h6">prognozę na 6 godzin</option>
+            <option value="h9">prognozę na 9 godzin</option>
+            <option value="days">pogodę na kolejne dni</option>
+          </select>
+        </label>
         <span class="hint">Puste współrzędne = moduł śpi. Współrzędne dziesiętnie, np. dla Krakowa 50.06 i 19.94. Dane odświeżają się same co 30 minut, kursy walut z NBP (dla konwertera w palecie) co 6 h.</span>
         <div class="row" style="margin-top:10px">
           <div class="txt"><b>Status</b><span>${w ? `${w.emoji || ''} ${w.temp != null ? String(Math.round(w.temp)).replace('-', '−') + '°C' : ''} — ${esc(w.text || '')} (${esc(w.label || '')})` : (cfg.weather.lat.trim() && cfg.weather.lon.trim() ? 'Pobieram dane…' : 'Brak lokalizacji — moduł śpi.')}</span></div>
@@ -808,6 +825,18 @@ const after = {
     for (const b of root.querySelectorAll('[data-secdel]')) b.onclick = () => { cfg.sections.splice(+b.dataset.secdel, 1); markDirty(); show(page); };
     $('secAdd').onclick = () => { cfg.sections.push({ id: uid('sekcja'), name: 'Nowa sekcja', color: '#f472b6' }); markDirty(); show(page); };
     $('appAdd').onclick = openPicker;
+    // Widget jako osobny wpis docka — bez zastępowania ikony aplikacji.
+    $('wgAdd').onclick = async () => {
+      const [v, l] = WIDGETS.find((w) => w[0] === $('wgAddType').value) || WIDGETS[1];
+      cfg.dock.push({
+        id: uid('widget'), name: l.replace(/\s*\(.*\)\s*/, ''), path: '', args: [],
+        category: cfg.sections[0]?.id || 'system', icon: 'auto', process: '', iconPath: '',
+        separatorAfter: false, widget: v, widgetTarget: '',
+      });
+      markDirty();
+      await save();
+      show(page);
+    };
 
     // Przeciąganie aplikacji między sekcjami i w obrębie sekcji.
     let dragId = null;
@@ -1466,7 +1495,8 @@ async function load() {
   cfg.automations ||= [];
   cfg.presence ||= { enabled: false, url: '', name: '', token: '', shareTask: false };
   cfg.windows ||= { zones: 'thirds', shiftDrag: true, zoneHotkeys: true, gap: 8 };
-  cfg.weather ||= { lat: '', lon: '', label: '' };
+  cfg.weather ||= { lat: '', lon: '', label: '', preview: 'h6' };
+  cfg.weather.preview ||= 'h6';
   cfg.focus.distractions ||= [];
   for (const a of cfg.dock) { a.iconPath ??= ''; a.icon ??= 'auto'; a.widget ??= ''; a.widgetTarget ??= ''; }
   for (const m of cfg.modes) m.dock ??= [];

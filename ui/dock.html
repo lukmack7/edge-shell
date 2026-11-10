@@ -38,10 +38,10 @@
   .app .tile, .app.card .tile { transition: transform 0.16s cubic-bezier(.2,.9,.3,1.3); transform-origin: 50% 100%; }
   .sep { width: 1px; height: 34px; margin-bottom: 14px; background: rgba(255,255,255,0.12); }
   /* Widgety: żywe kafle obok ikon (blok, fokus, radio, pogoda, muzyka, odliczanie). */
-  .app.wgt { flex-direction: row; align-items: center; gap: 9px; width: 128px; height: 52px; padding: 0 11px; border-radius: 15px; background: rgba(255,255,255,0.05); text-align: left; }
+  .app.wgt { flex-direction: row; align-items: center; gap: 9px; width: 142px; height: 52px; padding: 0 11px; border-radius: 15px; background: rgba(255,255,255,0.05); text-align: left; }
   .app.wgt:hover { transform: none; background: rgba(255,255,255,0.09); }
   .app.wgt .w-ic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.07); flex: none; color: var(--muted); }
-  .app.wgt .w-tx { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 68px; }
+  .app.wgt .w-tx { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 88px; }
   .app.wgt .w-t { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .app.wgt .w-v { font-size: 12px; font-weight: 650; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .app.wgt .stripe { position: absolute; left: 11px; bottom: 4px; width: 22px; }
@@ -166,7 +166,7 @@ function cardsFor(s) {
   const withWin = s.dock.filter((a) => a.windows > 0 && !a.widget);
   const widgets = s.dock.filter((a) => a.widget).length;
   const maxW = (screen.availWidth || 1920) * 0.78;
-  const est = (s.dock.length - widgets) * 60 + widgets * 132 + withWin.length * 150;
+  const est = (s.dock.length - widgets) * 60 + widgets * 142 + withWin.length * 150;
   return withWin.length <= 7 && est < maxW;
 }
 function cardLabel(s, a) {
@@ -211,7 +211,7 @@ function widgetData(a, s) {
     case 'weather': {
       const w = s.weather;
       return w
-        ? { emoji: w.emoji, t: w.label, v: `${Math.round(w.temp)}° · ${w.text}`, tip: `${w.label}: ${Math.round(w.temp)}° — ${w.text}` }
+        ? { emoji: w.emoji, t: `${Math.round(w.temp)}°`, v: String(w.text || '').split(' · ')[0], tip: weatherTip(w, s) }
         : { ic: 'globe', t: 'Pogoda', v: 'pobieram…', tip: 'Pogoda' };
     }
     case 'music': {
@@ -229,9 +229,27 @@ function widgetData(a, s) {
   }
 }
 
+/** Tooltip pogody: miasto + aktualna, niżej prognoza wg ustawienia (3/6/9 h albo dni). */
+function weatherTip(w, s) {
+  const lines = [`${w.label || 'Pogoda'} — ${Math.round(w.temp)}°C, ${String(w.text || '').toLowerCase()}`];
+  const mode = s.wpreview || 'h6';
+  if (mode === 'days') {
+    const ds = w.days || [];
+    if (ds.length) lines.push(ds.map((d) => `${d.d} ${d.emoji} ${d.lo}…${d.hi}°`).join('\n'));
+  } else {
+    const n = { h3: 3, h9: 9 }[mode] || 6;
+    const hs = (w.hours || []).slice(0, n);
+    if (hs.length) lines.push(hs.map((h) => `${h.h} ${h.emoji} ${h.temp}°`).join('   '));
+  }
+  return lines.join('\n');
+}
+
 const widgetTile = (w) =>
   `<span class="w-ic">${w.emoji ? `<span aria-hidden="true" style="font-size:16px">${esc(w.emoji)}</span>` : icon(w.ic, 16)}</span>` +
-  `<span class="w-tx"><span class="w-t">${esc(w.t)}</span><span class="w-v">${esc(w.v)}</span></span>`;
+  // Pogoda (ma emoji): temperatura jako główny wiersz, opis pod nią; reszta — tytuł nad wartością.
+  `<span class="w-tx">${w.emoji
+    ? `<span class="w-v">${esc(w.t)}</span><span class="w-t">${esc(w.v)}</span>`
+    : `<span class="w-t">${esc(w.t)}</span><span class="w-v">${esc(w.v)}</span>`}</span>`;
 
 /** Klik w widget: radio → czekające, muzyka → play/pauza, reszta → panel Teraz. */
 function widgetClick(a) {

@@ -602,6 +602,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "battery": rt.battery.map(|(p, c)| json!({ "percent": p, "charging": c })),
         "music": rt.music,
         "weather": rt.weather,
+        "wpreview": cfg.weather.preview,
         "spotifyEnabled": !cfg.spotify.client_id.is_empty(),
         "player": rt.store.player,
         "quietUntil": rt.store.quiet_until,
