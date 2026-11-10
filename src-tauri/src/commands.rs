@@ -178,7 +178,12 @@ pub fn dock_reorder(app: AppHandle, order: Vec<String>, moved: String) -> Res<()
     }
     sorted.extend(apps);
     if let Some(i) = sorted.iter().position(|a| a.id == moved) {
-        let neighbour = sorted.get(i + 1).or_else(|| if i > 0 { sorted.get(i - 1) } else { None }).map(|a| a.category.clone());
+        // Sąsiedni widget nie nadaje kategorii (ma własną, pustą).
+        let neighbour = [sorted.get(i + 1), if i > 0 { sorted.get(i - 1) } else { None }]
+            .into_iter()
+            .flatten()
+            .find(|a| a.widget.is_empty())
+            .map(|a| a.category.clone());
         if let Some(cat) = neighbour {
             sorted[i].category = cat;
         }

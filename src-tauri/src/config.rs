@@ -444,6 +444,8 @@ pub struct Mode {
     pub wallpaper: String,
     /// Jasność ekranów 0–100 (None = bez zmiany).
     pub brightness: Option<u8>,
+    /// Własny zestaw docka dla trybu (gdy niepusty — zastępuje wspólny `dock`).
+    pub dock: Vec<DockApp>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -465,6 +467,11 @@ pub struct DockApp {
     pub icon_path: String,
     /// Wstaw separator za tą ikoną.
     pub separator_after: bool,
+    /// Widget zamiast ikony: next-block | focus | radio | weather | music | countdown.
+    /// Puste = zwykła ikona aplikacji.
+    pub widget: String,
+    /// Cel widgetu — dla `countdown` identyfikator z listy, na razie nieużywany.
+    pub widget_target: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
