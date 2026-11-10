@@ -4,3 +4,6 @@ src-tauri/gen/
 package-lock.json
 *.log
 src-tauri/resources/
+
+# Lokalna makieta koncepcji (roboczy podgląd, nie część kodu)
+edge-shell-koncepcje.html
