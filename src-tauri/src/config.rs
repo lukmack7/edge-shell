@@ -107,11 +107,13 @@ pub struct WeatherCfg {
     pub lon: String,
     /// Podpis kafelka, np. `Kraków`.
     pub label: String,
+    /// Podgląd po najechaniu na kafelek: `h3` | `h6` | `h9` | `days`.
+    pub preview: String,
 }
 
 impl Default for WeatherCfg {
     fn default() -> Self {
-        Self { lat: String::new(), lon: String::new(), label: String::new() }
+        Self { lat: String::new(), lon: String::new(), label: String::new(), preview: "h6".into() }
     }
 }
 

@@ -1,4 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// Duże makra `json!` (snapshot) potrzebują głębszej rekursji niż domyślne 128.
+#![recursion_limit = "512"]
 
 mod commands;
 mod config;
@@ -193,6 +195,8 @@ fn main() {
             settings::toggle_mute,
             settings::set_brightness,
             settings::get_brightness,
+            settings::weather_refresh,
+            weather::weather_show,
             icons::dock_icons,
             icons::app_icon,
             commands::launch_new,

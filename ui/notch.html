@@ -128,6 +128,25 @@
   .n-tabs { display: flex; gap: 6px; align-items: center; }
   .n-tabs button { height: 28px; padding: 0 12px; border-radius: 999px; border: 0; background: rgba(255,255,255,0.05); color: #d4d4d8; font-size: 12px; font-weight: 600; }
   .n-tabs button.on { background: rgba(255,255,255,0.16); color: #fff; }
+  /* Pogoda: karta z aktualną + wiersze godzin/dni */
+  .n-wcard { position: relative; overflow: hidden; border-radius: 18px; padding: 18px 22px; display: flex; align-items: center; gap: 18px;
+    background: linear-gradient(115deg, rgba(2,132,199,0.55), rgba(30,64,175,0.35) 55%, rgba(15,23,42,0.5)); border: 1px solid rgba(125,211,252,0.3); }
+  .n-wcard.noc { background: linear-gradient(115deg, rgba(30,58,138,0.6), rgba(15,23,42,0.75)); border-color: rgba(59,130,246,0.3); }
+  .n-wemoji { font-size: 46px; line-height: 1; }
+  .n-wt { font-size: 46px; font-weight: 800; letter-spacing: -2px; }
+  .n-wd { display: flex; flex-direction: column; gap: 3px; font-size: 13px; color: #cbd5f5; margin-left: 6px; }
+  .n-wd small { color: #8b9cc8; font-size: 11.5px; }
+  .n-whours { display: flex; gap: 8px; margin-top: 12px; }
+  .n-wh { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border-radius: 14px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.06); }
+  .n-wh b { font-size: 11.5px; color: #8b8b98; font-weight: 600; }
+  .n-wh .we { font-size: 24px; line-height: 1.2; }
+  .n-wh .tt2 { font-size: 14px; font-weight: 700; }
+  .n-wdays { display: flex; flex-direction: column; gap: 4px; margin-top: 12px; }
+  .n-wday { display: flex; align-items: center; gap: 14px; padding: 8px 12px; border-radius: 12px; background: rgba(255,255,255,0.04); }
+  .n-wday b { width: 52px; font-size: 12.5px; font-weight: 600; color: #e4e4e7; text-transform: uppercase; letter-spacing: 0.4px; }
+  .n-wday .we { font-size: 20px; width: 30px; text-align: center; }
+  .n-wday .tt2 { margin-left: auto; font-size: 13.5px; font-weight: 700; color: #fff; }
+  .n-wday .tt2 i { font-style: normal; color: #8b8b98; font-weight: 500; }
   .n-find { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.12); background: rgba(0,0,0,0.3); color: #fff; font-size: 12.5px; outline: none; user-select: text; }
   .n-list { display: flex; flex-direction: column; gap: 2px; height: 262px; overflow-y: auto; scrollbar-width: thin; }
   .n-li { display: flex; align-items: center; gap: 10px; padding: 5px 8px; border-radius: 10px; border: 0; background: transparent; color: #e4e4e7; text-align: left; min-width: 0; }
@@ -188,7 +207,8 @@ let s = null;
 let stats = null;
 let hotCount = 0;
 let openState = false;
-let view = 'main';           // 'main' | 'msgs' | 'music' — co pokazuje rozwinięty notch
+let view = 'main';           // 'main' | 'msgs' | 'music' | 'weather' — co pokazuje rozwinięty notch
+let wtab = null;             // pogoda: 'hours' | 'days' (null = wg ustawienia weather.preview)
 let mtab = 'queue';          // muzyka: 'queue' | 'playlists'
 let playlistCache = null;
 let findText = '';
@@ -602,6 +622,10 @@ function openKey() {
     const m = s.music;
     return JSON.stringify(['music', m.title, m.artist, m.art, m.playing, m.shuffle, m.repeat, m.liked, m.connected, mtab]);
   }
+  if (view === 'weather') {
+    const w = s.weather || {};
+    return JSON.stringify(['weather', w.temp, w.text, w.emoji, wtab || s.wpreview, (w.hours || []).length, (w.days || []).length]);
+  }
   if (view === 'msgs') {
     const r = s.radio;
     return JSON.stringify(['msgs', (r.showingList || []).map((m) => m.id), (r.waitingList || []).map((m) => m.id), (s.missed || []).length, r.nextBatch, replying]);
@@ -647,6 +671,34 @@ function msgCard(m, opts = {}) {
     <span class="hd"><span class="dot" style="background:${color}"></span><b style="color:${color}">${esc(m.name)}</b>${src ? `<span class="src">· ${esc(src)}</span>` : ''}<span class="tm">${ago(m.at)}</span></span>
     <span class="bd">${esc(m.message)}</span>
     ${actions ? `<span class="ac">${actions}</span>` : ''}</${tag}>`;
+}
+
+/** Widok pogody w rozwiniętej notce: aktualna karta + godziny albo dni (tabs). */
+function weatherHtml() {
+  const w = s.weather;
+  const head = `<div class="n-head fade"><button class="back" id="backBtn">← Panel</button><b>Pogoda</b><span class="meta">${w ? `${esc(w.label || '')} · Open-Meteo` : ''}</span></div>`;
+  if (!w) {
+    return `<div class="n-pn" id="pn">${head}<div class="n-note">${s.wpreview ? 'Pobieram dane pogody…' : 'Pogoda nie jest skonfigurowana — wpisz szerokość i długość w Ustawieniach → Pogoda i HUD.'}</div></div>`;
+  }
+  const tab = wtab || s.wpreview || 'h6';
+  const tabs = `<div class="n-tabs"><button data-wtab="hours" class="${tab !== 'days' ? 'on' : ''}">Godziny</button><button data-wtab="days" class="${tab === 'days' ? 'on' : ''}">Dni</button></div>`;
+  const hh = +String(s.clock || '12:00').split(':')[0];
+  const noc = hh >= 19 || hh < 6;
+  const now = `<div class="n-wcard fade ${noc ? 'noc' : ''}">
+      <span class="n-wemoji">${esc(w.emoji)}</span>
+      <span class="n-wt">${Math.round(w.temp)}°</span>
+      <span class="n-wd"><b>${esc(String(w.text).toLowerCase())}</b><small>${esc(w.label || '')}</small></span>
+    </div>`;
+  let body;
+  if (tab === 'days') {
+    body = `<div class="n-wdays fade">${(w.days || []).map((d) => `
+      <div class="n-wday"><b>${esc(d.d)}</b><span class="we">${esc(d.emoji)}</span><span class="tt2">${d.lo}° <i>/</i> ${d.hi}°</span></div>`).join('')}</div>`;
+  } else {
+    const n = { h3: 3, h9: 9 }[s.wpreview] || 6;
+    body = `<div class="n-whours fade">${(w.hours || []).slice(0, n).map((h) => `
+      <div class="n-wh"><b>${esc(h.h)}</b><span class="we">${esc(h.emoji)}</span><span class="tt2">${h.temp}°</span></div>`).join('')}</div>`;
+  }
+  return `<div class="n-pn" id="pn">${head}${now}${tabs}${body}</div>`;
 }
 
 function musicHtml() {
@@ -774,6 +826,7 @@ function msgsHtml() {
 function panelHtml() {
   if (view === 'msgs') return msgsHtml();
   if (view === 'music') return musicHtml();
+  if (view === 'weather') return weatherHtml();
   if (triageOn()) return triageHtml();
   const t = focusTiming(s);
   const acc = s.mode.accent;
@@ -1020,6 +1073,9 @@ function wire(st, msg) {
     }
     loadMusicList();
     tickMusic();
+  } else if (st === 'open' && view === 'weather') {
+    on('backBtn', () => { view = 'main'; render(); });
+    for (const b of notch.querySelectorAll('[data-wtab]')) b.onclick = (e) => { e.stopPropagation(); wtab = b.dataset.wtab; render(); };
   } else if (st === 'open' && view === 'msgs') {
     const cur = (s.radio.showingList || [])[0];
     on('backBtn', () => { view = 'main'; replying = false; render(); });
@@ -1103,6 +1159,14 @@ function showMusic() {
   render();
 }
 
+function showWeather() {
+  clearTimeout(hoverTimer);
+  view = 'weather';
+  openState = true;
+  lastKey = '';
+  render();
+}
+
 function showMsgs() {
   clearTimeout(hoverTimer);
   clearTimeout(msgTimer);
@@ -1179,6 +1243,7 @@ onTick((snap) => { s = snap; render(); });
 listen('notch-wake', () => render());
 // Ctrl+Alt+M, „sp” w palecie itd. — muzyka otwiera się w notchu, nie w osobnym oknie.
 listen('notch-music', () => { if (openState && view === 'music') setOpen(false); else showMusic(); });
+listen('notch-weather', () => { if (openState && view === 'weather') setOpen(false); else showWeather(); });
 listen('notch-layout', () => { size = { w: 0, h: 0 }; render(); });
 </script>
 </body>
