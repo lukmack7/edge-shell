@@ -521,7 +521,7 @@ pub async fn share_file(app: AppHandle, path: String) -> Res<String> {
     let client = reqwest::Client::builder().connect_timeout(std::time::Duration::from_secs(5)).build().unwrap_or_default();
     let mut req = client
         .post(format!("{base}/share"))
-        .header("X-Filename", urlencoding::encode(&name).to_owned())
+        .header("X-Filename", urlencoding::encode(&name).into_owned())
         .timeout(std::time::Duration::from_secs(120))
         .body(data);
     if !cfg.presence.token.is_empty() {

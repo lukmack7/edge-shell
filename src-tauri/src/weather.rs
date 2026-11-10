@@ -39,7 +39,7 @@ struct MeteoNow {
     time: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Deserialize)]
 struct MeteoHourly {
     #[serde(default)]
     time: Vec<String>,
@@ -156,28 +156,34 @@ pub async fn refresh(app: AppHandle) {
     let _ = fetch_one(&app).await;
 }
 
-/// Kursy walut z NBP (tabela A): kod → PLN za 1 jednostkę, odświeżane co 6 h.
+/// Kursy walut z NBP (tabela A): kod → PLN za 1 jednostkę.
+async fn fetch_rates() -> Result<std::collections::HashMap<String, f64>, String> {
+    let url = "https://api.nbp.pl/api/exchangerates/tables/a/?format=json";
+    let tables: Vec<NbpTable> = client()
+        .get(url)
+        .timeout(Duration::from_secs(15))
+        .send()
+        .await
+        .map_err(|e| e.to_string())?
+        .error_for_status()
+        .map_err(|e| e.to_string())?
+        .json()
+        .await
+        .map_err(|e| e.to_string())?;
+    let mut rates: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
+    rates.insert("PLN".into(), 1.0);
+    for r in tables.into_iter().next().map(|t| t.rates).unwrap_or_default() {
+        rates.insert(r.code, r.mid);
+    }
+    Ok(rates)
+}
+
+/// Pętla kursów: odświeżanie co 6 h, po błędzie próba co 15 min.
 pub fn start_rates(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
-            let url = "https://api.nbp.pl/api/exchangerates/tables/a/?format=json";
-            match client()
-                .get(url)
-                .timeout(Duration::from_secs(15))
-                .send()
-                .await
-                .map_err(|e| e.to_string())?
-                .error_for_status()
-                .map_err(|e| e.to_string())?
-                .json::<Vec<NbpTable>>()
-                .await
-            {
-                Ok(tables) => {
-                    let mut rates: std::collections::HashMap<String, f64> = std::collections::HashMap::new();
-                    rates.insert("PLN".into(), 1.0);
-                    for r in tables.into_iter().next().map(|t| t.rates).unwrap_or_default() {
-                        rates.insert(r.code, r.mid);
-                    }
+            match fetch_rates().await {
+                Ok(rates) => {
                     if rates.len() > 1 {
                         state::update(&app, false, |rt| rt.rates = rates);
                     }

@@ -1025,7 +1025,7 @@ pub async fn palette_query(app: AppHandle, query: String) -> Answer {
     if q.chars().count() >= 3 {
         let text = query.trim().to_string();
         b.add("Sieć", "🌐", BLUE, format!("Szukaj „{text}” w sieci"), "DuckDuckGo w domyślnej przeglądarce".into(), "",
-            pv("Szukaj w sieci", format!("Otwiera DuckDuckGo z frazą „{text}”."), "• otwiera przeglądarkę"), &[], Cmd::WebSearch(text));
+            pv("Szukaj w sieci", format!("Otwiera DuckDuckGo z frazą „{text}”."), "• otwiera przeglądarkę"), &[], Cmd::WebSearch(text.clone()));
         let key = keys.iter().find(|(c, _)| c == "capture").map(|(_, k)| k.clone()).unwrap_or_default();
         b.add("Inne", "M", AMBER, "Wrzuć do Horologa".into(), text.clone(), &key,
             pv("Wrzuć myśl", format!("Do inboxu Horologa trafi: „{text}”."), "• trafia do Horologa\n• okno się zamyka"), &[], Cmd::Capture(text));
@@ -1166,12 +1166,17 @@ async fn winget_rows(app: &AppHandle, q: &str) -> Answer {
         return b.finish("Instalacja".into());
     }
     let res = tauri::async_runtime::spawn_blocking(move || winget_search(&query)).await.map_err(|e| e.to_string());
+    let fail = |b: &mut Builder, e: String| -> Answer {
+        b.add("Instalacja", "!", GREY, "WinGet nie odpowiada".into(), e.clone(), "", pv("WinGet", e, ""), &[], Cmd::WebSearch(String::new()));
+        b.finish("Instalacja".into())
+    };
+    // Podwójny Result: zewnętrzny to JoinError z spawn_blocking, wewnętrzny — sam winget.
     let list = match res {
-        Ok(list) => list,
-        Err(e) => {
-            b.add("Instalacja", "!", GREY, "WinGet nie odpowiada".into(), e.clone(), "", pv("WinGet", e, ""), &[], Cmd::WebSearch(String::new()));
-            return b.finish("Instalacja".into());
-        }
+        Ok(list) => match list {
+            Ok(list) => list,
+            Err(e) => return fail(&mut b, e),
+        },
+        Err(e) => return fail(&mut b, e),
     };
     if list.is_empty() {
         b.add("Instalacja", "📦", GREY, "Nic nie znalazłem".into(), "Spróbuj innej nazwy albo skrótu producenta.".into(), "",

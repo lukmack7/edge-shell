@@ -628,6 +628,7 @@ impl Default for Mode {
             playlist: String::new(),
             wallpaper: String::new(),
             brightness: None,
+            dock: vec![],
         }
     }
 }
@@ -670,6 +671,8 @@ impl Default for DockApp {
             process: String::new(),
             icon_path: String::new(),
             separator_after: false,
+            widget: String::new(),
+            widget_target: String::new(),
         }
     }
 }
@@ -893,6 +896,7 @@ impl Default for Config {
             presence: PresenceCfg::default(),
             windows: WindowsCfg::default(),
             mail: MailCfg::default(),
+            weather: WeatherCfg::default(),
         }
     }
 }
