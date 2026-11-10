@@ -269,6 +269,7 @@ onSnapshot((s) => {
   $('shelf').innerHTML = (s.shelf.length ? s.shelf.map((f) => `
     <div class="shelf-item">
       <button class="name ellipsis" data-path="${esc(f.path)}" title="${esc(f.path)}">${esc(f.name)}</button>
+      <button class="mini" data-send="${esc(f.path)}" data-name="${esc(f.name)}" title="Wyślij na telefon — link w schowku, ważny 10 minut">${icon('send', 14)}</button>
       <button class="mini" data-reveal="${esc(f.path)}" aria-label="Pokaż w folderze">${icon('folder', 14)}</button>
       <button class="mini" data-copy="${esc(f.path)}" aria-label="Kopiuj ścieżkę">${icon('clipboard', 14)}</button>
       <button class="mini" data-remove="${esc(f.path)}" aria-label="Zdejmij z półki">${icon('close', 12, 2.2)}</button>
@@ -278,6 +279,16 @@ onSnapshot((s) => {
   for (const b of $('shelf').querySelectorAll('[data-reveal]')) b.onclick = () => invoke('reveal', { path: b.dataset.reveal });
   for (const b of $('shelf').querySelectorAll('[data-copy]')) b.onclick = () => invoke('copy_text', { text: b.dataset.copy }).then(() => toast('Skopiowano ścieżkę'));
   for (const b of $('shelf').querySelectorAll('[data-remove]')) b.onclick = () => invoke('shelf_remove', { path: b.dataset.remove });
+  for (const b of $('shelf').querySelectorAll('[data-send]')) b.onclick = async () => {
+    b.disabled = true;
+    try {
+      await invoke('share_file', { path: b.dataset.send });
+      toast(`Wyślij: ${b.dataset.name} — link w schowku, ważny 10 minut`);
+    } catch (e) {
+      toast(String(e));
+    }
+    b.disabled = false;
+  };
 
   $('pinned').innerHTML = s.pinned.map((p) =>
     `<button class="tile" data-path="${esc(p.path)}"><span class="sq" style="background:${p.stripe};opacity:0.35"></span><span class="ellipsis">${esc(p.name)}</span></button>`).join('');

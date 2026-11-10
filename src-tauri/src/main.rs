@@ -171,6 +171,7 @@ fn main() {
             commands::radio_show_waiting,
             commands::shelf_add,
             commands::shelf_remove,
+            commands::share_file,
             commands::reveal,
             commands::copy_text,
             commands::stash_create,
