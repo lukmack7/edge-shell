@@ -38,19 +38,16 @@
   .app .tile, .app.card .tile { transition: transform 0.16s cubic-bezier(.2,.9,.3,1.3); transform-origin: 50% 100%; }
   .sep { width: 1px; height: 34px; margin-bottom: 14px; background: rgba(255,255,255,0.12); }
   /* Widgety: żywe kafle obok ikon (blok, fokus, radio, pogoda, muzyka, odliczanie). */
-  .app.wgt { flex-direction: row; align-items: center; gap: 9px; width: 126px; height: 52px; padding: 0 12px; border-radius: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.06); text-align: left; }
-  .app.wgt:hover { transform: none; background: rgba(255,255,255,0.09); }
-  /* Pogoda: gradient nieba — dzień jasny, noc granatowa; temp jako główny wiersz. */
-  .app.wgt[data-widget="weather"] { width: 122px; background: linear-gradient(135deg, rgba(56,132,255,0.22), rgba(125,211,252,0.08)); border-color: rgba(125,211,252,0.28); }
-  .app.wgt[data-widget="weather"].wngt { background: linear-gradient(135deg, rgba(30,58,138,0.6), rgba(15,23,42,0.72)); border-color: rgba(59,130,246,0.32); }
-  .app.wgt[data-widget="weather"] .w-ic { background: transparent; }
-  .app.wgt[data-widget="weather"] .w-ic span { font-size: 21px !important; }
-  .app.wgt[data-widget="weather"] .w-v { font-size: 15px; }
-  .app.wgt .w-ic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.07); flex: none; color: var(--muted); }
-  .app.wgt .w-tx { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 88px; }
-  .app.wgt .w-t { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .app.wgt .w-v { font-size: 12px; font-weight: 650; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .app.wgt .stripe { position: absolute; left: 11px; bottom: 4px; width: 22px; }
+  /* Widgety są kafelkami tej samej siatki co aplikacje — żadnych szerszych „pigułek”. */
+  .app.wgt { width: 52px; height: 52px; padding: 0; border-radius: 15px; background: transparent; text-align: center; }
+  .app.wgt:hover { transform: translateY(-3px); }
+  .app.wgt .w-face { position: relative; width: 52px; height: 52px; border-radius: 15px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.06); color: var(--muted); }
+  .app.wgt[data-widget="weather"] .w-face { background: linear-gradient(145deg, rgba(14,116,224,0.76), rgba(56,189,248,0.38)); border-color: rgba(125,211,252,0.46); }
+  .app.wgt[data-widget="weather"].wngt .w-face { background: linear-gradient(145deg, rgba(30,58,138,0.9), rgba(15,23,42,0.88)); border-color: rgba(96,165,250,0.38); }
+  .app.wgt .w-symbol { font-size: 23px; line-height: 1; }
+  .app.wgt .w-temp { position: absolute; right: 5px; bottom: 4px; padding: 1px 4px; border-radius: 6px; background: rgba(3,7,18,0.5); color: #fff; font-size: 11px; font-weight: 800; line-height: 14px; }
+  .app.wgt .w-tx { display: none; }
+  .app.wgt .stripe { position: absolute; left: 15px; bottom: -1px; width: 22px; }
 </style>
 </head>
 <body>
@@ -172,7 +169,7 @@ function cardsFor(s) {
   const withWin = s.dock.filter((a) => a.windows > 0 && !a.widget);
   const widgets = s.dock.filter((a) => a.widget).length;
   const maxW = (screen.availWidth || 1920) * 0.78;
-  const est = (s.dock.length - widgets) * 60 + widgets * 142 + withWin.length * 150;
+  const est = (s.dock.length - widgets) * 60 + widgets * 60 + withWin.length * 150;
   return withWin.length <= 7 && est < maxW;
 }
 function cardLabel(s, a) {
@@ -251,12 +248,16 @@ function weatherTip(w, s) {
   return lines.join('\n');
 }
 
-const widgetTile = (w) =>
-  `<span class="w-ic">${w.emoji ? `<span aria-hidden="true" style="font-size:16px">${esc(w.emoji)}</span>` : icon(w.ic, 16)}</span>` +
-  // Pogoda (ma emoji): temperatura jako główny wiersz, opis pod nią; reszta — tytuł nad wartością.
-  `<span class="w-tx">${w.emoji
-    ? `<span class="w-v">${esc(w.t)}</span><span class="w-t">${esc(w.v)}</span>`
-    : `<span class="w-t">${esc(w.t)}</span><span class="w-v">${esc(w.v)}</span>`}</span>`;
+/** Wartości logiczne nigdy nie są tekstem UI (chroni przed „false” z niepełnego snapshotu). */
+const text = (value) => value === false || value == null ? '' : String(value);
+
+/** Widgety są kwadratowe jak ikony; szczegóły są po kliknięciu w panelu/notce. */
+const widgetTile = (w) => {
+  if (w.emoji) {
+    return `<span class="w-face"><span class="w-symbol" aria-hidden="true">${esc(text(w.emoji))}</span><span class="w-temp">${esc(text(w.t))}</span></span>`;
+  }
+  return `<span class="w-face" title="${esc(text(w.t))}: ${esc(text(w.v))}">${icon(text(w.ic), 21)}</span>`;
+};
 
 /** Klik w widget: radio → czekające, muzyka → play/pauza, pogoda → prognoza w notce, reszta → panel Teraz. */
 function widgetClick(a) {
