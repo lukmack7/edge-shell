@@ -38,15 +38,34 @@
   .app .tile, .app.card .tile { transition: transform 0.16s cubic-bezier(.2,.9,.3,1.3); transform-origin: 50% 100%; }
   .sep { width: 1px; height: 34px; margin-bottom: 14px; background: rgba(255,255,255,0.12); }
   /* Widgety: żywe kafle obok ikon (blok, fokus, radio, pogoda, muzyka, odliczanie). */
-  /* Widgety są kafelkami tej samej siatki co aplikacje — żadnych szerszych „pigułek”. */
-  .app.wgt { width: 52px; height: 52px; padding: 0; border-radius: 15px; background: transparent; text-align: center; }
+  /* Widgety są kafelkami tej samej siatki co aplikacje — każdy ma własny „charakter”. */
+  .app.wgt { width: 52px; height: 52px; padding: 0; border-radius: 15px; background: transparent; }
   .app.wgt:hover { transform: translateY(-3px); }
-  .app.wgt .w-face { position: relative; width: 52px; height: 52px; border-radius: 15px; display: flex; align-items: center; justify-content: center; overflow: hidden; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.06); color: var(--muted); }
-  .app.wgt[data-widget="weather"] .w-face { background: linear-gradient(145deg, rgba(14,116,224,0.76), rgba(56,189,248,0.38)); border-color: rgba(125,211,252,0.46); }
-  .app.wgt[data-widget="weather"].wngt .w-face { background: linear-gradient(145deg, rgba(30,58,138,0.9), rgba(15,23,42,0.88)); border-color: rgba(96,165,250,0.38); }
-  .app.wgt .w-symbol { font-size: 23px; line-height: 1; }
-  .app.wgt .w-temp { position: absolute; right: 5px; bottom: 4px; padding: 1px 4px; border-radius: 6px; background: rgba(3,7,18,0.5); color: #fff; font-size: 11px; font-weight: 800; line-height: 14px; }
-  .app.wgt .w-tx { display: none; }
+  .w-face { --t1: rgba(255,255,255,0.1); --t2: rgba(255,255,255,0.04); --edge: rgba(255,255,255,0.1); --fg: #e4e4e7;
+    position: relative; width: 52px; height: 52px; border-radius: 15px; display: flex; align-items: center; justify-content: center; overflow: hidden;
+    background: linear-gradient(145deg, var(--t1), var(--t2)); border: 1px solid var(--edge); color: var(--fg); }
+  .w-face.tone-sky { --t1: rgba(14,116,224,0.8); --t2: rgba(56,189,248,0.4); --edge: rgba(125,211,252,0.5); --fg: #fff; }
+  .w-face.tone-night { --t1: rgba(30,58,138,0.95); --t2: rgba(15,23,42,0.9); --edge: rgba(96,165,250,0.4); --fg: #dbeafe; }
+  .w-face.tone-amber { --t1: rgba(217,119,6,0.55); --t2: rgba(120,53,15,0.4); --edge: rgba(251,191,36,0.45); --fg: #fde68a; }
+  .w-face.tone-red { --t1: rgba(185,28,28,0.6); --t2: rgba(69,10,10,0.5); --edge: rgba(248,113,113,0.5); --fg: #fecaca; }
+  .w-face.tone-rose { --t1: rgba(190,24,93,0.65); --t2: rgba(80,7,36,0.5); --edge: rgba(244,114,182,0.5); --fg: #fbcfe8; }
+  .w-face.tone-green { --t1: rgba(21,128,61,0.55); --t2: rgba(5,46,22,0.4); --edge: rgba(74,222,128,0.45); --fg: #bbf7d0; }
+  .w-face.tone-violet { --t1: rgba(109,40,217,0.65); --t2: rgba(157,23,77,0.5); --edge: rgba(192,132,252,0.5); --fg: #fff; }
+  .w-symbol { font-size: 25px; line-height: 1; margin-top: -7px; }
+  .w-glyph { display: flex; margin-top: -2px; }
+  .w-face:has(.w-chip) .w-glyph { margin-top: -9px; }
+  .w-ring ~ .w-glyph svg { width: 18px; height: 18px; }
+  .w-chip { position: absolute; left: 0; right: 0; bottom: 4px; text-align: center; font-size: 11px; font-weight: 800; line-height: 13px; letter-spacing: 0.2px; color: var(--fg); text-shadow: 0 1px 3px rgba(0,0,0,0.45); }
+  .w-art { position: absolute; inset: 0; background: center/cover; }
+  .w-art + .w-glyph { position: relative; padding: 6px; border-radius: 50%; background: rgba(0,0,0,0.5); margin: 0; }
+  .w-eq { position: absolute; left: 0; right: 0; bottom: 5px; display: flex; justify-content: center; align-items: flex-end; gap: 2px; height: 12px; }
+  .w-eq i { width: 3px; border-radius: 2px; background: #fff; box-shadow: 0 0 4px rgba(0,0,0,0.5); animation: eq 0.9s ease-in-out infinite; }
+  .w-eq i:nth-child(2) { animation-delay: -0.3s; } .w-eq i:nth-child(3) { animation-delay: -0.6s; } .w-eq i:nth-child(4) { animation-delay: -0.15s; }
+  @keyframes eq { 0%, 100% { height: 3px; } 50% { height: 12px; } }
+  .w-ring { position: absolute; top: 4px; left: 9px; width: 34px; height: 34px; border-radius: 50%; background: conic-gradient(#f87171 calc(var(--p) * 1%), rgba(255,255,255,0.12) 0);
+    -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); }
+  .w-face.pulse { animation: wpulse 2.4s ease-in-out infinite; }
+  @keyframes wpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(248,113,113,0); } 50% { box-shadow: 0 0 12px 1px rgba(248,113,113,0.35); } }
   .app.wgt .stripe { position: absolute; left: 15px; bottom: -1px; width: 22px; }
 </style>
 </head>
@@ -190,73 +209,73 @@ const humanDur = (ms) => {
   return d >= 1 ? `${d} dni ${h % 24} h` : `${h} h ${String(m % 60).padStart(2, '0')} min`;
 };
 
-/** Dane widgetu z migawki: {ic|emoji, t, v, count?, countfmt?, tip}. */
+/** Wartości logiczne nigdy nie są tekstem UI. */
+const text = (value) => (value === false || value == null ? '' : String(value));
+
+/** Krótki czas na kafelek: 12m, 2h05, 3d. */
+function shortDur(ms) {
+  const m = Math.max(0, Math.round(ms / 60000));
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h${String(m % 60).padStart(2, '0')}`;
+  return `${Math.floor(h / 24)}d`;
+}
+
+/**
+ * Dane widgetu: { ic|emoji, chip, tone, ring?, art?, eq?, pulse?, label, count? }.
+ * Kafelek jest kwadratowy jak ikona; szczegóły są po kliknięciu.
+ */
 function widgetData(a, s) {
   const quiet = s.quietUntil ? new Date(s.quietUntil) : null;
   switch (a.widget) {
     case 'next-block': {
       const n = s.next;
-      return n
-        ? { ic: 'clock', t: n.title, v: `od ${fmtClock(new Date(n.start))}`, tip: `Następny blok — klik otwiera panel Teraz` }
-        : { ic: 'clock', t: 'Plan na dziś', v: 'koniec listy', tip: 'Brak kolejnych bloków' };
+      if (!n) return { ic: 'check', chip: 'wolne', tone: 'green', label: 'Plan na dziś: koniec listy' };
+      const left = new Date(n.start) - Date.now();
+      return { ic: 'clock', chip: left > 0 && left < 3600000 ? shortDur(left) : fmtClock(new Date(n.start)), tone: 'amber', label: `Następny blok: ${n.title}` };
     }
     case 'focus': {
       const f = s.focus;
-      if (!f) return { ic: 'clock', t: 'Fokus', v: 'klik: zacznij', tip: 'Klik otwiera panel Teraz' };
-      return { ic: 'clock', t: f.title, v: humanDur(new Date(f.end) - Date.now()), count: f.end, countfmt: 'dur', tip: 'Fokus trwa — klik otwiera panel Teraz' };
+      if (!f) return { ic: 'clock', chip: 'start', tone: 'slate', label: 'Fokus: nie trwa' };
+      const start = new Date(f.start), end = new Date(f.end);
+      const ring = Math.max(0, Math.min(1, (Date.now() - start) / Math.max(1, end - start)));
+      return { ic: 'clock', chip: shortDur(end - Date.now()), tone: 'red', ring, pulse: !s.paused, count: f.end, label: `Fokus: ${f.title}` };
     }
     case 'radio': {
       const w = s.radio ? s.radio.waiting : 0;
-      if (w) return { ic: 'radio', t: 'Radio', v: `${w} czeka`, tip: 'Klik pokazuje czekające wiadomości' };
-      if (quiet) return { ic: 'moon', t: 'Radio', v: `cicho → ${fmtClock(quiet)}`, tip: 'Radio wyciszone w tej paczce' };
-      return { ic: 'radio', t: 'Radio', v: s.radio && s.radio.showingCount ? 'przekazanie…' : 'cisza', tip: 'Radio — klik pokazuje czekające' };
+      if (w) return { ic: 'radio', chip: String(w), tone: 'rose', pulse: true, label: `Radio: ${w} czeka` };
+      if (quiet) return { ic: 'moon', chip: fmtClock(quiet), tone: 'slate', label: 'Radio wyciszone' };
+      return { ic: 'radio', chip: '', tone: 'slate', label: 'Radio: cisza' };
     }
     case 'weather': {
       const w = s.weather;
+      if (!w) return { ic: 'globe', chip: '', tone: 'sky', label: 'Pogoda: pobieram dane' };
       const hh = +String(s.clock || '12:00').split(':')[0];
-      return w
-        ? { emoji: w.emoji, t: `${Math.round(w.temp)}°`, v: String(w.text || '').split(' · ')[0], night: hh >= 19 || hh < 6, tip: weatherTip(w, s) }
-        : { ic: 'globe', t: 'Pogoda', v: 'pobieram…', tip: 'Pogoda' };
+      return { emoji: w.emoji, chip: `${Math.round(w.temp)}°`, tone: hh >= 19 || hh < 6 ? 'night' : 'sky', label: `Pogoda: ${Math.round(w.temp)}°, ${w.text}` };
     }
     case 'music': {
       const m = s.music;
-      if (m && m.connected && m.title) return { ic: 'music', t: m.artist || 'Muzyka', v: m.playing ? m.title : `${m.title} — pauza`, tip: 'Klik: odtwórz / wstrzymaj' };
-      return { ic: 'music', t: 'Muzyka', v: 'niepołączono', tip: 'Klik: odtwórz / wstrzymaj' };
+      if (m && m.connected && m.title) return { ic: m.playing ? 'music' : 'pause', chip: '', tone: 'violet', art: m.art, eq: !!m.playing, label: `${m.playing ? 'Gra' : 'Pauza'}: ${m.title} — ${m.artist}` };
+      return { ic: 'music', chip: '', tone: 'violet', label: 'Muzyka: niepołączona' };
     }
     case 'countdown': {
       const [label, when] = (a.widgetTarget || '').split('|');
       const end = new Date(when || '');
-      if (isNaN(end)) return { ic: 'calendar', t: label || 'Odliczanie', v: 'ustaw cel', tip: 'Ustaw widgetTarget: „Nazwa|RRRR-MM-DDTHH:MM”' };
-      return { ic: 'calendar', t: label || 'Odliczanie', v: humanDur(end - Date.now()), count: end.toISOString(), countfmt: 'dur', tip: label || 'Odliczanie' };
+      if (isNaN(end)) return { ic: 'calendar', chip: '?', tone: 'slate', label: 'Odliczanie: ustaw cel w Dock → widgetTarget' };
+      return { ic: 'calendar', chip: shortDur(end - Date.now()), tone: 'amber', count: end.toISOString(), label: `${label || 'Odliczanie'}` };
     }
-    default: return { ic: 'clock', t: a.name, v: 'widget', tip: a.name };
+    default: return { ic: 'clock', chip: '', tone: 'slate', label: a.name };
   }
 }
-
-/** Tooltip pogody: miasto + aktualna, niżej prognoza wg ustawienia (3/6/9 h albo dni). */
-function weatherTip(w, s) {
-  const lines = [`${w.label || 'Pogoda'} — ${Math.round(w.temp)}°C, ${String(w.text || '').toLowerCase()}`];
-  const mode = s.wpreview || 'h6';
-  if (mode === 'days') {
-    const ds = w.days || [];
-    if (ds.length) lines.push(ds.map((d) => `${d.d} ${d.emoji} ${d.lo}…${d.hi}°`).join('\n'));
-  } else {
-    const n = { h3: 3, h9: 9 }[mode] || 6;
-    const hs = (w.hours || []).slice(0, n);
-    if (hs.length) lines.push(hs.map((h) => `${h.h} ${h.emoji} ${h.temp}°`).join('   '));
-  }
-  return lines.join('\n');
-}
-
-/** Wartości logiczne nigdy nie są tekstem UI (chroni przed „false” z niepełnego snapshotu). */
-const text = (value) => value === false || value == null ? '' : String(value);
 
 /** Widgety są kwadratowe jak ikony; szczegóły są po kliknięciu w panelu/notce. */
 const widgetTile = (w) => {
-  if (w.emoji) {
-    return `<span class="w-face"><span class="w-symbol" aria-hidden="true">${esc(text(w.emoji))}</span><span class="w-temp">${esc(text(w.t))}</span></span>`;
-  }
-  return `<span class="w-face" title="${esc(text(w.t))}: ${esc(text(w.v))}">${icon(text(w.ic), 21)}</span>`;
+  const art = w.art ? `<span class="w-art" style="background-image:url('${esc(text(w.art))}')"></span>` : '';
+  const ring = w.ring != null ? `<span class="w-ring" style="--p:${Math.round(w.ring * 100)}"></span>` : '';
+  const sym = w.emoji ? `<span class="w-symbol" aria-hidden="true">${esc(text(w.emoji))}</span>` : `<span class="w-glyph">${icon(text(w.ic), 22)}</span>`;
+  const eq = w.eq ? '<span class="w-eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>' : '';
+  const chip = w.chip ? `<span class="w-chip">${esc(text(w.chip))}</span>` : '';
+  return `<span class="w-face tone-${w.tone}${w.pulse ? ' pulse' : ''}">${art}${ring}${sym}${eq}${chip}</span>`;
 };
 
 /** Klik w widget: radio → czekające, muzyka → play/pauza, pogoda → prognoza w notce, reszta → panel Teraz. */
@@ -273,10 +292,8 @@ function tickCounts() {
   for (const b of dock.querySelectorAll('.app[data-count]')) {
     const end = new Date(b.dataset.count);
     if (isNaN(end)) continue;
-    const v = b.querySelector('.w-v');
-    if (v) v.textContent = b.dataset.countfmt === 'min'
-      ? `${Math.max(0, Math.round((end - Date.now()) / 60000))} min`
-      : humanDur(end - Date.now());
+    const v = b.querySelector('.w-chip');
+    if (v) v.textContent = shortDur(end - Date.now());
   }
 }
 setInterval(tickCounts, 1000);
@@ -294,13 +311,13 @@ function render(s) {
     const active = a.exe && a.exe === s.fgExe;
     const lbl = card ? cardLabel(s, a) : null;
     const wd = a.widget ? widgetData(a, s) : null;
-    const count = wd && wd.count ? ` data-count="${esc(wd.count)}" data-countfmt="${wd.countfmt || 'dur'}"` : '';
+    const count = wd && wd.count ? ` data-count="${esc(wd.count)}" ` : '';
     return `
-    <button class="app ${a.dim ? 'dim' : ''} ${a.stack ? 'stack' : ''} ${a.unpinned ? 'unpinned' : ''} ${card ? 'card' : ''} ${active ? 'active' : ''} ${wd ? `wgt${wd.night ? ' wngt' : ''}` : ''}" data-widget="${wd ? esc(a.widget) : ''}" data-stack="${a.stack ? 1 : ''}" data-id="${esc(a.id)}" data-name="${esc(a.name)}" aria-label="${esc(wd ? `${wd.t}: ${wd.v}` : a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}"${count}>
+    <button class="app ${a.dim ? 'dim' : ''} ${a.stack ? 'stack' : ''} ${a.unpinned ? 'unpinned' : ''} ${card ? 'card' : ''} ${active ? 'active' : ''} ${wd ? 'wgt' : ''}" data-widget="${wd ? esc(a.widget) : ''}" data-stack="${a.stack ? 1 : ''}" data-id="${esc(a.id)}" data-name="${esc(a.name)}" aria-label="${esc(wd ? wd.label : a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}"${count}>
       ${wd ? widgetTile(wd) : tile(a)}
       ${card ? `<span class="lbl"><b>${esc(lbl.title)}</b>${lbl.sub ? `<span>${esc(lbl.sub)}</span>` : ''}</span>` : ''}
       <span class="stripe" style="background:${a.stripe}"></span>
-      ${!wd && (a.badgeMuted ? '<span class="badge muted" aria-label="nieprzeczytana poczta — wyciszone w fokusie" title="Poczta czeka — licznik wyciszony w fokusie"></span>'
+      ${wd ? '' : (a.badgeMuted ? '<span class="badge muted" aria-label="nieprzeczytana poczta — wyciszone w fokusie" title="Poczta czeka — licznik wyciszony w fokusie"></span>'
         : a.badge ? `<span class="badge" aria-label="${a.badge} nowych">${a.badge > 99 ? '99+' : a.badge}</span>`
         : !card && (a.windows || a.running) ? `<span class="dots" aria-hidden="true">${'<i></i>'.repeat(Math.min(3, Math.max(1, a.windows || 1)))}</span>` : '')}
     </button>${a.separatorAfter ? '<span class="sep" aria-hidden="true"></span>' : ''}`;
