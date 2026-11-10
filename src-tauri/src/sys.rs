@@ -632,6 +632,44 @@ mod imp {
             .spawn();
     }
 
+    /// Odczyt jasności pierwszego monitora z DDC/CI (0–100); None = brak odpowiedzi.
+    /// Wbudowane ekrany laptopów zwykle nie wspierają odczytu — wtedy HUD startuje z 50%.
+    pub fn get_brightness() -> Option<u8> {
+        use windows::Win32::Devices::Display::{
+            DestroyPhysicalMonitors, GetMonitorBrightness, GetNumberOfPhysicalMonitorsFromHMONITOR,
+            GetPhysicalMonitorsFromHMONITOR, PHYSICAL_MONITOR,
+        };
+        use windows::Win32::Graphics::Gdi::{EnumDisplayMonitors, HDC, HMONITOR};
+        let mut mons: Vec<isize> = Vec::new();
+        unsafe {
+            let _ = EnumDisplayMonitors(HDC::default(), None, Some(collect_monitor), LPARAM(&mut mons as *mut Vec<isize> as isize));
+            for raw in mons {
+                let hm = HMONITOR(raw as *mut c_void);
+                let mut n = 0u32;
+                if GetNumberOfPhysicalMonitorsFromHMONITOR(hm, &mut n).is_err() || n == 0 {
+                    continue;
+                }
+                let mut phys = vec![PHYSICAL_MONITOR::default(); n as usize];
+                if GetPhysicalMonitorsFromHMONITOR(hm, &mut phys).is_err() {
+                    continue;
+                }
+                let mut out = None;
+                for p in &phys {
+                    let (mut min, mut cur, mut max) = (0u32, 0u32, 100u32);
+                    if GetMonitorBrightness(p.hPhysicalMonitor, &mut min, &mut cur, &mut max) != 0 && max > min {
+                        out = Some(((cur - min) * 100 / (max - min)).min(100) as u8);
+                        break;
+                    }
+                }
+                let _ = DestroyPhysicalMonitors(&phys);
+                if out.is_some() {
+                    return out;
+                }
+            }
+        }
+        None
+    }
+
     // ---------------- Okna i miniatury DWM ----------------
 
     pub fn activate(raw: isize) {
@@ -716,6 +754,7 @@ mod imp {
     pub fn hicon_raw_png(_: isize) -> Option<Vec<u8>> { None }
     pub fn set_wallpaper(_: &str) -> bool { false }
     pub fn set_brightness(_: u8) {}
+    pub fn get_brightness() -> Option<u8> { None }
     pub fn activate(_: isize) {}
     pub fn close_window(_: isize) {}
     pub fn thumb_register(_: isize, _: isize) -> Option<isize> { None }

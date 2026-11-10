@@ -37,6 +37,14 @@
   .app.active .stripe { width: 22px !important; background: #f4f4f5 !important; }
   .app .tile, .app.card .tile { transition: transform 0.16s cubic-bezier(.2,.9,.3,1.3); transform-origin: 50% 100%; }
   .sep { width: 1px; height: 34px; margin-bottom: 14px; background: rgba(255,255,255,0.12); }
+  /* Widgety: żywe kafle obok ikon (blok, fokus, radio, pogoda, muzyka, odliczanie). */
+  .app.wgt { flex-direction: row; align-items: center; gap: 9px; width: 128px; height: 52px; padding: 0 11px; border-radius: 15px; background: rgba(255,255,255,0.05); text-align: left; }
+  .app.wgt:hover { transform: none; background: rgba(255,255,255,0.09); }
+  .app.wgt .w-ic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.07); flex: none; color: var(--muted); }
+  .app.wgt .w-tx { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 68px; }
+  .app.wgt .w-t { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app.wgt .w-v { font-size: 12px; font-weight: 650; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .app.wgt .stripe { position: absolute; left: 11px; bottom: 4px; width: 22px; }
 </style>
 </head>
 <body>
@@ -92,6 +100,7 @@ dock.addEventListener('mousemove', (e) => {
   if (dragging) return;
   for (const b of dock.querySelectorAll('.app')) {
     const t = b.querySelector('.tile');
+    if (!t) continue;
     const r = t.getBoundingClientRect();
     const d = Math.abs(e.clientX - (r.left + r.width / 2));
     const k = Math.max(0, 1 - d / 120);
@@ -108,7 +117,8 @@ const webview = window.__TAURI__.webview.getCurrentWebview();
 function dropTarget(pos) {
   const r = window.devicePixelRatio || 1;
   const el = document.elementFromPoint(pos.x / r, pos.y / r);
-  return el ? el.closest('.app') : null;
+  const app = el ? el.closest('.app') : null;
+  return app && !app.dataset.widget ? app : null;
 }
 function clearDrop() {
   for (const x of dock.querySelectorAll('.drop-target')) x.classList.remove('drop-target');
@@ -153,9 +163,10 @@ let suppressClick = false;
 
 /** Karty z tytułem okna, gdy jest miejsce; przy tłoku wszystko wraca do ikon. */
 function cardsFor(s) {
-  const withWin = s.dock.filter((a) => a.windows > 0);
+  const withWin = s.dock.filter((a) => a.windows > 0 && !a.widget);
+  const widgets = s.dock.filter((a) => a.widget).length;
   const maxW = (screen.availWidth || 1920) * 0.78;
-  const est = s.dock.length * 60 + withWin.length * 150;
+  const est = (s.dock.length - widgets) * 60 + widgets * 132 + withWin.length * 150;
   return withWin.length <= 7 && est < maxW;
 }
 function cardLabel(s, a) {
@@ -167,30 +178,121 @@ function cardLabel(s, a) {
   return { title: short, sub: short === t ? '' : a.name };
 }
 
+// --- Widgety -------------------------------------------------------------
+const fmtClock = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+const humanDur = (ms) => {
+  const m = Math.max(0, Math.round(ms / 60000));
+  if (m < 60) return `${m} min`;
+  const h = Math.floor(m / 60), d = Math.floor(h / 24);
+  return d >= 1 ? `${d} dni ${h % 24} h` : `${h} h ${String(m % 60).padStart(2, '0')} min`;
+};
+
+/** Dane widgetu z migawki: {ic|emoji, t, v, count?, countfmt?, tip}. */
+function widgetData(a, s) {
+  const quiet = s.quietUntil ? new Date(s.quietUntil) : null;
+  switch (a.widget) {
+    case 'next-block': {
+      const n = s.next;
+      return n
+        ? { ic: 'clock', t: n.title, v: `od ${fmtClock(new Date(n.start))}`, tip: `Następny blok — klik otwiera panel Teraz` }
+        : { ic: 'clock', t: 'Plan na dziś', v: 'koniec listy', tip: 'Brak kolejnych bloków' };
+    }
+    case 'focus': {
+      const f = s.focus;
+      if (!f) return { ic: 'clock', t: 'Fokus', v: 'klik: zacznij', tip: 'Klik otwiera panel Teraz' };
+      return { ic: 'clock', t: f.title, v: humanDur(new Date(f.end) - Date.now()), count: f.end, countfmt: 'dur', tip: 'Fokus trwa — klik otwiera panel Teraz' };
+    }
+    case 'radio': {
+      const w = s.radio ? s.radio.waiting : 0;
+      if (w) return { ic: 'radio', t: 'Radio', v: `${w} czeka`, tip: 'Klik pokazuje czekające wiadomości' };
+      if (quiet) return { ic: 'moon', t: 'Radio', v: `cicho → ${fmtClock(quiet)}`, tip: 'Radio wyciszone w tej paczce' };
+      return { ic: 'radio', t: 'Radio', v: s.radio && s.radio.showingCount ? 'przekazanie…' : 'cisza', tip: 'Radio — klik pokazuje czekające' };
+    }
+    case 'weather': {
+      const w = s.weather;
+      return w
+        ? { emoji: w.emoji, t: w.label, v: `${Math.round(w.temp)}° · ${w.text}`, tip: `${w.label}: ${Math.round(w.temp)}° — ${w.text}` }
+        : { ic: 'globe', t: 'Pogoda', v: 'pobieram…', tip: 'Pogoda' };
+    }
+    case 'music': {
+      const m = s.music;
+      if (m && m.connected && m.title) return { ic: 'music', t: m.artist || 'Muzyka', v: m.playing ? m.title : `${m.title} — pauza`, tip: 'Klik: odtwórz / wstrzymaj' };
+      return { ic: 'music', t: 'Muzyka', v: 'niepołączono', tip: 'Klik: odtwórz / wstrzymaj' };
+    }
+    case 'countdown': {
+      const [label, when] = (a.widgetTarget || '').split('|');
+      const end = new Date(when || '');
+      if (isNaN(end)) return { ic: 'calendar', t: label || 'Odliczanie', v: 'ustaw cel', tip: 'Ustaw widgetTarget: „Nazwa|RRRR-MM-DDTHH:MM”' };
+      return { ic: 'calendar', t: label || 'Odliczanie', v: humanDur(end - Date.now()), count: end.toISOString(), countfmt: 'dur', tip: label || 'Odliczanie' };
+    }
+    default: return { ic: 'clock', t: a.name, v: 'widget', tip: a.name };
+  }
+}
+
+const widgetTile = (w) =>
+  `<span class="w-ic">${w.emoji ? `<span aria-hidden="true" style="font-size:16px">${esc(w.emoji)}</span>` : icon(w.ic, 16)}</span>` +
+  `<span class="w-tx"><span class="w-t">${esc(w.t)}</span><span class="w-v">${esc(w.v)}</span></span>`;
+
+/** Klik w widget: radio → czekające, muzyka → play/pauza, reszta → panel Teraz. */
+function widgetClick(a) {
+  invoke('previews_hide');
+  if (a.widget === 'radio') { invoke('radio_show_waiting').catch((err) => console.warn(err)); return; }
+  if (a.widget === 'music') { invoke('player_toggle').catch((err) => console.warn(err)); return; }
+  invoke('toggle_panel', { label: 'now' }).catch((err) => console.warn(err));
+}
+
+/** Żywe odliczania w widgetach (bez pełnego renderu). */
+function tickCounts() {
+  for (const b of dock.querySelectorAll('.app[data-count]')) {
+    const end = new Date(b.dataset.count);
+    if (isNaN(end)) continue;
+    const v = b.querySelector('.w-v');
+    if (v) v.textContent = b.dataset.countfmt === 'min'
+      ? `${Math.max(0, Math.round((end - Date.now()) / 60000))} min`
+      : humanDur(end - Date.now());
+  }
+}
+setInterval(tickCounts, 1000);
+
 function render(s) {
   if (dragging) return;
   const cards = cardsFor(s);
   const key = JSON.stringify(s.dock) + Object.keys(icons).length + Object.values(runIcons).filter(Boolean).length
-    + (cards ? JSON.stringify(s.windowTitles) : '') + s.fgExe + cards;
+    + (cards ? JSON.stringify(s.windowTitles) : '') + s.fgExe + cards
+    + JSON.stringify([s.focus, s.next, s.radio, s.quietUntil, s.weather, s.music && s.music.title, s.music && s.music.playing, s.clock]);
   if (key === lastKey) return;
   lastKey = key;
   dock.innerHTML = s.dock.map((a) => {
-    const card = cards && a.windows > 0;
+    const card = cards && a.windows > 0 && !a.widget;
     const active = a.exe && a.exe === s.fgExe;
     const lbl = card ? cardLabel(s, a) : null;
+    const wd = a.widget ? widgetData(a, s) : null;
+    const count = wd && wd.count ? ` data-count="${esc(wd.count)}" data-countfmt="${wd.countfmt || 'dur'}"` : '';
     return `
-    <button class="app ${a.dim ? 'dim' : ''} ${a.stack ? 'stack' : ''} ${a.unpinned ? 'unpinned' : ''} ${card ? 'card' : ''} ${active ? 'active' : ''}" data-stack="${a.stack ? 1 : ''}" data-id="${esc(a.id)}" data-name="${esc(a.name)}" aria-label="${esc(a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}">
-      ${tile(a)}
+    <button class="app ${a.dim ? 'dim' : ''} ${a.stack ? 'stack' : ''} ${a.unpinned ? 'unpinned' : ''} ${card ? 'card' : ''} ${active ? 'active' : ''} ${wd ? 'wgt' : ''}" data-widget="${wd ? esc(a.widget) : ''}" data-stack="${a.stack ? 1 : ''}" data-id="${esc(a.id)}" data-name="${esc(a.name)}" aria-label="${esc(wd ? `${wd.t}: ${wd.v}` : a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}"${count}>
+      ${wd ? widgetTile(wd) : tile(a)}
       ${card ? `<span class="lbl"><b>${esc(lbl.title)}</b>${lbl.sub ? `<span>${esc(lbl.sub)}</span>` : ''}</span>` : ''}
       <span class="stripe" style="background:${a.stripe}"></span>
-      ${a.badgeMuted ? '<span class="badge muted" aria-label="nieprzeczytana poczta — wyciszone w fokusie" title="Poczta czeka — licznik wyciszony w fokusie"></span>'
+      ${!wd && (a.badgeMuted ? '<span class="badge muted" aria-label="nieprzeczytana poczta — wyciszone w fokusie" title="Poczta czeka — licznik wyciszony w fokusie"></span>'
         : a.badge ? `<span class="badge" aria-label="${a.badge} nowych">${a.badge > 99 ? '99+' : a.badge}</span>`
-        : !card && (a.windows || a.running) ? `<span class="dots" aria-hidden="true">${'<i></i>'.repeat(Math.min(3, Math.max(1, a.windows || 1)))}</span>` : ''}
+        : !card && (a.windows || a.running) ? `<span class="dots" aria-hidden="true">${'<i></i>'.repeat(Math.min(3, Math.max(1, a.windows || 1)))}</span>` : '')}
     </button>${a.separatorAfter ? '<span class="sep" aria-hidden="true"></span>' : ''}`;
   }).join('');
   for (const b of dock.querySelectorAll('.app')) {
     const id = b.dataset.id;
     const isStack = b.dataset.stack === '1';
+    // Widgety: klik → akcja, bez kółka, przeciągania i podglądów okien.
+    if (b.dataset.widget) {
+      const item = s.dock.find((x) => x.id === id);
+      b.onclick = () => { if (item && !suppressClick) widgetClick(item); };
+      b.onmouseenter = () => {
+        if (!item) return;
+        const r = b.getBoundingClientRect();
+        invoke('previews_tip', { text: widgetData(item, s).tip, anchor: r.left + r.width / 2 });
+      };
+      b.onmouseleave = () => { emitTo('preview', 'preview-leave', null); };
+      continue;
+    }
     b.onclick = (e) => {
       if (suppressClick) return;
       clearTimeout(hoverTimer);
@@ -232,7 +334,7 @@ function render(s) {
             b.setPointerCapture(e.pointerId);
           }
           if (!active) return;
-          const pinned = [...dock.querySelectorAll('.app')].filter((x) => x !== b && !x.dataset.id.startsWith('run:'));
+          const pinned = [...dock.querySelectorAll('.app')].filter((x) => x !== b && !x.dataset.id.startsWith('run:') && !x.dataset.widget);
           const target = pinned.find((x) => { const r = x.getBoundingClientRect(); return ev.clientX < r.left + r.width / 2; });
           if (target) {
             if (b.nextElementSibling !== target) dock.insertBefore(b, target);
@@ -249,7 +351,7 @@ function render(s) {
           suppressClick = true;
           setTimeout(() => { suppressClick = false; }, 50);
           b.classList.remove('dragging');
-          const order = [...dock.querySelectorAll('.app')].map((x) => x.dataset.id).filter((x) => !x.startsWith('run:'));
+          const order = [...dock.querySelectorAll('.app')].filter((x) => !x.dataset.id.startsWith('run:') && !x.dataset.widget).map((x) => x.dataset.id);
           dragging = null;
           lastKey = '';
           invoke('dock_reorder', { order, moved: id }).catch((err) => console.warn(err));

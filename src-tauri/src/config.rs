@@ -18,6 +18,19 @@ pub fn config_path() -> PathBuf {
     data_dir().join("config.json")
 }
 
+/// Zapis atomowy: najpierw plik tymczasowy obok celu, potem zamiana miejscami.
+/// Przerwany zapis (awaria zasilania, zawieszenie) nie zostawi zepsutego JSON-a —
+/// w najgorszym razie plik główny zostaje w poprzedniej, poprawnej wersji.
+pub fn atomic_write(path: &std::path::Path, text: &str) {
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let tmp = path.with_file_name(format!("{name}.tmp"));
+    let res = std::fs::write(&tmp, text).and_then(|()| std::fs::rename(&tmp, path));
+    if let Err(err) = res {
+        log::error!("zapis atomowy {} nieudany: {err}", path.display());
+        let _ = std::fs::remove_file(&tmp);
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
@@ -42,6 +55,7 @@ pub struct Config {
     pub presence: PresenceCfg,
     pub windows: WindowsCfg,
     pub mail: MailCfg,
+    pub weather: WeatherCfg,
 }
 
 /// Poczta z Thunderbirda (przez dodatek Edge Shell Bridge).
@@ -80,6 +94,24 @@ impl Default for MailCfg {
             badge_mute_focus: true,
             task_minutes: 30,
         }
+    }
+}
+
+/// Pogoda z Open-Meteo (bez klucza API). Gdy lat/lon puste — moduł śpi.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct WeatherCfg {
+    /// Szerokość geograficzna, np. `50.06`.
+    pub lat: String,
+    /// Długość geograficzna, np. `19.94`.
+    pub lon: String,
+    /// Podpis kafelka, np. `Kraków`.
+    pub label: String,
+}
+
+impl Default for WeatherCfg {
+    fn default() -> Self {
+        Self { lat: String::new(), lon: String::new(), label: String::new() }
     }
 }
 
@@ -431,6 +463,8 @@ pub struct Mode {
     pub wallpaper: String,
     /// Jasność ekranów 0–100 (None = bez zmiany).
     pub brightness: Option<u8>,
+    /// Własny zestaw docka dla trybu (gdy niepusty — zastępuje wspólny `dock`).
+    pub dock: Vec<DockApp>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -452,6 +486,11 @@ pub struct DockApp {
     pub icon_path: String,
     /// Wstaw separator za tą ikoną.
     pub separator_after: bool,
+    /// Widget zamiast ikony: next-block | focus | radio | weather | music | countdown.
+    /// Puste = zwykła ikona aplikacji.
+    pub widget: String,
+    /// Cel widgetu — dla `countdown` identyfikator z listy, na razie nieużywany.
+    pub widget_target: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -589,6 +628,7 @@ impl Default for Mode {
             playlist: String::new(),
             wallpaper: String::new(),
             brightness: None,
+            dock: vec![],
         }
     }
 }
@@ -631,6 +671,8 @@ impl Default for DockApp {
             process: String::new(),
             icon_path: String::new(),
             separator_after: false,
+            widget: String::new(),
+            widget_target: String::new(),
         }
     }
 }
@@ -854,6 +896,7 @@ impl Default for Config {
             presence: PresenceCfg::default(),
             windows: WindowsCfg::default(),
             mail: MailCfg::default(),
+            weather: WeatherCfg::default(),
         }
     }
 }
@@ -912,7 +955,7 @@ impl Config {
 
     pub fn save(&self) {
         if let Ok(text) = serde_json::to_string_pretty(self) {
-            let _ = std::fs::write(config_path(), text);
+            crate::config::atomic_write(&config_path(), &text);
         }
     }
 

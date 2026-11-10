@@ -12,23 +12,35 @@ API (nagłówek Authorization: Bearer <PRESENCE_TOKEN>, jeśli ustawiony):
   POST /status  {"name": "Łukasz", "state": "focus|available|away", "task": "...", "until": "ISO"}
   GET  /status  → [{"name", "state", "task", "until", "seen"}]
 Wpisy starsze niż 2 minuty są zwracane jako „offline”, po dobie znikają.
+
+Wysyłanie plików z Półki na telefon (koncepcja 6):
+  POST /share   (bearer wymagany) — body: plik, nagłówek X-Filename (zakodowany URL-encode)
+                → {"id": "..."}  · limit 50 MB, żyje 10 minut, tylko w pamięci
+  GET  /share/{id} — BEZ tokenu (telefon ma dostać sam link), zwraca plik do pobrania
 """
 
 from __future__ import annotations
 
 import json
+import mimetypes
 import os
+import secrets
 import threading
 import time
+import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 TOKEN = os.environ.get("PRESENCE_TOKEN", "")
 PORT = int(os.environ.get("PRESENCE_PORT", "7320"))
 STALE_S = 120
 FORGET_S = 24 * 3600
+SHARE_TTL_S = 10 * 60
+SHARE_MAX = 50 * 1024 * 1024
 
 _lock = threading.Lock()
 _people: dict[str, dict] = {}
+# id → (dane, deadline, nazwa pliku); tylko pamięć — po restarcie serwera linki gasną.
+_shares: dict[str, tuple[bytes, float, str]] = {}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -51,6 +63,10 @@ class Handler(BaseHTTPRequestHandler):
         if self.path.rstrip("/") == "/health":
             self._send(200, {"status": "ok"})
             return
+        # Pobranie udostępnionego pliku — celowo bez tokenu: link idzie na telefon.
+        if self.path.startswith("/share/"):
+            self._share_get()
+            return
         if self.path.rstrip("/") != "/status":
             self._send(404, {"error": "not found"})
             return
@@ -69,6 +85,9 @@ class Handler(BaseHTTPRequestHandler):
         self._send(200, out)
 
     def do_POST(self) -> None:  # noqa: N802
+        if self.path.rstrip("/") == "/share":
+            self._share_post()
+            return
         if self.path.rstrip("/") != "/status":
             self._send(404, {"error": "not found"})
             return
@@ -94,6 +113,53 @@ class Handler(BaseHTTPRequestHandler):
                 "seen": time.time(),
             }
         self._send(200, {"ok": True})
+
+    # --- Półka → telefon: upload z tokenem, pobranie bez ------------------
+
+    def _share_post(self) -> None:
+        if TOKEN and not self._auth():
+            self._send(401, {"error": "unauthorized"})
+            return
+        name = urllib.parse.unquote(self.headers.get("X-Filename", "")).strip()[:120] or "plik"
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
+        if length <= 0 or length > SHARE_MAX:
+            self._send(413, {"error": f"plik musi mieć 1 B–{SHARE_MAX // (1024 * 1024)} MB"})
+            return
+        data = self.rfile.read(length)
+        mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        sid = secrets.token_urlsafe(9)
+        with _lock:
+            # Przy okazji sprzątamy przedawnione udostępnienia.
+            now = time.time()
+            for k in [k for k, (_, dl, _) in _shares.items() if dl <= now]:
+                del _shares[k]
+            _shares[sid] = (data, now + SHARE_TTL_S, name)
+        self._send(200, {"id": sid})
+
+    def _share_get(self) -> None:
+        sid = self.path[len("/share/"):].split("?")[0].split("/")[0]
+        now = time.time()
+        with _lock:
+            item = _shares.get(sid)
+            if item and item[1] <= now:
+                del _shares[sid]
+                item = None
+        if not item:
+            self._send(404, {"error": "link wygasł (ważny 10 minut)"})
+            return
+        data, _, name = item
+        mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        quoted = urllib.parse.quote(name)
+        self.send_response(200)
+        self.send_header("Content-Type", mime)
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Content-Disposition", f"attachment; filename*=UTF-8''{quoted}")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
 
     def log_message(self, *_: object) -> None:  # cisza w logach
         pass

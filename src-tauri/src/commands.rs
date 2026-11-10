@@ -178,7 +178,12 @@ pub fn dock_reorder(app: AppHandle, order: Vec<String>, moved: String) -> Res<()
     }
     sorted.extend(apps);
     if let Some(i) = sorted.iter().position(|a| a.id == moved) {
-        let neighbour = sorted.get(i + 1).or_else(|| if i > 0 { sorted.get(i - 1) } else { None }).map(|a| a.category.clone());
+        // Sąsiedni widget nie nadaje kategorii (ma własną, pustą).
+        let neighbour = [sorted.get(i + 1), if i > 0 { sorted.get(i - 1) } else { None }]
+            .into_iter()
+            .flatten()
+            .find(|a| a.widget.is_empty())
+            .map(|a| a.category.clone());
         if let Some(cat) = neighbour {
             sorted[i].category = cat;
         }
@@ -489,6 +494,51 @@ pub fn shelf_add(app: AppHandle, paths: Vec<String>) {
 #[tauri::command]
 pub fn shelf_remove(app: AppHandle, path: String) {
     state::update(&app, true, |rt| rt.store.shelf.retain(|s| s.path != path));
+}
+
+/// Półka → telefon: wysyła plik na serwer obecności (POST /share) i kopiuje
+/// link do schowka. Link jest bez tokenu, żyje 10 minut (limit 50 MB po stronie
+/// serwera). Zwraca URL — szuflada pokazuje go w komunikacie.
+#[tauri::command]
+pub async fn share_file(app: AppHandle, path: String) -> Res<String> {
+    let cfg = state::cfg(&app);
+    let base = cfg.presence.url.trim().trim_end_matches('/').to_string();
+    if base.is_empty() {
+        return Err("Podaj adres serwera obecności w Ustawieniach → Obecność.".into());
+    }
+    let file = std::path::PathBuf::from(&path);
+    let name = file.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_else(|| "plik".into());
+    let data = tauri::async_runtime::spawn_blocking(move || std::fs::read(&file))
+        .await
+        .map_err(|e| e.to_string())?
+        .map_err(|e| format!("nie da się czytać pliku: {e}"))?;
+    if data.is_empty() {
+        return Err("Plik jest pusty.".into());
+    }
+    if data.len() > 50 * 1024 * 1024 {
+        return Err("Plik większy niż 50 MB — wyślij go inaczej.".into());
+    }
+    let client = reqwest::Client::builder().connect_timeout(std::time::Duration::from_secs(5)).build().unwrap_or_default();
+    let mut req = client
+        .post(format!("{base}/share"))
+        .header("X-Filename", urlencoding::encode(&name).into_owned())
+        .timeout(std::time::Duration::from_secs(120))
+        .body(data);
+    if !cfg.presence.token.is_empty() {
+        req = req.bearer_auth(&cfg.presence.token);
+    }
+    let resp = req.send().await.map_err(|e| format!("serwer nie odpowiada: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("serwer odrzucił plik ({})", resp.status()));
+    }
+    let id = resp.json::<Value>().await.map_err(|e| e.to_string())?["id"]
+        .as_str()
+        .ok_or("serwer nie zwrócił id")?
+        .to_string();
+    let url = format!("{base}/share/{id}");
+    copy_text(app.clone(), url.clone())?;
+    radio::pit_wall(&app, format!("Wyślij: {name} — link w schowku, ważny 10 minut"), None);
+    Ok(url)
 }
 
 #[tauri::command]

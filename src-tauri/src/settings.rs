@@ -116,6 +116,17 @@ pub fn set_volume(app: AppHandle, level: u8) {
 }
 
 #[tauri::command]
+pub fn set_brightness(_app: AppHandle, level: u8) {
+    sys::set_brightness(level);
+}
+
+/// Odczyt jasności (DDC/CI) — do suwaka w HUD przy notchu. None = nieznana.
+#[tauri::command]
+pub async fn get_brightness() -> Option<u8> {
+    tauri::async_runtime::spawn_blocking(sys::get_brightness).await.ok().flatten()
+}
+
+#[tauri::command]
 pub fn toggle_mute(app: AppHandle) {
     sys::toggle_mute();
     stats::refresh_volume(&app);

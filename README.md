@@ -238,6 +238,25 @@ Systemowe powiadomienia Thunderbirda są pomijane, gdy dodatek jest połączony 
 
 Sterowanie odtwarzaniem przez Web API wymaga konta Premium. Bez niego widget tylko pokazuje, co gra.
 
+## Widgety, HUD, pogoda i wysyłka na telefon
+
+- **Widgety w docku**: aplikacja w docku może być widgetem (`widget` w *Ustawienia → Dock*): następny blok z Horologa,
+  bieżący fokus z paskiem postępu, radio (co gra + oczekujące), pogoda, muzyka (okładka + play/pauza) albo odliczanie.
+  Widgety stoją na początku docka, w kolejności z konfiguracji. Klik w widget działa od razu (np. play/pauza).
+- **Własny dock trybu**: każdemu trybowi możesz ustawić własny zestaw ikon i widgetów (*Ustawienia → Tryby → Dock*) —
+  niepusty zastępuje wspólny dock na czas trybu.
+- **Pogoda**: *Ustawienia → Pogoda* (szerokość, długość, podpis). Dane z Open-Meteo (bez klucza), odświeżane co 30 minut,
+  z podpowiedzią opadów („deszcz ~16:00"). Kursy walut z NBP (co 6 h) zasilają konwerter w palecie.
+- **HUD przy notchu**: kółko myszy nad głośnością albo jasnością w pasku (klik w ikonę słońca też) otwiera kartę
+  z suwakami głośności i jasności (jasność przez DDC/CI — ekrany zewnętrzne), z podglądem fokusu i ciszy. Znika po 1,6 s.
+- **Paleta+**: `pog` — pogoda z odświeżeniem (Tab: prognoza wttr.in), `web słowa` — DuckDuckGo,
+  `inst nazwa` — WinGet (wyniki, Enter instaluje w tle), konwerter — `20 eur → pln`, `120 usd`, `5 mil na km`,
+  `72 f na c`, `3 gal na l` (waluty z NBP, wynik do schowka); działa też z wiodącym `=`.
+- **Raport fokusa**: w raporcie tygodnia (`rap`) jest sekcja „Co robiłeś w fokusie” — top 5 aplikacji, które były
+  na pierwszym planie w trakcie sesji (próbkowanie co 30 s, historia 7 dni, liczone w przybliżeniu).
+- **Półka → telefon**: przycisk „Wyślij” przy pliku na Półce wysyła go na serwer obecności (max 50 MB) i kopiuje
+  link do schowka — otwierasz go na telefonie i pobierasz. Link żyje 10 minut, pobranie nie wymaga tokenu.
+
 ## Budowanie ze źródeł
 
 Potrzebujesz Windows 10/11, [Rust](https://rustup.rs), Node 20+ i WebView2 (jest w Windows 11).

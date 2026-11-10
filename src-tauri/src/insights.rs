@@ -36,7 +36,9 @@ const DAYS: [&str; 7] = ["pon", "wt", "śr", "czw", "pt", "sob", "nd"];
 #[tauri::command]
 pub fn get_report(app: AppHandle) -> Value {
     let cfg = state::cfg(&app);
-    let (history, planned) = state::read(&app, |rt| (rt.store.history.clone(), rt.store.week_focus_min));
+    let (history, planned, focus_apps) = state::read(&app, |rt| {
+        (rt.store.history.clone(), rt.store.week_focus_min, rt.store.focus_apps.clone())
+    });
     let today = Local::now().date_naive();
     let from = today - Duration::days(6);
 
@@ -88,6 +90,21 @@ pub fn get_report(app: AppHandle) -> Value {
     best_hours.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
     let best_hours: Vec<String> = best_hours.iter().take(2).map(|(h, _)| format!("{h:02}:00–{:02}:00", h + 1)).collect();
 
+    // „Co robiłeś w fokusie”: próbki po 30 s → minuty, top 5 aplikacji z okna 7 dni.
+    let mut apps: HashMap<String, u32> = HashMap::new();
+    for (d, day) in &focus_apps {
+        let Ok(date) = chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d") else { continue };
+        if date < from || date > today {
+            continue;
+        }
+        for (exe, n) in day {
+            *apps.entry(pretty_exe(exe)).or_insert(0) += n;
+        }
+    }
+    let mut apps: Vec<(String, i64)> = apps.into_iter().map(|(n, c)| (n, (c as i64) / 2)).collect();
+    apps.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    let focus_apps: Vec<Value> = apps.iter().take(5).map(|(n, m)| json!({ "name": n, "minutes": m })).collect();
+
     json!({
         "from": from.format("%d.%m").to_string(),
         "to": today.format("%d.%m").to_string(),
@@ -99,7 +116,18 @@ pub fn get_report(app: AppHandle) -> Value {
         "bestSector": best.filter(|(d, _)| *d < 0).map(|(d, t)| json!({ "title": t, "deltaMin": d })),
         "worstSector": worst.filter(|(d, _)| *d > 2).map(|(d, t)| json!({ "title": t, "deltaMin": d })),
         "bestHours": best_hours,
+        "focusApps": focus_apps,
     })
+}
+
+/// Ładna nazwa z pliku .exe: bez rozszerzenia, pierwsza litera wielka (jak w docku).
+fn pretty_exe(exe: &str) -> String {
+    let stem = exe.trim().trim_end_matches(".exe");
+    let mut c = stem.chars();
+    match c.next() {
+        Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+        None => String::new(),
+    }
 }
 
 // ---------------------------------------------------------------------------

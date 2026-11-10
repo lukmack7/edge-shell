@@ -188,6 +188,8 @@ pub struct Store {
     pub mail_planned: Vec<String>,
     /// „Co przegapiłeś” — wiadomości, które notch pokazał i schował (ostatnie 10).
     pub missed: Vec<Missed>,
+    /// Fokus: co było na pierwszym planie w trakcie sesji (data → exe → próbki po 30 s).
+    pub focus_apps: HashMap<String, HashMap<String, u32>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -272,7 +274,7 @@ impl Store {
     }
     pub fn save(&self) {
         if let Ok(text) = serde_json::to_string(self) {
-            let _ = std::fs::write(Self::path(), text);
+            crate::config::atomic_write(&Self::path(), &text);
         }
     }
 }
@@ -357,6 +359,10 @@ pub struct Runtime {
     /// Inne osoby z serwera obecności.
     pub presence: Vec<crate::presence::Person>,
     pub presence_at: Option<DateTime<Local>>,
+    /// Ostatnia pogoda (Open-Meteo), None = jeszcze nie pobrano albo brak konfiguracji.
+    pub weather: Option<crate::weather::Weather>,
+    /// Kursy walut z NBP (kod → PLN za 1 jednostkę), odświeżane co 6 h.
+    pub rates: HashMap<String, f64>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, PartialEq)]
@@ -447,27 +453,43 @@ pub fn snapshot(app: &AppHandle) -> Value {
     let mode = cfg.mode(&rt.store.mode);
     let today = today_key();
 
-    // Dock pogrupowany według kolejności sekcji; separator między sekcjami.
+    // Dock: tryb z własnym zestawem (mode.dock) albo wspólny config.dock.
+    // Widgety idą na początek w kolejności z konfiguracji, aplikacje pogrupowane
+    // po sekcjach (stabilnie — kolejność w sekcji z pliku).
     let section_index = |id: &str| cfg.sections.iter().position(|s| s.id == id).unwrap_or(usize::MAX);
-    let mut ordered: Vec<&crate::config::DockApp> = cfg.dock.iter().collect();
-    ordered.sort_by_key(|a| section_index(&a.category));
+    let mut ordered: Vec<(usize, &crate::config::DockApp)> = if mode.dock.is_empty() {
+        cfg.dock.iter().enumerate().collect()
+    } else {
+        mode.dock.iter().enumerate().collect()
+    };
+    ordered.sort_by_key(|(i, a)| (a.widget.is_empty(), section_index(&a.category), *i));
     let mut dock: Vec<Value> = ordered
         .iter()
         .enumerate()
-        .map(|(n, a)| {
+        .map(|(n, (i, a))| {
             let (bg, fg, stripe) = section_colors(&cfg.sections, &a.category);
-            let exes = a.exe_names();
-            let running = exes.iter().any(|e| rt.running.contains(e));
-            let windows = exes.iter().filter_map(|e| rt.window_counts.get(e)).sum::<usize>();
-            let separator = ordered.get(n + 1).is_some_and(|next| next.category != a.category);
-            let badge = rt.badges.get(&a.id).copied().unwrap_or(0);
-            let stack = crate::stacks::is_folder(&a.path);
+            let separator = ordered.get(n + 1).is_some_and(|(_, next)| {
+                let (cur_w, next_w) = (!a.widget.is_empty(), !next.widget.is_empty());
+                if cur_w != next_w { true } else if next_w { false } else { next.category != a.category }
+            });
+            // Widget nie jest aplikacją: bez procesów, kropek i stosów.
+            let (running, windows, badge, stack, exes) = if a.widget.is_empty() {
+                let exes = a.exe_names();
+                let running = exes.iter().any(|e| rt.running.contains(e));
+                let windows = exes.iter().filter_map(|e| rt.window_counts.get(e)).sum::<usize>();
+                let badge = rt.badges.get(&a.id).copied().unwrap_or(0);
+                let stack = crate::stacks::is_folder(&a.path);
+                (running, windows, badge, stack, exes)
+            } else {
+                (false, 0usize, 0u32, false, Vec::new())
+            };
             json!({
                 "id": a.id, "name": a.name, "icon": a.icon, "category": a.category,
                 "bg": bg, "fg": fg, "stripe": stripe,
                 "dim": mode.dim.iter().any(|d| d == &a.id),
                 "running": running, "windows": windows, "separatorAfter": separator,
                 "badge": badge, "stack": stack, "exe": exes.first().cloned().unwrap_or_default(),
+                "widget": a.widget, "widgetTarget": a.widget_target,
             })
         })
         .collect();
@@ -579,8 +601,10 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "app": rt.foreground,
         "battery": rt.battery.map(|(p, c)| json!({ "percent": p, "charging": c })),
         "music": rt.music,
+        "weather": rt.weather,
         "spotifyEnabled": !cfg.spotify.client_id.is_empty(),
         "player": rt.store.player,
+        "quietUntil": rt.store.quiet_until,
         "oneThing": rt.one_thing,
         "missed": rt.store.missed,
         "notch": cfg.shell.notch,
@@ -592,8 +616,10 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "fgExe": rt.foreground_exe,
         "presence": rt.presence,
         "panels": { "drawer": rt.drawer_open, "now": rt.now_open },
-        "friction": rt.friction_app.as_ref().and_then(|id| cfg.dock.iter().find(|a| &a.id == id))
-            .map(|a| json!({ "id": a.id, "name": a.name })),
+        "friction": rt.friction_app.as_ref().and_then(|id| {
+            let hit = mode.dock.iter().find(|a| &a.id == id).or_else(|| cfg.dock.iter().find(|a| &a.id == id));
+            hit.map(|a| json!({ "id": a.id, "name": a.name }))
+        }),
         "hotkeys": cfg.hotkeys,
         "showBubbles": cfg.shell.show_bubbles,
         "barStats": cfg.bar.stats,
