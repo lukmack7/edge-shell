@@ -429,6 +429,12 @@ const render = {
           <button class="btn" id="wRefresh">${icon('restart', 16, 2)}Odśwież teraz</button>
         </div>
       </div>
+      <div class="card"><h3>Kafelek pogody w docku</h3>
+        <div class="row">
+          <div class="txt"><b>${cfg.dock.some((a) => a.widget === 'weather') ? 'Kafelek jest już w docku' : 'W docku nie ma kafelka pogody'}</b><span>${cfg.dock.some((a) => a.widget === 'weather') ? `Znajdziesz go na początku docka — klik otwiera podgląd następnych godzin. ${(cfg.dock.find((a) => a.widget === 'weather')?.name || '').trim() ? `Wpis nazywa się „${esc(cfg.dock.find((a) => a.widget === 'weather').name)}” (Dock → kliknij wpis, żeby zmienić nazwę).` : ''}` : 'Kliknięcie poniżej doda wpis z widgetem „Pogoda” na początku docka — bez tego kafelek się nie pojawi.'}</span></div>
+          ${cfg.dock.some((a) => a.widget === 'weather') ? `<button class="btn" id="wTileRemove">${icon('trash', 16, 2)}Usuń z docka</button>` : `<button class="btn primary" id="wTileAdd">${icon('plus', 16, 2)}Dodaj kafelek do docka</button>`}
+        </div>
+      </div>
       <div class="card"><h3>HUD przy notchu</h3>
         <div class="row"><div class="txt"><b>Zawsze dostępny</b><span>Kółko myszy nad ikoną głośności albo jasności na pasku (klik w ikonę jasności też) otwiera kartę z suwakami. Znika po 1,6 s. Jasność działa przez DDC/CI — ekrany zewnętrzne; wbudowane ekrany laptopów zwykle nie pozwalają jej odczytać.</span></div></div>
       </div>`;
@@ -693,6 +699,25 @@ const after = {
     $('wRefresh').onclick = async () => {
       $('wRefresh').disabled = true;
       await invoke('weather_refresh').catch(() => {});
+      show(page);
+    };
+    // Kafelek pogody w docku: jeden wpis z widget=weather, sortowany na początek.
+    const tile = () => cfg.dock.find((a) => a.widget === 'weather');
+    if ($('wTileAdd')) $('wTileAdd').onclick = async () => {
+      if (!tile()) {
+        cfg.dock.unshift({
+          id: uid('pogoda'), name: cfg.weather.label.trim() || 'Pogoda', path: '', args: [],
+          category: cfg.sections[0]?.id || 'system', icon: 'auto', process: '', iconPath: '',
+          separatorAfter: false, widget: 'weather', widgetTarget: '',
+        });
+        markDirty();
+        await save();
+      }
+      show('dock');
+    };
+    if ($('wTileRemove')) $('wTileRemove').onclick = async () => {
+      const i = cfg.dock.findIndex((a) => a.widget === 'weather');
+      if (i >= 0) { cfg.dock.splice(i, 1); markDirty(); await save(); }
       show(page);
     };
   },
