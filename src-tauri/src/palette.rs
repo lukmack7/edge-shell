@@ -85,6 +85,11 @@ enum Cmd {
     Plan { title: String, minutes: i64, intent: Option<String>, kind: String },
     MailCompose { to: String, subject: String },
     MailOpen { id: i64, mid: String },
+    /// Szukaj frazy w DuckDuckGo (puste = tylko podpowiedź, nic nie otwieraj).
+    WebSearch(String),
+    WingetInstall { id: String, name: String },
+    /// Pogoda: Enter odświeża, Tab (url niepusty) otwiera prognozę w sieci.
+    Weather(String),
 }
 
 static LAST: Mutex<Option<HashMap<String, Cmd>>> = Mutex::new(None);
@@ -437,6 +442,60 @@ fn looks_like_math(q: &str) -> bool {
             && q.chars().all(|c| c.is_ascii_digit() || " .,+-*/^()%x:".contains(c)))
 }
 
+/// Liczba po polsku: kropka dziesiętna → przecinek, bez zbędnych zer.
+fn num_pl(v: f64) -> String {
+    let r = (v * 100.0).round() / 100.0;
+    let s = if r.fract() == 0.0 && r.abs() < 1e15 { format!("{}", r as i64) } else { format!("{r:.2}") };
+    s.replace('.', ",")
+}
+
+/// Konwerter w palecie: „20 eur → pln”, „5 mil na km”, „72 f na c”.
+/// Waluty z kursów NBP trzymanych w pamięci (weather::start_rates), jednostki lokalnie.
+/// Zwraca gotowy wynik (np. „85,50 PLN”) albo None, gdy zapytanie nie jest konwersją.
+fn convert_query(app: &AppHandle, q: &str) -> Option<String> {
+    let q = q.trim();
+    let mut it = q.split_whitespace();
+    let amount = it.next()?.replace(',', ".").parse::<f64>().ok()?;
+    if !amount.is_finite() {
+        return None;
+    }
+    let from = it.next()?.to_lowercase();
+    let arrow = it.next()?;
+    if !["→", "->", "na", "w", "to"].contains(&arrow) {
+        return None;
+    }
+    let to = it.next()?.to_lowercase();
+    if it.next().is_some() {
+        return None;
+    }
+    // Temperatura: przeliczenie niezależne od kursów.
+    match (from.as_str(), to.as_str()) {
+        ("c", "f") | ("°c", "°f") => return Some(format!("{} °F", num_pl(amount * 1.8 + 32.0))),
+        ("f", "c") | ("°f", "°c") => return Some(format!("{} °C", num_pl((amount - 32.0) / 1.8))),
+        _ => {}
+    }
+    // Waluty: trzy litery, kurs musi być w pamięci (NBP); PLN jest zawsze.
+    if from.len() == 3 && to.len() == 3 && from.chars().all(|c| c.is_ascii_alphabetic()) && to.chars().all(|c| c.is_ascii_alphabetic()) {
+        let (f, t) = (from.to_uppercase(), to.to_uppercase());
+        let rates = state::read(app, |rt| rt.rates.clone());
+        let rfrom = rates.get(&f).copied()?;
+        let rto = rates.get(&t).copied()?;
+        return Some(format!("{:.2} {}", amount * rfrom / rto, t));
+    }
+    // Jednostki: długość (0), masa (1), objętość (2) — przeliczenie przez bazę.
+    const FACTORS: &[(&str, f64, u8)] = &[
+        ("km", 1000.0, 0), ("m", 1.0, 0), ("mil", 1609.344, 0), ("mile", 1609.344, 0), ("cm", 0.01, 0),
+        ("kg", 1.0, 1), ("lb", 0.45359237, 1), ("funt", 0.45359237, 1), ("g", 0.001, 1),
+        ("l", 1.0, 2), ("ml", 0.001, 2), ("gal", 3.785411784, 2),
+    ];
+    let fv = FACTORS.iter().find(|(n, _, _)| *n == from)?;
+    let tv = FACTORS.iter().find(|(n, _, _)| *n == to)?;
+    if fv.2 != tv.2 {
+        return None;
+    }
+    Some(format!("{} {}", num_pl(amount * fv.1 / tv.1), to))
+}
+
 // ---------------------------------------------------------------------------
 // Polecenia (szybkie klawisze)
 // ---------------------------------------------------------------------------
@@ -463,6 +522,9 @@ const CMD_NAMES: &[(&str, &str)] = &[
     ("evening", "zamknięcie dnia"),
     ("mail_compose", "nowy mail (@ adresat temat)"),
     ("mail_search", "szukaj w poczcie"),
+    ("weather", "pogoda (pog)"),
+    ("web_search", "szukaj w sieci (web słowa)"),
+    ("winget", "instaluj program (inst nazwa)"),
 ];
 
 fn cmd_label(cfg: &Config, cmd: &str) -> String {
@@ -486,6 +548,12 @@ fn keys(cfg: &Config) -> Vec<(String, String)> {
     out.retain(|(c, _)| !c.starts_with("mode:") || cfg.modes.iter().any(|m| format!("mode:{}", m.id) == *c));
     // Poczta doszła później — starsze konfiguracje nie mają tych klawiszy.
     for (c, k) in [("mail_compose", "@"), ("mail_search", "ms")] {
+        if !cfg.palette.keys.iter().any(|q| q.cmd == c) {
+            out.push((c.into(), k.into()));
+        }
+    }
+    // Paleta+ (pogoda, sieciowe szukanie, WinGet) — tak samo.
+    for (c, k) in [("weather", "pog"), ("web_search", "web"), ("winget", "inst")] {
         if !cfg.palette.keys.iter().any(|q| q.cmd == c) {
             out.push((c.into(), k.into()));
         }
@@ -660,6 +728,27 @@ fn add_command(b: &mut Builder, app: &AppHandle, cfg: &Config, cmd: &str, key: &
             pv("Szukaj w poczcie", "Temat, nadawca i treść we wszystkich kontach Thunderbirda. Enter otwiera mail, Tab: zadanie, archiwum.", ""), &[], Cmd::MailCompose { to: String::new(), subject: String::new() }),
         "evening" => b.add(g, "K", AMBER, "Zamknięcie dnia".into(), "Co zrobione, co na jutro, jedno zdanie".into(), key,
             pv("Zamknięcie dnia", "Karta z dzisiejszymi sektorami i niedokończonymi zadaniami — każde jednym kliknięciem na jutro.", ""), &[], Cmd::Evening),
+        "weather" => {
+            let w = state::read(app, |rt| rt.weather.clone());
+            let (title, sub) = match &w {
+                Some(w) => (format!("{}°, {}", w.temp.round(), w.text), format!("{} · Open-Meteo", w.label)),
+                None => ("Pogoda — czekam na dane".into(),
+                    if cfg.weather.lat.trim().is_empty() { "Podaj szerokość i długość w Ustawieniach → Pogoda".into() } else { "Pobieram z Open-Meteo…".into() }),
+            };
+            let city = if cfg.weather.label.trim().is_empty() { "Polska".into() } else { cfg.weather.label.trim().to_string() };
+            b.add("Pogoda", "🌤", BLUE, title, sub, key,
+                pv("Pogoda", format!("{}\n{} — dane z Open-Meteo, bez klucza API.", title, city),
+                    "• Enter: odśwież\n• Tab: prognoza w przeglądarce"),
+                &[("web", "Prognoza w sieci")], Cmd::Weather(format!("https://wttr.in/{}", urlencoding::encode(&city))));
+        }
+        "web_search" => {
+            let text = arg.trim().to_string();
+            let title = if text.is_empty() { "Szukaj w sieci".to_string() } else { format!("Szukaj: {text}") };
+            b.add("Sieć", "🌐", BLUE, title.clone(), if text.is_empty() { "wpisz web i szukaną frazę, np. web rust book".into() } else { "DuckDuckGo w domyślnej przeglądarce".into() }, key,
+                pv(title, "Fraza ląduje w DuckDuckGo i otwiera się w przeglądarce.", "• otwiera przeglądarkę"), &[], Cmd::WebSearch(text));
+        }
+        "winget" => b.add("Instalacja", "📦", PURPLE, "Instaluj program (WinGet)".into(), "wpisz inst i nazwa, np. inst obsidian".into(), key,
+            pv("WinGet", "Szukasz i instalujesz programy z repozytorium winget bez konsoli.", "• wyniki: Enter instaluje"), &[], Cmd::WebSearch(String::new())),
         _ => {}
     }
 }
@@ -776,6 +865,25 @@ pub async fn palette_query(app: AppHandle, query: String) -> Answer {
         Some((h, r)) => (h.to_lowercase(), r.trim().to_string()),
         None => (q.clone(), String::new()),
     };
+
+    // Paleta+: „inst nazwa” (WinGet) i „web słowa” (DuckDuckGo) — prefiksy z argumentem.
+    if head == "inst" {
+        return winget_rows(&app, &rest).await;
+    }
+    if head == "web" {
+        let mut b = Builder { rows: Vec::new() };
+        add_command(&mut b, &app, &cfg, "web_search", "web", &rest);
+        return b.finish("Sieć".into());
+    }
+    // Konwerter: „20 eur → pln”, „5 mil na km” — przed kalkulatorem, bo nie jest to działanie.
+    // Wiodące „=” (nawyk z kalkulatora) jest ignorowane, żeby „= 20 eur” też działało.
+    if let Some(res) = convert_query(&app, q.trim_start_matches('=').trim()) {
+        let key = keys.iter().find(|(c, _)| c == "calc").map(|(_, k)| k.clone()).unwrap_or_else(|| "=".into());
+        let text = query.trim().to_string();
+        b.add("Kalkulator", "⇄", GREY, format!("= {res}"), text.clone(), &key,
+            pv("Konwerter", format!("„{text}” → {res}.\nWaluty: kursy NBP odświeżane co 6 h. Jednostki: mil/km, kg/lb, gal/l, °F/°C."), "• wynik trafia do schowka"), &[], Cmd::Calc(res));
+        return b.finish("Konwerter".into());
+    }
 
     // 1) Dokładny szybki klawisz (z argumentem albo bez).
     let mut chip = String::new();
@@ -913,10 +1021,12 @@ pub async fn palette_query(app: AppHandle, query: String) -> Answer {
         }
     }
 
-    // 4) Zawsze na końcu: wrzuć wpisany tekst do Horologa.
+    // 4) Zawsze na końcu: szukaj w sieci i wrzuć wpisany tekst do Horologa.
     if q.chars().count() >= 3 {
-        let key = keys.iter().find(|(c, _)| c == "capture").map(|(_, k)| k.clone()).unwrap_or_default();
         let text = query.trim().to_string();
+        b.add("Sieć", "🌐", BLUE, format!("Szukaj „{text}” w sieci"), "DuckDuckGo w domyślnej przeglądarce".into(), "",
+            pv("Szukaj w sieci", format!("Otwiera DuckDuckGo z frazą „{text}”."), "• otwiera przeglądarkę"), &[], Cmd::WebSearch(text));
+        let key = keys.iter().find(|(c, _)| c == "capture").map(|(_, k)| k.clone()).unwrap_or_default();
         b.add("Inne", "M", AMBER, "Wrzuć do Horologa".into(), text.clone(), &key,
             pv("Wrzuć myśl", format!("Do inboxu Horologa trafi: „{text}”."), "• trafia do Horologa\n• okno się zamyka"), &[], Cmd::Capture(text));
     }
@@ -926,6 +1036,7 @@ pub async fn palette_query(app: AppHandle, query: String) -> Answer {
             Some("Tryby") => "Tryb".into(),
             Some("Akcje") => "Polecenie".into(),
             Some("Inne") => "Myśl → Horolog".into(),
+            Some("Sieć") => "Sieć".into(),
             Some(_) => "Szukaj".into(),
             None => String::new(),
         };
@@ -942,6 +1053,137 @@ fn kind_label(kind: &str) -> &'static str {
         "busy" => "Zajęte",
         _ => "Blok",
     }
+}
+
+// ---------------------------------------------------------------------------
+// Paleta+: WinGet i sieciowe szukanie
+// ---------------------------------------------------------------------------
+
+/// Kolumny wiersza: nazwa może mieć pojedyncze spacje, kolumny rozdziela 2+ spacji.
+fn split_cols(line: &str) -> Vec<String> {
+    let mut cols: Vec<String> = Vec::new();
+    let mut cur = String::new();
+    let mut spaces = 0usize;
+    for c in line.chars() {
+        if c == ' ' {
+            spaces += 1;
+        } else {
+            if spaces >= 2 && !cur.is_empty() {
+                cols.push(std::mem::take(&mut cur));
+            } else if spaces == 1 && !cur.is_empty() {
+                cur.push(' ');
+            }
+            spaces = 0;
+            cur.push(c);
+        }
+    }
+    if !cur.trim().is_empty() {
+        cols.push(cur.trim().to_string());
+    }
+    cols
+}
+
+/// Wyjście `winget search` → (nazwa, id) pakietu (max 8, nagłówki i stopki pomijane).
+fn parse_winget(text: &str) -> Vec<(String, String)> {
+    let mut out: Vec<(String, String)> = Vec::new();
+    for line in text.lines() {
+        let l = line.trim_end();
+        let lower = l.trim().to_lowercase();
+        if l.trim().len() < 8 || l.trim_start().starts_with('-') || lower.starts_with("name") || lower.starts_with("found") || lower.contains("source agreement") || lower.starts_with('^') {
+            continue;
+        }
+        let cols = split_cols(l);
+        if cols.len() < 2 {
+            continue;
+        }
+        let id = cols[1].trim().to_string();
+        // Id pakietu nie ma spacji (np. Obsidian.Obsidian); to odsiewa stopki.
+        if id.contains(' ') || id.contains("https") {
+            continue;
+        }
+        out.push((cols[0].trim().to_string(), id));
+        if out.len() >= 8 {
+            break;
+        }
+    }
+    out
+}
+
+/// `winget search` — może chwilę pociągnąć, więc wołane przez spawn_blocking.
+fn winget_search(q: &str) -> Result<Vec<(String, String)>, String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let out = std::process::Command::new("winget")
+            .args(["search", q, "--accept-source-agreements"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| format!("winget niedostępny: {e}"))?;
+        if out.stdout.is_empty() {
+            return Err(String::from_utf8_lossy(&out.stderr).trim().to_string());
+        }
+        Ok(parse_winget(&String::from_utf8_lossy(&out.stdout)))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = q;
+        Err("tylko Windows".into())
+    }
+}
+
+fn winget_install(id: &str) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let out = std::process::Command::new("winget")
+            .args(["install", "-e", "--id", id, "--accept-source-agreements", "--accept-package-agreements"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .output()
+            .map_err(|e| e.to_string())?;
+        if out.status.success() {
+            Ok(())
+        } else {
+            let err = String::from_utf8_lossy(&out.stderr).trim().to_string();
+            Err(if err.is_empty() { format!("instalacja nie powiodła się ({id})") } else { err })
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = id;
+        Err("tylko Windows".into())
+    }
+}
+
+/// „inst obsid” → wyniki wyszukiwania winget; Enter instaluje wybrany pakiet.
+async fn winget_rows(app: &AppHandle, q: &str) -> Answer {
+    let mut b = Builder { rows: Vec::new() };
+    let query = q.trim().to_string();
+    if query.is_empty() {
+        let cfg = state::cfg(app);
+        add_command(&mut b, app, &cfg, "winget", "inst", "");
+        return b.finish("Instalacja".into());
+    }
+    let res = tauri::async_runtime::spawn_blocking(move || winget_search(&query)).await.map_err(|e| e.to_string());
+    let list = match res {
+        Ok(list) => list,
+        Err(e) => {
+            b.add("Instalacja", "!", GREY, "WinGet nie odpowiada".into(), e.clone(), "", pv("WinGet", e, ""), &[], Cmd::WebSearch(String::new()));
+            return b.finish("Instalacja".into());
+        }
+    };
+    if list.is_empty() {
+        b.add("Instalacja", "📦", GREY, "Nic nie znalazłem".into(), "Spróbuj innej nazwy albo skrótu producenta.".into(), "",
+            pv("WinGet", "Repozytorium zwróciło pustą listę.", ""), &[], Cmd::WebSearch(String::new()));
+        return b.finish("Instalacja".into());
+    }
+    for (name, id) in list {
+        b.add("Instalacja", "📦", PURPLE, name.clone(), format!("winget install -e --id {id}"), "",
+            pv(format!("Zainstaluj: {name}"), format!("Id pakietu: {id}\nEnter uruchamia winget install -e --id {id} (bez okien konsoli). Po instalacji dostaniesz komunikat w notchu."), "• winget install -e --id"),
+            &[], Cmd::WingetInstall { id, name });
+    }
+    b.finish("Instalacja".into())
 }
 
 fn when(start: &DateTime<Local>, end: &DateTime<Local>, now: DateTime<Local>) -> String {
@@ -1127,6 +1369,23 @@ pub async fn palette_run(app: AppHandle, id: String, action: Option<String>) -> 
                 let _ = kind;
                 commands::focus_start_adhoc(app.clone(), Some(minutes.min(180)), Some(title));
             }
+        },
+        Cmd::WebSearch(q) => {
+            if !q.trim().is_empty() {
+                let url = format!("https://duckduckgo.com/?q={}", urlencoding::encode(q.trim()));
+                app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())?;
+            }
+        }
+        Cmd::WingetInstall { id, name } => {
+            let r = tauri::async_runtime::spawn_blocking(move || winget_install(&id)).await.map_err(|e| e.to_string())?;
+            match r {
+                Ok(()) => radio::pit_wall(&app, format!("Zainstalowano: {name}"), None),
+                Err(e) => radio::pit_wall(&app, format!("WinGet — {name}: {e}"), None),
+            }
+        }
+        Cmd::Weather(url) => match action.as_str() {
+            "web" if !url.is_empty() => app.opener().open_url(url, None::<&str>).map_err(|e| e.to_string())?,
+            _ => crate::weather::refresh(app.clone()).await,
         },
     }
     Ok(())

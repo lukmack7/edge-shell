@@ -151,6 +151,11 @@ pub fn start(app: AppHandle) {
     });
 }
 
+/// Odświeżenie na żądanie (paleta: Enter na „pog”).
+pub async fn refresh(app: AppHandle) {
+    let _ = fetch_one(&app).await;
+}
+
 /// Kursy walut z NBP (tabela A): kod → PLN za 1 jednostkę, odświeżane co 6 h.
 pub fn start_rates(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
