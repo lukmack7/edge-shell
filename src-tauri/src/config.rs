@@ -18,6 +18,19 @@ pub fn config_path() -> PathBuf {
     data_dir().join("config.json")
 }
 
+/// Zapis atomowy: najpierw plik tymczasowy obok celu, potem zamiana miejscami.
+/// Przerwany zapis (awaria zasilania, zawieszenie) nie zostawi zepsutego JSON-a —
+/// w najgorszym razie plik główny zostaje w poprzedniej, poprawnej wersji.
+pub fn atomic_write(path: &std::path::Path, text: &str) {
+    let name = path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let tmp = path.with_file_name(format!("{name}.tmp"));
+    let res = std::fs::write(&tmp, text).and_then(|()| std::fs::rename(&tmp, path));
+    if let Err(err) = res {
+        log::error!("zapis atomowy {} nieudany: {err}", path.display());
+        let _ = std::fs::remove_file(&tmp);
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Config {
@@ -912,7 +925,7 @@ impl Config {
 
     pub fn save(&self) {
         if let Ok(text) = serde_json::to_string_pretty(self) {
-            let _ = std::fs::write(config_path(), text);
+            crate::config::atomic_write(&config_path(), &text);
         }
     }
 

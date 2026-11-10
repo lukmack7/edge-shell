@@ -272,7 +272,7 @@ impl Store {
     }
     pub fn save(&self) {
         if let Ok(text) = serde_json::to_string(self) {
-            let _ = std::fs::write(Self::path(), text);
+            crate::config::atomic_write(&Self::path(), &text);
         }
     }
 }
