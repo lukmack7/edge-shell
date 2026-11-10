@@ -9,7 +9,7 @@ use crate::state;
 use chrono::TimeZone;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
-use tauri::AppHandle;
+use tauri::{AppHandle, Emitter};
 
 /// Ostatnia pogoda — trafia do snapshotu jako `weather`.
 #[derive(Clone, Debug, Serialize)]
@@ -249,6 +249,16 @@ pub fn start(app: AppHandle) {
 /// Odświeżenie na żądanie (paleta: Enter na „pog”).
 pub async fn refresh(app: AppHandle) {
     let _ = fetch_one(&app).await;
+}
+
+/// Klik kafelka pogody: rozwija notkę z prognozą (jak muzyka); bez notki — panel Teraz.
+#[tauri::command]
+pub fn weather_show(app: AppHandle) {
+    if state::cfg(&app).shell.notch {
+        let _ = app.emit_to("notch", "notch-weather", ());
+        return;
+    }
+    crate::layout::toggle_panel(&app, "now");
 }
 
 /// Kursy walut z NBP (tabela A): kod → PLN za 1 jednostkę.

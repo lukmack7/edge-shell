@@ -196,6 +196,7 @@ fn main() {
             settings::set_brightness,
             settings::get_brightness,
             settings::weather_refresh,
+            weather::weather_show,
             icons::dock_icons,
             icons::app_icon,
             commands::launch_new,

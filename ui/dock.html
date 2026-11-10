@@ -38,8 +38,14 @@
   .app .tile, .app.card .tile { transition: transform 0.16s cubic-bezier(.2,.9,.3,1.3); transform-origin: 50% 100%; }
   .sep { width: 1px; height: 34px; margin-bottom: 14px; background: rgba(255,255,255,0.12); }
   /* Widgety: żywe kafle obok ikon (blok, fokus, radio, pogoda, muzyka, odliczanie). */
-  .app.wgt { flex-direction: row; align-items: center; gap: 9px; width: 142px; height: 52px; padding: 0 11px; border-radius: 15px; background: rgba(255,255,255,0.05); text-align: left; }
+  .app.wgt { flex-direction: row; align-items: center; gap: 9px; width: 126px; height: 52px; padding: 0 12px; border-radius: 15px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.06); text-align: left; }
   .app.wgt:hover { transform: none; background: rgba(255,255,255,0.09); }
+  /* Pogoda: gradient nieba — dzień jasny, noc granatowa; temp jako główny wiersz. */
+  .app.wgt[data-widget="weather"] { width: 122px; background: linear-gradient(135deg, rgba(56,132,255,0.22), rgba(125,211,252,0.08)); border-color: rgba(125,211,252,0.28); }
+  .app.wgt[data-widget="weather"].wngt { background: linear-gradient(135deg, rgba(30,58,138,0.6), rgba(15,23,42,0.72)); border-color: rgba(59,130,246,0.32); }
+  .app.wgt[data-widget="weather"] .w-ic { background: transparent; }
+  .app.wgt[data-widget="weather"] .w-ic span { font-size: 21px !important; }
+  .app.wgt[data-widget="weather"] .w-v { font-size: 15px; }
   .app.wgt .w-ic { width: 30px; height: 30px; border-radius: 9px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.07); flex: none; color: var(--muted); }
   .app.wgt .w-tx { display: flex; flex-direction: column; gap: 1px; min-width: 0; max-width: 88px; }
   .app.wgt .w-t { font-size: 10px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -210,8 +216,9 @@ function widgetData(a, s) {
     }
     case 'weather': {
       const w = s.weather;
+      const hh = +String(s.clock || '12:00').split(':')[0];
       return w
-        ? { emoji: w.emoji, t: `${Math.round(w.temp)}°`, v: String(w.text || '').split(' · ')[0], tip: weatherTip(w, s) }
+        ? { emoji: w.emoji, t: `${Math.round(w.temp)}°`, v: String(w.text || '').split(' · ')[0], night: hh >= 19 || hh < 6, tip: weatherTip(w, s) }
         : { ic: 'globe', t: 'Pogoda', v: 'pobieram…', tip: 'Pogoda' };
     }
     case 'music': {
@@ -251,11 +258,12 @@ const widgetTile = (w) =>
     ? `<span class="w-v">${esc(w.t)}</span><span class="w-t">${esc(w.v)}</span>`
     : `<span class="w-t">${esc(w.t)}</span><span class="w-v">${esc(w.v)}</span>`}</span>`;
 
-/** Klik w widget: radio → czekające, muzyka → play/pauza, reszta → panel Teraz. */
+/** Klik w widget: radio → czekające, muzyka → play/pauza, pogoda → prognoza w notce, reszta → panel Teraz. */
 function widgetClick(a) {
   invoke('previews_hide');
   if (a.widget === 'radio') { invoke('radio_show_waiting').catch((err) => console.warn(err)); return; }
   if (a.widget === 'music') { invoke('player_toggle').catch((err) => console.warn(err)); return; }
+  if (a.widget === 'weather') { invoke('weather_show').catch((err) => console.warn(err)); return; }
   invoke('toggle_panel', { label: 'now' }).catch((err) => console.warn(err));
 }
 
@@ -287,7 +295,7 @@ function render(s) {
     const wd = a.widget ? widgetData(a, s) : null;
     const count = wd && wd.count ? ` data-count="${esc(wd.count)}" data-countfmt="${wd.countfmt || 'dur'}"` : '';
     return `
-    <button class="app ${a.dim ? 'dim' : ''} ${a.stack ? 'stack' : ''} ${a.unpinned ? 'unpinned' : ''} ${card ? 'card' : ''} ${active ? 'active' : ''} ${wd ? 'wgt' : ''}" data-widget="${wd ? esc(a.widget) : ''}" data-stack="${a.stack ? 1 : ''}" data-id="${esc(a.id)}" data-name="${esc(a.name)}" aria-label="${esc(wd ? `${wd.t}: ${wd.v}` : a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}"${count}>
+    <button class="app ${a.dim ? 'dim' : ''} ${a.stack ? 'stack' : ''} ${a.unpinned ? 'unpinned' : ''} ${card ? 'card' : ''} ${active ? 'active' : ''} ${wd ? `wgt${wd.night ? ' wngt' : ''}` : ''}" data-widget="${wd ? esc(a.widget) : ''}" data-stack="${a.stack ? 1 : ''}" data-id="${esc(a.id)}" data-name="${esc(a.name)}" aria-label="${esc(wd ? `${wd.t}: ${wd.v}` : a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}"${count}>
       ${wd ? widgetTile(wd) : tile(a)}
       ${card ? `<span class="lbl"><b>${esc(lbl.title)}</b>${lbl.sub ? `<span>${esc(lbl.sub)}</span>` : ''}</span>` : ''}
       <span class="stripe" style="background:${a.stripe}"></span>
@@ -299,16 +307,11 @@ function render(s) {
   for (const b of dock.querySelectorAll('.app')) {
     const id = b.dataset.id;
     const isStack = b.dataset.stack === '1';
-    // Widgety: klik → akcja, bez kółka, przeciągania i podglądów okien.
+    // Widgety: klik → akcja (bez kółka, przeciągania i podglądów okien). Bez tooltipa —
+    // szczegóły po kliknięciu (pogoda rozwija notkę), a dymek podglądów potrafił gubić tekst.
     if (b.dataset.widget) {
       const item = s.dock.find((x) => x.id === id);
       b.onclick = () => { if (item && !suppressClick) widgetClick(item); };
-      b.onmouseenter = () => {
-        if (!item) return;
-        const r = b.getBoundingClientRect();
-        invoke('previews_tip', { text: widgetData(item, s).tip, anchor: r.left + r.width / 2 });
-      };
-      b.onmouseleave = () => { emitTo('preview', 'preview-leave', null); };
       continue;
     }
     b.onclick = (e) => {
