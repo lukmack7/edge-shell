@@ -126,6 +126,12 @@ pub async fn get_brightness() -> Option<u8> {
     tauri::async_runtime::spawn_blocking(sys::get_brightness).await.ok().flatten()
 }
 
+/// Odświeżenie pogody na żądanie (Ustawienia → Pogoda).
+#[tauri::command]
+pub async fn weather_refresh(app: AppHandle) {
+    crate::weather::refresh(app).await;
+}
+
 #[tauri::command]
 pub fn toggle_mute(app: AppHandle) {
     sys::toggle_mute();

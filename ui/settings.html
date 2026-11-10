@@ -159,6 +159,7 @@ const PAGES = [
   ['bar', 'Notch i pasek', 'layers'],
   ['dock', 'Dock', 'apps'],
   ['modes', 'Tryby', 'clock'],
+  ['weather', 'Pogoda i HUD', 'moon'],
   ['auto', 'Automatyzacje', 'replan'],
   ['focus', 'Fokus i ludzie', 'clock'],
   ['windows', 'Okna', 'apps'],
@@ -174,6 +175,7 @@ let page = 'general';
 
 const uid = (name) => `${(name || 'app').toLowerCase().normalize('NFD').replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').slice(0, 20) || 'app'}-${Math.random().toString(36).slice(2, 6)}`;
 const sw = (on, key) => `<button class="switch" role="switch" aria-checked="${on ? 'true' : 'false'}" data-sw="${key}"></button>`;
+const WIDGETS = [['', '— zwykła ikona —'], ['next-block', 'Następny blok z Horologa'], ['focus', 'Bieżący fokus'], ['radio', 'Radio (co gra)'], ['weather', 'Pogoda'], ['music', 'Muzyka (Spotify)'], ['countdown', 'Odliczanie']];
 
 function get(path) { return path.split('.').reduce((o, k) => (o == null ? o : o[k]), cfg); }
 function set(path, value) {
@@ -390,6 +392,16 @@ const render = {
         <div class="field-l">Wyciszone aplikacje w tym trybie — kliknięcie pokaże żółtą flagę
           <div class="chips">${cfg.dock.map((a) => `<button class="chip ${m.dim.includes(a.id) ? 'on' : ''}" data-dim="${n}:${esc(a.id)}">${esc(a.name)}</button>`).join('')}</div>
         </div>
+        <div class="field-l">Własny dock trybu
+          <span style="display:flex;align-items:center;gap:10px">
+            <button class="switch" role="switch" aria-checked="${m.dock.length ? 'true' : 'false'}" data-mdock="${n}"></button>
+            <span class="hint">${m.dock.length ? `${m.dock.length} aplikacji — własny zestaw i kolejność` : 'tryb używa wspólnego docka'}</span>
+          </span>
+          ${m.dock.length ? `
+            <span class="hint" style="display:block;margin-top:6px">Górne chipsy: w trybie (klik = usuń). Dolne: klik = dodaj na koniec. To kopie aplikacji — zmiany w zakładce Dock ich nie przeniosą (usunięte wróć, dodając ponownie).</span>
+            <div class="chips" style="margin-top:6px">${m.dock.map((d, k) => `<button class="chip on" data-mdel="${n}:${k}" title="Usuń z trybu">${esc(d.name)}</button>`).join('')}</div>
+            <div class="chips" style="margin-top:6px">${cfg.dock.filter((a) => !m.dock.some((d) => d.id === a.id)).map((a) => `<button class="chip" data-madd="${n}:${esc(a.id)}" title="Dodaj do trybu">+ ${esc(a.name)}</button>`).join('') || '<span class="hint">Wszystkie aplikacje są już w tym trybie.</span>'}</div>` : ''}
+        </div>
       </div>`).join('');
     return `
       <h2>Tryby</h2>
@@ -398,6 +410,28 @@ const render = {
         <select class="in" data-bind="startMode">${cfg.modes.map((m) => `<option value="${esc(m.id)}">${esc(m.label)}</option>`).join('')}</select></div></div>
       ${cards}
       <div><button class="btn" id="modeAdd">${icon('plus', 16, 2)}Dodaj tryb</button></div>`;
+  },
+
+  weather() {
+    const w = snap?.weather;
+    return `
+      <h2>Pogoda i HUD</h2>
+      <p class="lead">Kafelek pogody w docku (widget „Pogoda”) i HUD przy notchu z głośnością i jasnością.</p>
+      <div class="card"><h3>Pogoda — Open-Meteo (bez klucza API)</h3>
+        <div class="grid2">
+          <label class="field-l">Szerokość geograficzna<input class="in" data-bind="weather.lat" placeholder="np. 50.06"></label>
+          <label class="field-l">Długość geograficzna<input class="in" data-bind="weather.lon" placeholder="np. 19.94"></label>
+        </div>
+        <label class="field-l">Podpis kafelka (miasto)<input class="in" data-bind="weather.label" placeholder="np. Kraków"></label>
+        <span class="hint">Puste współrzędne = moduł śpi. Współrzędne dziesiętnie, np. dla Krakowa 50.06 i 19.94. Dane odświeżają się same co 30 minut, kursy walut z NBP (dla konwertera w palecie) co 6 h.</span>
+        <div class="row" style="margin-top:10px">
+          <div class="txt"><b>Status</b><span>${w ? `${w.emoji || ''} ${w.temp != null ? String(Math.round(w.temp)).replace('-', '−') + '°C' : ''} — ${esc(w.text || '')} (${esc(w.label || '')})` : (cfg.weather.lat.trim() && cfg.weather.lon.trim() ? 'Pobieram dane…' : 'Brak lokalizacji — moduł śpi.')}</span></div>
+          <button class="btn" id="wRefresh">${icon('restart', 16, 2)}Odśwież teraz</button>
+        </div>
+      </div>
+      <div class="card"><h3>HUD przy notchu</h3>
+        <div class="row"><div class="txt"><b>Zawsze dostępny</b><span>Kółko myszy nad ikoną głośności albo jasności na pasku (klik w ikonę jasności też) otwiera kartę z suwakami. Znika po 1,6 s. Jasność działa przez DDC/CI — ekrany zewnętrzne; wbudowane ekrany laptopów zwykle nie pozwalają jej odczytać.</span></div></div>
+      </div>`;
   },
 
   radio() {
@@ -655,6 +689,13 @@ function altgrConflict(combo) {
 // ------------------------------------------------------------ akcje stron
 
 const after = {
+  weather(root) {
+    $('wRefresh').onclick = async () => {
+      $('wRefresh').disabled = true;
+      await invoke('weather_refresh').catch(() => {});
+      show(page);
+    };
+  },
   general(root) {
     // Notch zmienia, które opcje mają sens — przerysuj stronę po przełączeniu.
     root.querySelector('[data-sw="shell.notch"]')?.addEventListener('click', () => setTimeout(() => show(page), 0));
@@ -809,7 +850,29 @@ const after = {
       el.onchange = () => { cfg.modes[+el.dataset.br].brightness = Number(el.value); markDirty(); show(page); };
     }
     for (const b of root.querySelectorAll('[data-modedel]')) b.onclick = () => { cfg.modes.splice(+b.dataset.modedel, 1); markDirty(); show(page); };
-    $('modeAdd').onclick = () => { cfg.modes.push({ id: uid('tryb'), label: 'Nowy tryb', accent: '#0EA5E9', dim: [], quiet: true, playlist: '', wallpaper: '', brightness: null }); markDirty(); show(page); };
+    // Własny dock trybu: włącz = kopia wspólnego docka do przeróbki, wyłącz = pusty (dziedziczy).
+    for (const el of root.querySelectorAll('[data-mdock]')) {
+      el.onclick = () => {
+        const m = cfg.modes[+el.dataset.mdock];
+        m.dock = m.dock.length ? [] : JSON.parse(JSON.stringify(cfg.dock));
+        markDirty(); show(page);
+      };
+    }
+    for (const b of root.querySelectorAll('[data-mdel]')) {
+      b.onclick = () => {
+        const [n, k] = b.dataset.mdel.split(':');
+        cfg.modes[+n].dock.splice(+k, 1);
+        markDirty(); show(page);
+      };
+    }
+    for (const b of root.querySelectorAll('[data-madd]')) {
+      b.onclick = () => {
+        const [n, id] = b.dataset.madd.split(':');
+        const a = cfg.dock.find((x) => x.id === id);
+        if (a) { cfg.modes[+n].dock.push(JSON.parse(JSON.stringify(a))); markDirty(); show(page); }
+      };
+    }
+    $('modeAdd').onclick = () => { cfg.modes.push({ id: uid('tryb'), label: 'Nowy tryb', accent: '#0EA5E9', dim: [], quiet: true, playlist: '', wallpaper: '', brightness: null, dock: [] }); markDirty(); show(page); };
   },
   radio(root) {
     for (const el of root.querySelectorAll('[data-ct]')) {
@@ -1248,6 +1311,10 @@ function renderEditor() {
       <span style="display:flex;gap:6px"><input class="in" style="flex:1" id="edPath" value="${esc(a.path)}"><button class="mini" id="edPick" aria-label="Wybierz plik">${icon('folder', 16)}</button></span>
     </label>
     <label class="field-l">Sekcja<select class="in" id="edSec">${cfg.sections.map((s) => `<option value="${esc(s.id)}" ${s.id === a.category ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+    <label class="field-l">Widget (kafelek zamiast ikony — widoczny na początku docka)
+      <select class="in" id="edWidget">${WIDGETS.map(([v, l]) => `<option value="${v}" ${a.widget === v ? 'selected' : ''}>${l}</option>`).join('')}</select>
+    </label>
+    ${a.widget === 'countdown' || a.widget === 'next-block' ? `<label class="field-l">Cel widgetu (zapasowe, na razie nieużywane)<input class="in" id="edWidgetT" value="${esc(a.widgetTarget || '')}"></label>` : ''}
     <div class="field-l">Ikona
       <div class="chips">
         <button class="chip ${mode === 'auto' ? 'on' : ''}" data-im="auto">Z aplikacji</button>
@@ -1275,6 +1342,8 @@ function renderEditor() {
     markDirty(); show(page);
   };
   $('edSec').onchange = (e) => upd('category', e.target.value, true);
+  $('edWidget').onchange = (e) => upd('widget', e.target.value, true);
+  if ($('edWidgetT')) $('edWidgetT').oninput = (e) => upd('widgetTarget', e.target.value);
   for (const b of el.querySelectorAll('[data-im]')) {
     b.onclick = () => {
       const m = b.dataset.im;
@@ -1372,8 +1441,10 @@ async function load() {
   cfg.automations ||= [];
   cfg.presence ||= { enabled: false, url: '', name: '', token: '', shareTask: false };
   cfg.windows ||= { zones: 'thirds', shiftDrag: true, zoneHotkeys: true, gap: 8 };
+  cfg.weather ||= { lat: '', lon: '', label: '' };
   cfg.focus.distractions ||= [];
-  for (const a of cfg.dock) { a.iconPath ??= ''; a.icon ??= 'auto'; }
+  for (const a of cfg.dock) { a.iconPath ??= ''; a.icon ??= 'auto'; a.widget ??= ''; a.widgetTarget ??= ''; }
+  for (const m of cfg.modes) m.dock ??= [];
   saved = JSON.stringify(cfg);
   markDirty();
   show(page);
