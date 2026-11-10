@@ -1,0 +1,28 @@
+error[E0308]: mismatched types
+   --> src\weather.rs:188:28
+    |
+188 |             matches!(when, Ok(w) if w > now)
+    |                      ----  ^^^^^ expected `Option<DateTime<Local>>`, found `Result<_, _>`
+    |                      |
+    |                      this expression has type `std::option::Option<chrono::DateTime<chrono::Local>>`
+    |
+    = note: expected enum `std::option::Option<chrono::DateTime<chrono::Local>>`
+               found enum `Result<_, _>`
+
+warning: unused variable: `i`
+   --> src\state.rs:469:20
+    |
+469 |         .map(|(n, (i, a))| {
+    |                    ^ help: if this is intentional, prefix it with an underscore: `_i`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0308`.
+warning: `edge-shell` (bin "edge-shell") generated 1 warning
+error: could not compile `edge-shell` (bin "edge-shell") due to 1 previous error; 1 warning emitted
+failed to build app: failed to build app
+       Error failed to build app: failed to build app
+
+error: could not compile `edge-shell` (bin "edge-shell") due to 1 previous error; 1 warning emitted
+failed to build app: failed to build app
+       Error failed to build app: failed to build app
