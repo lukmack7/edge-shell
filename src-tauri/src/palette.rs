@@ -736,7 +736,7 @@ fn add_command(b: &mut Builder, app: &AppHandle, cfg: &Config, cmd: &str, key: &
                     if cfg.weather.lat.trim().is_empty() { "Podaj szerokość i długość w Ustawieniach → Pogoda".into() } else { "Pobieram z Open-Meteo…".into() }),
             };
             let city = if cfg.weather.label.trim().is_empty() { "Polska".into() } else { cfg.weather.label.trim().to_string() };
-            b.add("Pogoda", "🌤", BLUE, title, sub, key,
+            b.add("Pogoda", "🌤", BLUE, title.clone(), sub, key,
                 pv("Pogoda", format!("{}\n{} — dane z Open-Meteo, bez klucza API.", title, city),
                     "• Enter: odśwież\n• Tab: prognoza w przeglądarce"),
                 &[("web", "Prognoza w sieci")], Cmd::Weather(format!("https://wttr.in/{}", urlencoding::encode(&city))));
@@ -1156,6 +1156,12 @@ fn winget_install(id: &str) -> Result<(), String> {
     }
 }
 
+/// Błąd wyszukiwania WinGet — jeden wiersz z opisem (konsumuje builder).
+fn winget_fail(mut b: Builder, e: String) -> Answer {
+    b.add("Instalacja", "!", GREY, "WinGet nie odpowiada".into(), e.clone(), "", pv("WinGet", e, ""), &[], Cmd::WebSearch(String::new()));
+    b.finish("Instalacja".into())
+}
+
 /// „inst obsid” → wyniki wyszukiwania winget; Enter instaluje wybrany pakiet.
 async fn winget_rows(app: &AppHandle, q: &str) -> Answer {
     let mut b = Builder { rows: Vec::new() };
@@ -1166,17 +1172,13 @@ async fn winget_rows(app: &AppHandle, q: &str) -> Answer {
         return b.finish("Instalacja".into());
     }
     let res = tauri::async_runtime::spawn_blocking(move || winget_search(&query)).await.map_err(|e| e.to_string());
-    let fail = |b: &mut Builder, e: String| -> Answer {
-        b.add("Instalacja", "!", GREY, "WinGet nie odpowiada".into(), e.clone(), "", pv("WinGet", e, ""), &[], Cmd::WebSearch(String::new()));
-        b.finish("Instalacja".into())
-    };
     // Podwójny Result: zewnętrzny to JoinError z spawn_blocking, wewnętrzny — sam winget.
     let list = match res {
         Ok(list) => match list {
             Ok(list) => list,
-            Err(e) => return fail(&mut b, e),
+            Err(e) => return winget_fail(b, e),
         },
-        Err(e) => return fail(&mut b, e),
+        Err(e) => return winget_fail(b, e),
     };
     if list.is_empty() {
         b.add("Instalacja", "📦", GREY, "Nic nie znalazłem".into(), "Spróbuj innej nazwy albo skrótu producenta.".into(), "",
