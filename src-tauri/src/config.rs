@@ -55,6 +55,7 @@ pub struct Config {
     pub presence: PresenceCfg,
     pub windows: WindowsCfg,
     pub mail: MailCfg,
+    pub weather: WeatherCfg,
 }
 
 /// Poczta z Thunderbirda (przez dodatek Edge Shell Bridge).
@@ -93,6 +94,24 @@ impl Default for MailCfg {
             badge_mute_focus: true,
             task_minutes: 30,
         }
+    }
+}
+
+/// Pogoda z Open-Meteo (bez klucza API). Gdy lat/lon puste — moduł śpi.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct WeatherCfg {
+    /// Szerokość geograficzna, np. `50.06`.
+    pub lat: String,
+    /// Długość geograficzna, np. `19.94`.
+    pub lon: String,
+    /// Podpis kafelka, np. `Kraków`.
+    pub label: String,
+}
+
+impl Default for WeatherCfg {
+    fn default() -> Self {
+        Self { lat: String::new(), lon: String::new(), label: String::new() }
     }
 }
 

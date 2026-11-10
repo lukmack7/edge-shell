@@ -32,6 +32,7 @@ mod automations;
 mod backup;
 mod stacks;
 mod mail;
+mod weather;
 
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
@@ -101,6 +102,8 @@ fn main() {
             presence::start(handle.clone());
             windows_mgr::start(handle.clone());
             automations::start(handle.clone());
+            weather::start(handle.clone());
+            weather::start_rates(handle.clone());
 
             // Szuflada i Teraz chowają się, gdy klikniesz gdzie indziej.
             for label in ["drawer", "now"] {

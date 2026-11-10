@@ -357,6 +357,10 @@ pub struct Runtime {
     /// Inne osoby z serwera obecności.
     pub presence: Vec<crate::presence::Person>,
     pub presence_at: Option<DateTime<Local>>,
+    /// Ostatnia pogoda (Open-Meteo), None = jeszcze nie pobrano albo brak konfiguracji.
+    pub weather: Option<crate::weather::Weather>,
+    /// Kursy walut z NBP (kod → PLN za 1 jednostkę), odświeżane co 6 h.
+    pub rates: HashMap<String, f64>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, PartialEq)]
@@ -595,6 +599,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "app": rt.foreground,
         "battery": rt.battery.map(|(p, c)| json!({ "percent": p, "charging": c })),
         "music": rt.music,
+        "weather": rt.weather,
         "spotifyEnabled": !cfg.spotify.client_id.is_empty(),
         "player": rt.store.player,
         "quietUntil": rt.store.quiet_until,
