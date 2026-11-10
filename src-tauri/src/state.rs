@@ -188,6 +188,8 @@ pub struct Store {
     pub mail_planned: Vec<String>,
     /// „Co przegapiłeś” — wiadomości, które notch pokazał i schował (ostatnie 10).
     pub missed: Vec<Missed>,
+    /// Fokus: co było na pierwszym planie w trakcie sesji (data → exe → próbki po 30 s).
+    pub focus_apps: HashMap<String, HashMap<String, u32>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

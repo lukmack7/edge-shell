@@ -48,6 +48,8 @@ pub fn start(app: AppHandle) {
                     state::update(&app, false, |rt| rt.battery = b);
                 }
                 recent_files(&app);
+                // Raport fokusa: co pół minuty notujemy aktywną aplikację (tylko w sesji).
+                focus_sample(&app);
             }
         }
     });
@@ -258,6 +260,32 @@ fn foreground(app: &AppHandle) {
     if state::read(app, |rt| rt.foreground != name) {
         state::update(app, false, |rt| rt.foreground = name);
     }
+}
+
+/// Próbkowanie raportu fokusa (co 30 s): gdy trwa sesja fokusu (ad hoc albo blok
+/// task/focus/habit, bez pauzy), notujemy, która aplikacja jest na pierwszym planie.
+/// Próbka = 30 s; agregacja w raporcie tygodnia (insights::get_report).
+fn focus_sample(app: &AppHandle) {
+    let now = Local::now();
+    let (paused, exe, in_focus) = state::read(app, |rt| {
+        (
+            rt.paused_since.is_some(),
+            rt.foreground_exe.clone(),
+            rt.adhoc.is_some()
+                || current_item(&rt.plan, now)
+                    .is_some_and(|c| matches!(c.kind.as_str(), "task" | "focus" | "habit")),
+        )
+    });
+    if paused || !in_focus || exe.is_empty() {
+        return;
+    }
+    let day = now.format("%Y-%m-%d").to_string();
+    let oldest = (now - CDuration::days(6)).format("%Y-%m-%d").to_string();
+    state::update(app, true, |rt| {
+        *rt.store.focus_apps.entry(day).or_default().entry(exe).or_insert(0) += 1;
+        // Cap: tylko ostatnie 7 dni — starsze dni wypadają przy zapisie.
+        rt.store.focus_apps.retain(|d, _| *d >= oldest);
+    });
 }
 
 static DESCRIPTIONS: std::sync::Mutex<Option<std::collections::HashMap<String, String>>> = std::sync::Mutex::new(None);
