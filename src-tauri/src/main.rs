@@ -1,4 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// Duże makra `json!` (snapshot) potrzebują głębszej rekursji niż domyślne 128.
+#![recursion_limit = "512"]
 
 mod commands;
 mod config;
