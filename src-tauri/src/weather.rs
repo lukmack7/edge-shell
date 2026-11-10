@@ -185,7 +185,7 @@ async fn fetch_one(app: &AppHandle) -> Result<(), String> {
         .filter(|(_, t)| {
             let Ok(when) = chrono::NaiveDateTime::parse_from_str(t.as_str(), "%Y-%m-%dT%H:%M") else { return false };
             let when = chrono::Local.from_local_datetime(&when).single();
-            matches!(when, Ok(w) if w > now)
+            matches!(when, Some(w) if w > now)
         })
         .take(12)
         .filter_map(|(i, t)| {
