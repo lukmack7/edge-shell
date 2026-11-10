@@ -190,6 +190,8 @@ fn main() {
             settings::get_stats,
             settings::set_volume,
             settings::toggle_mute,
+            settings::set_brightness,
+            settings::get_brightness,
             icons::dock_icons,
             icons::app_icon,
             commands::launch_new,

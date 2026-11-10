@@ -165,6 +165,14 @@
   .n-tri .dec button.p { background: rgba(56,189,248,0.25); }
   .n-tri .dec button small { font-size: 10.5px; font-weight: 500; color: rgba(255,255,255,0.6); }
   .n-msg .ac button.mail { background: rgba(56,189,248,0.2); }
+  /* HUD przy notchu (koncepcja 3): głośność, jasność i timer zamiast systemowych OSD. */
+  .n-hud { position: absolute; left: 50%; transform: translateX(-50%); top: 40px; width: 288px; box-sizing: border-box;
+           padding: 12px 16px 9px; display: flex; flex-direction: column; gap: 9px; border-radius: 0 0 16px 16px;
+           background: rgba(255,255,255,0.045); border: 1px solid rgba(255,255,255,0.05); border-top: 0; }
+  .n-hud label { display: flex; align-items: center; gap: 10px; color: #d4d4d8; font-size: 12px; }
+  .n-hud input[type=range] { flex: 1; accent-color: #fff; height: 4px; cursor: pointer; }
+  .n-hud b { width: 40px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; flex: none; }
+  .n-hudinfo { font-size: 11px; color: #8b8b98; text-align: center; }
   .fade { animation: fade 0.25s ease-out 0.15s both; }
   @keyframes fade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
 </style>
@@ -200,6 +208,10 @@ let size = { w: 0, h: 0 };
 let shrinkTimer = null;
 let firstStep = { title: '', step: '' };
 let lastKey = '';
+// HUD przy notchu: pokazuje się na kółko myszy nad głośnością/jasnością, znika po 1,6 s.
+let hud = null;               // { until, vol, bri }
+let hudTimer = null;
+let briVal = null;            // ostatnia znana jasność (None = jeszcze nieodczytana)
 
 const MAT = { bg: 'rgba(16,16,19,0.96)', edge: 'rgba(255,255,255,0.08)' };
 const TINT = {
@@ -279,6 +291,7 @@ function statusHtml() {
   const unread = (s?.radio?.waiting || 0) + (s?.missed || []).length;
   parts.push(`<button class="n-sb n-bell" id="bellBtn" title="Powiadomienia i komunikaty${unread ? ` · ${unread} do przejrzenia` : ''}">${icon('bell', 15)}${unread ? `<span class="bd">${unread > 9 ? '9+' : unread}</span>` : ''}</button>`);
   const on = (k) => !s?.barStats || s.barStats.includes(k);
+  parts.push(`<button class="n-sb" id="bri" title="Jasność ekranu · kółko myszy albo klik">${SUN_SVG}</button>`);
   if (on('wifi')) parts.push(`<button class="n-sb" data-pop="wifi" title="${st.wifiSsid ? esc(st.wifiSsid) + ' · ' + st.wifiSignal + '%' : 'Wi‑Fi: brak połączenia'}">${wifiIcon(st.wifiSignal)}</button>`);
   if (on('volume') && st.volume != null) parts.push(`<button class="n-sb" id="vol" data-pop="sound" title="Dźwięk ${st.muted ? '— wyciszony' : st.volume + '%'} · kółko: głośność · środkowy klik: wycisz">${icon(st.muted ? 'mute' : 'volume', 16)}</button>`);
   if (on('bluetooth') && st.btPresent && st.btConnected) parts.push(`<button class="n-sb" data-pop="bt" title="Bluetooth: ${st.btConnected} połączonych">${icon('bluetooth', 15)}</button>`);
@@ -292,6 +305,44 @@ function dateText() {
   return new Date().toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).replace(',', '');
 }
 const timeText = () => new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+
+// ------------------------------------------------------------------ HUD (koncepcja 3)
+
+const SUN_SVG = `<svg aria-hidden="true" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.4"></circle><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.2 5.2l1.9 1.9M16.9 16.9l1.9 1.9M18.8 5.2l-1.9 1.9M7.1 16.9l-1.9 1.9"></path></svg>`;
+
+const hudOn = () => !!hud && Date.now() < hud.until && !openState;
+
+function showHud() {
+  hud = { until: Date.now() + 1600, vol: stats?.volume ?? 40, bri: briVal ?? 50 };
+  clearTimeout(hudTimer);
+  lastKey = '';
+  render();
+  hudTimer = setTimeout(() => { hud = null; lastKey = ''; render(); }, 1750);
+  // Rzeczywista jasność (DDC/CI) — po odpowiedzi uaktualniamy suwak bez przerysowania.
+  invoke('get_brightness').then((v) => {
+    if (v != null) briVal = v;
+    if (hud && v != null) { hud.bri = v; syncHud(); }
+  }).catch(() => {});
+}
+
+/** Aktualizacja suwaków HUD bez pełnego renderu (przerysowanie przerywałoby przeciąganie). */
+function syncHud() {
+  const v = $('hudVol');
+  if (v && hud) { v.value = hud.vol; $('hudVolV').textContent = `${hud.vol}%`; }
+  const b = $('hudBri');
+  if (b && hud) { b.value = hud.bri; $('hudBriV').textContent = `${hud.bri}%`; }
+}
+
+function hudHtml() {
+  const t = focusTiming(s);
+  const quiet = s.quietUntil && new Date(s.quietUntil) > new Date() ? `🌙 cisza do ${hhmm(s.quietUntil)}` : '';
+  const info = [t && !s.paused ? `⏱ Fokus ${mmss(t.left)}` : '', quiet].filter(Boolean).join(' · ');
+  return `<div class="n-hud fade" id="hud">
+    <label title="Kółko myszy albo suwak">${icon(stats?.muted ? 'mute' : 'volume', 15)}<input type="range" id="hudVol" min="0" max="100" step="1" value="${hud.vol}"><b id="hudVolV">${hud.vol}%</b></label>
+    <label title="Jasność ekranu — kółko myszy albo suwak">${SUN_SVG}<input type="range" id="hudBri" min="0" max="100" step="1" value="${hud.bri}"><b id="hudBriV">${hud.bri}%</b></label>
+    ${info ? `<span class="n-hudinfo">${esc(info)}</span>` : ''}
+  </div>`;
+}
 
 // ------------------------------------------------------------------ środek
 
@@ -373,7 +424,7 @@ function render() {
   notch.style.setProperty('--modeFg', tint === MAT ? '#fca5a5' : '#fff');
 
   const msg = st === 'msg' ? currentMsg() : null;
-  const key = JSON.stringify([st, midKey(st), focus, replying, msg?.id, statusKey(), st === 'open' ? openKey() : '', flash?.text]);
+  const key = JSON.stringify([st, midKey(st), focus, replying, msg?.id, statusKey(), st === 'open' ? openKey() : '', flash?.text, hudOn()]);
   if (key !== lastKey) {
     lastKey = key;
     notch.innerHTML = `
@@ -386,6 +437,7 @@ function render() {
         <button class="n-clock" id="clockBtn" title="Kalendarz">${focus ? '' : `<span id="date">${esc(dateText())}</span><span class="sep"></span>`}<span class="tm" id="time">${timeText()}</span></button>
       </div>
       ${mailMsg ? mailDropHtml(mailMsg) : msg && replying && st !== 'open' ? replyHtml(msg) : ''}
+      ${hudOn() ? hudHtml() : ''}
       ${st === 'open' ? panelHtml() : ''}`;
     wire(st, msg);
   } else {
@@ -395,6 +447,7 @@ function render() {
   let w = Math.max(focus ? 150 : 260, Math.ceil(row.scrollWidth) + 2);
   let h = 40;
   if (msg && replying) h = 86;
+  if (hudOn()) h = Math.max(h, 182);
   if (mailMsg) {
     w = Math.max(w, 642);
     h = 40 + ($('drop')?.offsetHeight || 80);
@@ -815,7 +868,37 @@ function wire(st, msg) {
       const next = Math.max(0, Math.min(100, (stats?.volume || 0) + (e.deltaY < 0 ? 2 : -2)));
       if (stats) { stats.volume = next; stats.muted = false; }
       invoke('set_volume', { level: next });
+      // HUD zamiast cichej zmiany — jak systemowe OSD, tylko przy notchu.
+      if (hudOn()) { hud.vol = next; syncHud(); hud.until = Date.now() + 1600; }
+      else showHud();
     };
+  }
+  // Jasność: klik i kółko otwierają ten sam HUD (suwak zmienia wartość).
+  const bri = $('bri');
+  if (bri) {
+    bri.onclick = (e) => { e.stopPropagation(); showHud(); };
+    bri.onwheel = (e) => {
+      e.preventDefault();
+      const next = Math.max(0, Math.min(100, (briVal ?? 50) + (e.deltaY < 0 ? 2 : -2)));
+      briVal = next;
+      invoke('set_brightness', { level: next });
+      if (hudOn()) { hud.bri = next; syncHud(); hud.until = Date.now() + 1600; }
+      else showHud();
+    };
+  }
+  // Suwaki w HUD: zmieniają głośność/jasność na żywo (bez renderu).
+  if (hudOn()) {
+    for (const [id, apply] of [['hudVol', (v) => { if (stats) { stats.volume = v; stats.muted = false; } invoke('set_volume', { level: v }); }], ['hudBri', (v) => { briVal = v; invoke('set_brightness', { level: v }); }]]) {
+      const el = $(id);
+      if (!el) continue;
+      el.onclick = (e) => e.stopPropagation();
+      el.oninput = () => {
+        const v = +el.value;
+        if (hud) { hud[id === 'hudVol' ? 'vol' : 'bri'] = v; }
+        $(id === 'hudVol' ? 'hudVolV' : 'hudBriV').textContent = `${v}%`;
+        apply(v);
+      };
+    }
   }
   // Środek otwiera panel (klik albo chwila najechania); ikony i zegar — nie, żeby nic nie uciekało spod kursora.
   const mid = $('mid');
@@ -1079,6 +1162,8 @@ listen('stats', (st) => {
   stats = st;
   const watch = (k) => !s?.barStats || s.barStats.includes(k);
   hotCount = (watch('cpu') && (st.cpu ?? 0) >= 85) || (watch('memory') && (st.mem ?? 0) >= 90) ? hotCount + 1 : 0;
+  // Zmiana głośności z HUD-em otwartym: emit stats nie może przerysować suwaków.
+  if (hudOn()) { syncHud(); return; }
   render();
 });
 invoke('get_stats').then((st) => { stats = st; render(); });
