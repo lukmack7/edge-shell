@@ -46,8 +46,10 @@ pub fn popup_open(app: AppHandle, view: String, from: String, x: f64, y: f64, w:
         // Obok lewego paska, dolną krawędzią do przycisku.
         (origin.x + ((x + w) * scale) as i32 + gap, origin.y + ((y + h) * scale) as i32 - ph)
     } else if from == "dock" {
-        // Nad dockiem, wyrównane do prawej krawędzi metryki.
-        (origin.x + ((x + w) * scale) as i32 - pw, origin.y + (y * scale) as i32 - ph - gap)
+        // Nad dockiem. `y` to odległość góry metryki od dolnej krawędzi okna (ujemna),
+        // więc wynik nie zależy od tego, czy okno docka jest akurat powiększone.
+        let bottom = origin.y + src.outer_size().map(|z| z.height as i32).unwrap_or(0);
+        (origin.x + ((x + w) * scale) as i32 - pw, bottom + (y * scale) as i32 - ph - gap)
     } else {
         // Pod elementem paska, wyrównane do jego prawej krawędzi.
         (origin.x + ((x + w) * scale) as i32 - pw, origin.y + ((y + h) * scale) as i32 + gap)
