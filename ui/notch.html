@@ -44,10 +44,31 @@
   .n-reply input { flex: 1; height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.35); color: #fff; font-size: 13px; outline: none; user-select: text; }
   .n-reply input:focus { border-color: #fff; }
   /* panel */
-  .n-pn { width: 940px; box-sizing: border-box; padding: 4px 18px 18px; margin: 0 auto; }
+  .n-pn { width: 680px; box-sizing: border-box; padding: 4px 12px 12px; margin: 0 auto; }
   .n-modes { display: flex; align-items: center; gap: 6px; }
   .n-modes button { height: 26px; padding: 0 11px; border-radius: 999px; border: 0; background: rgba(255,255,255,0.05); color: #d4d4d8; font-size: 12px; font-weight: 600; }
   .n-modes button:hover { background: rgba(255,255,255,0.1); }
+  /* Centrum notcha: plan i komunikaty przed przełącznikami; media tylko w jednym pasku. */
+  .n-center { display:flex; flex-direction:column; gap:9px; padding-top:8px; }
+  .n-center-top { display:grid; grid-template-columns:1.05fr .95fr; gap:9px; }
+  .n-center-card { min-width:0; border-radius:15px; padding:10px 12px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.07); }
+  .n-center-card .hd { display:flex; align-items:center; color:#8b8b98; font-size:10px; letter-spacing:.08em; font-weight:700; }
+  .n-center-card .hd button { margin-left:auto; padding:0; border:0; background:none; color:#a1a1aa; font-size:9px; font-weight:700; letter-spacing:.05em; }
+  .n-center-item { display:flex; align-items:center; gap:8px; padding-top:7px; min-width:0; color:#e4e4e7; font-size:11.5px; }
+  .n-center-item .tm { flex:none; color:#8b8b98; font:10.5px var(--mono); }
+  .n-center-item .tx { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+  .n-center-item .now { margin-left:auto; flex:none; border-radius:6px; padding:3px 5px; background:rgba(34,197,94,.13); color:#86efac; font-size:9px; font-weight:700; }
+  .n-center-item .dot { width:6px; height:6px; flex:none; border-radius:50%; background:#38bdf8; }
+  .n-center-item .sender { color:#7dd3fc; font-weight:700; }
+  .n-center-quick { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; }
+  .n-center-quick .n-q { height:62px; padding:8px 9px; align-items:flex-start; justify-content:flex-start; flex-direction:column; gap:5px; border:1px solid rgba(255,255,255,.07); }
+  .n-center-quick .n-q svg { width:15px; height:15px; }
+  .n-center-quick .n-q b { font-size:10.5px; font-weight:600; }.n-center-quick .n-q small { font-size:9px; color:#8b8b98; }
+  .n-center-media { display:flex; align-items:center; gap:9px; min-width:0; padding:8px 10px; border-radius:14px; background:linear-gradient(90deg,rgba(76,29,149,.52),rgba(157,23,77,.40)); border:1px solid rgba(244,114,182,.18); }
+  .n-center-media .art { width:32px; height:32px; flex:none; border-radius:8px; background:#222 center/cover; }
+  .n-center-media .tx { display:flex; flex-direction:column; gap:1px; min-width:0; flex:1; }.n-center-media .tx b { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:11px; }.n-center-media .tx span { color:rgba(255,255,255,.72); font-size:9.5px; }
+  .n-center-media .time { flex:none; color:rgba(255,255,255,.72); font:10px var(--mono); }
+  .n-center-media .ctl { display:flex; gap:3px; flex:none; }.n-center-media .ctl button { width:27px; height:27px; display:grid; place-items:center; border:0; border-radius:50%; background:rgba(255,255,255,.16); color:#fff; }.n-center-media .ctl button.play { background:#fff; color:#111; }.n-center-media .ctl svg { width:10px; height:10px; fill:currentColor; stroke:none; }
   .n-people { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #8b8b98; }
   .n-pp { width: 22px; height: 22px; border-radius: 50%; background: #27272a; box-shadow: 0 0 0 2px var(--st); font-size: 10px; font-weight: 700; color: #e5e7eb; display: flex; align-items: center; justify-content: center; }
   .n-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 12px; margin-top: 12px; }
@@ -474,7 +495,7 @@ function render() {
   }
   const r = st === 'open' ? 26 : 18;
   if (st === 'open') {
-    w = Math.max(w, 942);
+    w = Math.max(w, 682);
     h = 40 + ($('pn')?.offsetHeight || 300);
   }
   notch.style.borderRadius = `0 0 ${r}px ${r}px`;
@@ -862,35 +883,35 @@ function panelHtml() {
       <span style="display:flex;gap:6px"><button class="n-b2 w" id="pStart">Start fokusu</button><button class="n-b2" id="pReplan">Przeplanuj</button></span></div>`;
   }
   const upcoming = (s.day || []).filter((i) => i.status === 'next' && i.kind !== 'buffer').slice(0, 2);
-  const missed = (s.missed || []).slice(0, 3);
+  const missed = (s.missed || []).slice(0, 2);
   const modes = (s.modes || []).map((m) => {
     const on = m.id === s.mode.id;
     return `<button data-mode="${esc(m.id)}" style="${on ? `background:${m.accent}40;color:#fff` : ''}">${esc(m.label)}</button>`;
   }).join('');
+  const nextRows = upcoming.map((i, index) => `<div class="n-center-item"><span class="tm">${hhmm(i.start)}</span><span class="tx">${esc(i.title)}</span>${index === 0 ? '<b class="now">TERAZ</b>' : ''}</div>`).join('') || '<div class="n-center-item"><span class="tx" style="color:#71717a">Nic więcej dziś</span></div>';
+  const missedRows = missed.map((m, index) => `<button class="n-center-item" ${m.mail ? `data-mact="open" data-id="${m.mail.id}" data-mid="${esc(m.mail.mid)}"` : `data-miss="${index}"`}><span class="dot" style="background:${esc(m.color)}"></span><span class="tx"><b class="sender" style="color:${esc(m.color)}">${esc(m.name)}</b> ${esc(m.message)}</span></button>`).join('') || '<div class="n-center-item"><span class="tx" style="color:#71717a">Jesteś na bieżąco</span></div>';
+  const media = s.spotifyEnabled && s.music.connected && s.music.title ? `<div class="n-center-media">
+    <span class="art" style="background-image:url('${esc(s.music.art)}')"></span>
+    <span class="tx"><b>${esc(s.music.title)}</b><span>${esc(s.music.artist)} · Spotify</span></span>
+    <span class="time">${s.music.durationMs ? short(s.music.progressMs || 0) + ' / ' + short(s.music.durationMs) : ''}</span>
+    <span class="ctl"><button id="pPrev" title="Poprzedni">${icon('prev', 10)}</button><button class="play" id="pPlay" title="${s.music.playing ? 'Pauza' : 'Odtwórz'}">${icon(s.music.playing ? 'pause' : 'play', 10)}</button><button id="pNext" title="Następny">${icon('next', 10)}</button></span>
+  </div>` : '';
   return `<div class="n-pn" id="pn">
     <div class="n-modes fade">${modes}${peopleHtml()}</div>
-    <div class="n-grid">${main}
-      <div class="n-side fade">
-        <div class="n-box"><span class="lbl">DALEJ</span>
-          ${upcoming.map((i) => `<span class="n-it"><span class="tm">${hhmm(i.start)}</span><span class="tx">${esc(i.title)}</span></span>`).join('') || '<span class="n-it" style="color:#71717a">nic więcej dziś</span>'}
-        </div>
-        <div class="n-box"><span class="lbl">CO PRZEGAPIŁEŚ<button id="allMsgs" style="margin-left:auto;border:0;background:transparent;color:#a1a1aa;font-size:10.5px;font-weight:700;letter-spacing:0.05em">WSZYSTKIE →</button></span>
-          ${missed.map((m, i) => `<button class="n-it" ${m.mail ? `data-mact="open" data-id="${m.mail.id}" data-mid="${esc(m.mail.mid)}"` : `data-miss="${i}"`} title="${esc(m.message)}"><span class="dot" style="background:${esc(m.color)}"></span><span class="tx"><b style="color:${esc(m.color)}">${esc(m.name)}</b> ${esc(m.message)}</span>${m.openTarget || m.mail ? '<b>Otwórz</b>' : ''}</button>`).join('') || '<span class="n-it" style="color:#71717a">nic — jesteś na bieżąco</span>'}
-        </div>
-        <div class="n-quick">
-          <button class="n-q" id="qCap" title="Wrzuć myśl">${icon('note', 16)}</button>
-          <button class="n-q" id="qOne" title="Jedna rzecz">${icon('layers', 16)}</button>
-          <button class="n-q" id="qShot" title="Zrzut ekranu">${icon('camera', 16)}</button>
-          <button class="n-q" id="qReplan" title="Przeplanuj">${icon('replan', 16)}</button>
-        </div>
-        <div class="n-deep">
-          <button id="dMusic">${icon('music', 13)} Muzyka i kolejka</button>
-          <button id="dShelf">${icon('clipboard', 13)} Półka i schowek</button>
-          <button id="dCal">${icon('calendar', 13)} Kalendarz</button>
-          <button id="dSys">${icon('cpu', 13)} System</button>
-        </div>
+    <div class="n-center fade">
+      <div class="n-center-top">
+        <div class="n-center-card"><span class="hd">DALEJ<button id="dCal">PEŁNY PLAN →</button></span>${nextRows}</div>
+        <div class="n-center-card"><span class="hd">WYMAGA UWAGI<button id="allMsgs">WSZYSTKIE →</button></span>${missedRows}</div>
       </div>
-    </div></div>`;
+      <div class="n-center-quick">
+        <button class="n-q" id="qWifi">${wifiIcon((stats || {}).wifi_signal)}<b>Wi‑Fi</b><small>${esc((stats || {}).wifi_ssid || 'brak połączenia')}</small></button>
+        <button class="n-q" id="qBt">${icon('bluetooth', 15)}<b>Bluetooth</b><small>${(stats || {}).bt_connected || 0} urządzenia</small></button>
+        <button class="n-q" id="qQuiet">${icon('moon', 15)}<b>Cisza</b><small>${s.quietUntil ? `do ${hhmm(s.quietUntil)}` : 'wyłączona'}</small></button>
+        <button class="n-q" id="qShot">${icon('camera', 15)}<b>Zrzut</b><small>cały ekran</small></button>
+      </div>
+      ${media}
+    </div>
+  </div>`;
 }
 
 function popup(view, el) {
@@ -1111,6 +1132,9 @@ function wire(st, msg) {
     on('pPlay', () => invoke('spotify_control', { action: s.music.playing ? 'pause' : 'play' }));
     on('qCap', () => invoke('show_capture'));
     on('qOne', () => invoke('one_thing_toggle'));
+    on('qWifi', (e) => popup('wifi', e.currentTarget));
+    on('qBt', (e) => popup('bt', e.currentTarget));
+    on('qQuiet', () => showMsgs());
     on('qShot', () => { setOpen(false); setTimeout(() => invoke('shot_start'), 300); });
     on('qReplan', () => invoke('replan'));
     on('dMusic', () => showMusic());
