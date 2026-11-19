@@ -45,6 +45,9 @@ pub fn popup_open(app: AppHandle, view: String, from: String, x: f64, y: f64, w:
     let (mut px, mut py) = if from == "rail" {
         // Obok lewego paska, dolną krawędzią do przycisku.
         (origin.x + ((x + w) * scale) as i32 + gap, origin.y + ((y + h) * scale) as i32 - ph)
+    } else if from == "dock" {
+        // Nad dockiem, wyrównane do prawej krawędzi metryki.
+        (origin.x + ((x + w) * scale) as i32 - pw, origin.y + (y * scale) as i32 - ph - gap)
     } else {
         // Pod elementem paska, wyrównane do jego prawej krawędzi.
         (origin.x + ((x + w) * scale) as i32 - pw, origin.y + ((y + h) * scale) as i32 + gap)

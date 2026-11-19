@@ -39,12 +39,26 @@
   .sep { width: 1px; height: 34px; margin-bottom: 14px; background: rgba(255,255,255,0.12); }
   /* Widgety: żywe kafle obok ikon (blok, fokus, radio, pogoda, muzyka, odliczanie). */
   /* Widgety są kafelkami tej samej siatki co aplikacje — każdy ma własny „charakter”. */
-   .app.wgt { width: 52px; height: 52px; padding: 0; border-radius: 15px; background: transparent; }
-   .app.wgt.w-weather { width: 112px; }
-   .app.wgt.w-music { width: 190px; }
-   .app.wgt.w-weather .w-face, .app.wgt.w-music .w-face { width:100%; justify-content:flex-start; gap:8px; padding:0 10px; }
-   .w-wide-text { display:flex; flex-direction:column; align-items:flex-start; min-width:0; gap:2px; }.w-wide-text b { font-size:11px; color:var(--fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }.w-wide-text span { font-size:9px; color:color-mix(in srgb,var(--fg) 70%,transparent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }
-   .app.wgt.w-weather .w-symbol { margin:0; font-size:25px; }.app.wgt.w-music .w-art { position:relative; inset:auto; width:32px; height:32px; flex:none; border-radius:9px; }.app.wgt.w-music .w-eq { right:9px; left:auto; bottom:8px; }.app.wgt.w-music .w-glyph { display:none; }
+   .app.wgt { width: 52px; height: auto; padding: 0; border-radius: 15px; background: transparent; }
+   .app.wgt.w-weather, .app.wgt.w-music { width: auto; }
+   .app.wgt .stripe { position: static; width: 28px; }
+   .app.wgt .w-face.wide { width: auto; height: 52px; padding: 0 12px 0 10px; gap: 10px; justify-content: flex-start; text-align: left; }
+   .wide .ws-ic { font-size: 30px; line-height: 1; margin: 0; }
+   .wide .ws-col { display: flex; flex-direction: column; justify-content: center; gap: 2px; min-width: 0; line-height: 1.1; }
+   .wide .ws-col b { font-size: 11.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+   .wide .ws-col small { font-size: 10px; opacity: 0.72; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+   .w-weather .ws-temp b { font-size: 19px; font-weight: 700; letter-spacing: -0.3px; }
+   .w-weather .ws-div { align-self: center; width: 1px; height: 28px; background: rgba(255,255,255,0.22); }
+   .w-weather .ws-side { align-items: center; text-align: center; }
+   .w-music .w-face.wide { width: 262px; gap: 9px; }
+   .w-music .ws-art { position: relative; flex: none; width: 36px; height: 36px; border-radius: 10px; background: rgba(255,255,255,0.14) center/cover; display: grid; place-items: center; }
+   .w-music .ws-art svg { width: 18px; height: 18px; }
+   .w-music .ws-col { flex: 1; }
+   .w-music .ws-ctl { display: flex; align-items: center; gap: 2px; flex: none; }
+   .w-music .ws-ctl [data-act] { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; color: #fff; }
+   .w-music .ws-ctl [data-act]:hover { background: rgba(255,255,255,0.18); }
+   .w-music .ws-ctl [data-act="toggle"] { background: rgba(255,255,255,0.2); }
+   .w-music .ws-ctl svg { width: 11px; height: 11px; fill: currentColor; stroke: none; }
   .app.wgt:hover { transform: translateY(-3px); }
   .w-face { --t1: rgba(255,255,255,0.1); --t2: rgba(255,255,255,0.04); --edge: rgba(255,255,255,0.1); --fg: #e4e4e7;
     position: relative; width: 52px; height: 52px; border-radius: 15px; display: flex; align-items: center; justify-content: center; overflow: hidden;
@@ -71,21 +85,31 @@
     -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); mask: radial-gradient(farthest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); }
   .w-face.pulse { animation: wpulse 2.4s ease-in-out infinite; }
   @keyframes wpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(248,113,113,0); } 50% { box-shadow: 0 0 12px 1px rgba(248,113,113,0.35); } }
-   .app.wgt .stripe { position: absolute; left: 15px; bottom: -1px; width: 22px; }
    /* Parametry systemu są częścią docka: sam pierścień z ikoną, szczegóły po najechaniu. */
-   .metrics { display:flex; align-items:center; gap:3px; padding:3px; margin-left:2px; border-radius:15px;
+   /* Parametry systemu: sam pierścień z ikoną; szczegóły w dymku po najechaniu. */
+   .metrics { display:flex; align-items:center; gap:3px; padding:3px; margin:0 0 6px 2px; border-radius:16px;
      background:rgba(255,255,255,0.035); border:1px solid rgba(255,255,255,0.055); }
-   .metric { position:relative; width:42px; height:48px; border:0; border-radius:12px; background:transparent; color:var(--muted); display:grid; place-items:center; }
-   .metric:hover { background:rgba(255,255,255,0.09); }
-   .metric-ring { --p:0; --c:#fbbf24; position:relative; width:27px; height:27px; border-radius:50%; display:grid; place-items:center;
+   .metric { position:relative; width:44px; height:48px; border-radius:13px; color:var(--muted); display:grid; place-items:center; cursor:default; outline:0; }
+   .metric:hover, .metric.open { background:rgba(255,255,255,0.09); }
+   .metric-ring { --p:0; --c:#fbbf24; position:relative; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
      background:conic-gradient(var(--c) calc(var(--p) * 1%), rgba(255,255,255,0.12) 0); }
    .metric-ring::before { content:""; position:absolute; inset:3px; border-radius:50%; background:#17181d; }
-   .metric-ring svg { position:relative; width:11px; height:11px; fill:none; stroke:var(--c); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-   .metric-pop { position:absolute; right:0; bottom:calc(100% + 10px); width:176px; padding:10px 11px; border-radius:14px; background:rgba(20,21,26,.98); border:1px solid rgba(255,255,255,.1); box-shadow:0 20px 42px -20px #000; text-align:left; opacity:0; pointer-events:none; transform:translateY(5px); transition:.16s; z-index:5; }
-   .metric:hover .metric-pop, .metric:focus-visible .metric-pop { opacity:1; transform:none; }
-   .metric-pop b { display:block; font-size:11px; color:var(--text); }
-   .metric-pop span { display:flex; justify-content:space-between; gap:8px; margin-top:5px; color:var(--muted); font:10px var(--mono); }
-   .metric-pop strong { color:var(--text-2); font-weight:600; }
+   .metric-ring svg { position:relative; width:12px; height:12px; fill:none; stroke:var(--c); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+   .metric-pop { position:absolute; right:-6px; bottom:calc(100% + 14px); width:244px; padding:14px 15px 13px; border-radius:20px; background:rgba(22,23,28,.98);
+     border:1px solid rgba(255,255,255,.1); box-shadow:0 24px 50px -18px #000; text-align:left; color:var(--text); opacity:0; visibility:hidden; pointer-events:none; transform:translateY(6px); transition:opacity .14s, transform .14s, visibility 0s .14s; z-index:5; cursor:default; }
+   .metric-pop::after { content:""; position:absolute; left:0; right:0; top:100%; height:16px; }
+   .metric.open .metric-pop { opacity:1; visibility:visible; pointer-events:auto; transform:none; transition:opacity .14s, transform .14s; }
+   .mp-t { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; }
+   .mp-t i { width:8px; height:8px; border-radius:50%; background:var(--c); }
+   .mp-big { margin-top:10px; font-size:26px; font-weight:800; letter-spacing:-.5px; }
+   .mp-big small { margin-left:7px; font:11px var(--mono); color:var(--muted); letter-spacing:0; font-weight:400; }
+   .mp-bars { display:flex; align-items:flex-end; justify-content:flex-end; gap:3px; height:34px; margin:11px 0 10px; }
+   .mp-bars i { flex:none; width:6px; min-height:3px; border-radius:2px; background:var(--c); opacity:.78; }
+   .mp-rows { display:flex; flex-direction:column; gap:7px; padding:9px 0 11px; border-top:1px solid rgba(255,255,255,.08); }
+   .mp-row { display:flex; justify-content:space-between; gap:10px; font-size:12px; color:var(--text-2); }
+   .mp-row b { font-weight:700; color:var(--text); }
+   .mp-more { width:100%; height:32px; border-radius:11px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.04); color:var(--text); font-size:12px; font-weight:600; }
+   .mp-more:hover { background:rgba(255,255,255,.1); }
 </style>
 </head>
 <body>
@@ -138,43 +162,90 @@ function tile(a) {
 }
 
 onSnapshot((s) => { snap = s; render(s); });
-listen('stats', (next) => { stats = next || {}; updateMetrics(); });
-invoke('get_stats').then((next) => { stats = next || {}; updateMetrics(); }).catch(() => {});
-
 const metricIcon = {
   cpu: '<svg viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/></svg>',
   mem: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="10" rx="1.5"/><path d="M7 17v3M11 17v3M15 17v3"/></svg>',
   battery: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="17" height="10" rx="2"/><path d="M21 10v4"/><path d="M12 5v14"/></svg>',
 };
+const METRIC = {
+  cpu: { color: '#ff9f0a', title: 'Procesor', pop: 370, more: true },
+  mem: { color: '#30d158', title: 'Pamięć', pop: 370, more: true },
+  battery: { color: '#ffd60a', title: 'Bateria', pop: 230, more: false },
+};
 const pct = (value) => Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
-function metric(key, value, color, title, rows) {
-  return `<button class="metric" type="button" aria-label="${esc(title)} ${pct(value)}%">
-    <span class="metric-ring" style="--p:${pct(value)};--c:${color}">${metricIcon[key]}</span>
-    <span class="metric-pop"><b>${esc(title)} · ${pct(value)}%</b>${rows}</span>
-  </button>`;
-}
+const history = { cpu: [], mem: [], battery: [] };
+let procs = [];
+let openKey = null;
+let openTimer = null;
+let closeTimer = null;
+let procTimer = null;
+
+const metricKeys = () => ['cpu', 'mem', 'battery'].filter((k) => stats[k] != null);
 function metricsHtml() {
-  const cpu = stats.cpu;
-  const mem = stats.mem;
-  const battery = stats.battery;
-  const cpuRows = '<span>odświeżanie <strong>co sekundę</strong></span>';
-  const memRows = stats.memUsedGb != null && stats.memTotalGb != null
-    ? `<span>użyte <strong>${Number(stats.memUsedGb).toFixed(1)} GB</strong></span><span>całość <strong>${Number(stats.memTotalGb).toFixed(1)} GB</strong></span>`
-    : '<span>odświeżanie <strong>co sekundę</strong></span>';
-  const batteryRows = stats.charging ? '<span>stan <strong>ładowanie</strong></span>' : '<span>stan <strong>na baterii</strong></span>';
-  return `<span class="metrics" data-metrics>
-    ${cpu != null ? metric('cpu', cpu, '#ff9f0a', 'Procesor', cpuRows) : ''}
-    ${mem != null ? metric('mem', mem, '#30d158', 'Pamięć', memRows) : ''}
-    ${battery != null ? metric('battery', battery, '#ffd60a', 'Bateria', batteryRows) : ''}
-  </span>`;
+  const keys = metricKeys();
+  return `<span class="metrics" data-metrics data-keys="${keys.join(',')}">${keys.map((k) => `
+    <div class="metric" data-k="${k}" tabindex="0" role="button" style="--c:${METRIC[k].color}">
+      <span class="metric-ring" style="--c:${METRIC[k].color}">${metricIcon[k]}</span>
+      <div class="metric-pop">
+        <div class="mp-t"><i></i><span data-f="title"></span></div>
+        <div class="mp-big" data-f="big"></div>
+        <div class="mp-bars" data-f="bars"></div>
+        <div class="mp-rows" data-f="rows"></div>
+        ${METRIC[k].more ? '<button class="mp-more" type="button" data-more>Pokaż szczegóły</button>' : ''}
+      </div>
+    </div>`).join('')}</span>`;
 }
+const sizeText = (mb) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`);
+function metricRows(k) {
+  const row = (name, val) => `<div class="mp-row"><span>${esc(name)}</span><b>${esc(val)}</b></div>`;
+  if (k === 'battery') return row('stan', stats.charging ? 'ładowanie' : 'na baterii') + row('poziom', `${pct(stats.battery)}%`);
+  if (k === 'mem') {
+    const used = Number(stats.memUsedGb) || 0;
+    const top = [...procs].sort((a, b) => b.memMb - a.memMb).slice(0, 3);
+    const rest = Math.max(0, used * 1024 - top.reduce((n, p) => n + p.memMb, 0));
+    return row('użyte', `${used.toFixed(1)} GB`) + row('całość', `${Number(stats.memTotalGb || 0).toFixed(1)} GB`)
+      + (top.length ? top.map((p) => row(p.name, sizeText(p.memMb))).join('') + row('reszta', sizeText(rest)) : '');
+  }
+  const top = [...procs].sort((a, b) => b.cpu - a.cpu).slice(0, 3);
+  const rest = Math.max(0, pct(stats.cpu) - top.reduce((n, p) => n + p.cpu, 0));
+  return top.length ? top.map((p) => row(p.name, `${Math.round(p.cpu)}%`)).join('') + row('reszta', `${Math.round(rest)}%`) : row('procesy', 'mierzę…');
+}
+/** Aktualizacja w miejscu — bez podmiany elementów, żeby hover nie migał co sekundę. */
 function updateMetrics() {
-  const current = dock.querySelector('[data-metrics]');
-  if (!current) return;
-  const shell = document.createElement('span');
-  shell.innerHTML = metricsHtml();
-  current.replaceWith(shell.firstElementChild);
+  const box = dock.querySelector('[data-metrics]');
+  if (!box) return;
+  if (box.dataset.keys !== metricKeys().join(',')) {
+    const shell = document.createElement('span');
+    shell.innerHTML = metricsHtml();
+    box.replaceWith(shell.firstElementChild);
+    return updateMetrics();
+  }
+  for (const m of box.querySelectorAll('.metric')) {
+    const k = m.dataset.k;
+    const v = pct(stats[k]);
+    m.querySelector('.metric-ring').style.setProperty('--p', v);
+    m.setAttribute('aria-label', `${METRIC[k].title} ${v}%`);
+    if (!m.classList.contains('open')) continue;
+    m.querySelector('[data-f=title]').textContent = `${METRIC[k].title} · teraz`;
+    const extra = k === 'cpu' ? `z ${navigator.hardwareConcurrency || '?'} rdzeni`
+      : k === 'mem' ? `${Number(stats.memUsedGb || 0).toFixed(1)} / ${Number(stats.memTotalGb || 0).toFixed(1)} GB`
+      : stats.charging ? 'ładowanie' : '';
+    m.querySelector('[data-f=big]').innerHTML = `${v}%${extra ? `<small>${esc(extra)}</small>` : ''}`;
+    m.querySelector('[data-f=bars]').innerHTML = history[k].map((x) => `<i style="height:${Math.max(8, pct(x))}%"></i>`).join('');
+    m.querySelector('[data-f=rows]').innerHTML = metricRows(k);
+  }
 }
+const onStats = (next) => {
+  stats = next || {};
+  for (const k of Object.keys(history)) {
+    if (stats[k] == null) continue;
+    history[k].push(stats[k]);
+    if (history[k].length > 24) history[k].shift();
+  }
+  updateMetrics();
+};
+listen('stats', onStats);
+invoke('get_stats').then(onStats).catch(() => {});
 
 function setDockHeight(height) {
   const next = height || 92;
@@ -182,16 +253,54 @@ function setDockHeight(height) {
   dockHeight = next;
   invoke('dock_resize', { width: dockWidth || Math.ceil(dock.getBoundingClientRect().width), height: next });
 }
-
-// Dymek metryki musi dostać miejsce w natywnym oknie docka — CSS nie może
-// rysować poza granicą WebView. Okno rośnie tylko na czas najechania.
-dock.addEventListener('pointerover', (e) => {
-  if (e.target.closest('.metric')) setDockHeight(184);
+async function loadProcs() {
+  if (!openKey || !METRIC[openKey].more) return;
+  procs = await invoke('sys_processes').catch(() => procs);
+  updateMetrics();
+}
+// Dymek musi dostać miejsce w natywnym oknie docka (CSS nie wychodzi poza WebView):
+// okno rośnie na czas najechania, dopiero potem dymek się pokazuje.
+function openMetric(m) {
+  clearTimeout(closeTimer);
+  if (openKey === m.dataset.k) return;
+  clearTimeout(openTimer);
+  const k = m.dataset.k;
+  setDockHeight(METRIC[k].pop);
+  openTimer = setTimeout(() => {
+    for (const x of dock.querySelectorAll('.metric.open')) x.classList.remove('open');
+    openKey = k;
+    m.classList.add('open');
+    updateMetrics();
+    loadProcs();
+    clearInterval(procTimer);
+    procTimer = setInterval(loadProcs, 3000);
+  }, 70);
+}
+function closeMetric() {
+  clearTimeout(openTimer);
+  clearTimeout(closeTimer);
+  closeTimer = setTimeout(() => {
+    for (const x of dock.querySelectorAll('.metric.open')) x.classList.remove('open');
+    openKey = null;
+    clearInterval(procTimer);
+    setTimeout(() => { if (!openKey) setDockHeight(92); }, 160);
+  }, 120);
+}
+dock.addEventListener('mouseover', (e) => {
+  const m = e.target.closest?.('.metric');
+  if (m) openMetric(m);
 });
-dock.addEventListener('pointerout', (e) => {
-  const from = e.target.closest('.metric');
-  const to = e.relatedTarget?.closest?.('.metric');
-  if (from && from !== to) setDockHeight(92);
+dock.addEventListener('mouseout', (e) => {
+  const m = e.target.closest?.('.metric');
+  if (m && !m.contains(e.relatedTarget)) closeMetric();
+});
+dock.addEventListener('focusin', (e) => { const m = e.target.closest?.('.metric'); if (m) openMetric(m); });
+dock.addEventListener('focusout', (e) => { if (e.target.closest?.('.metric')) closeMetric(); });
+dock.addEventListener('click', (e) => {
+  const more = e.target.closest?.('[data-more]');
+  if (!more) return;
+  const r = more.closest('.metric').getBoundingClientRect();
+  invoke('popup_open', { view: more.closest('.metric').dataset.k, from: 'dock', x: r.left, y: r.top, w: r.width, h: r.height });
 });
 
 // Lekkie powiększenie pod kursorem (najbliższa ikona 1.14, sąsiednie trochę mniej).
@@ -328,11 +437,14 @@ function widgetData(a, s) {
       const w = s.weather;
       if (!w) return { ic: 'globe', chip: '', tone: 'sky', label: 'Pogoda: pobieram dane' };
       const hh = +String(s.clock || '12:00').split(':')[0];
-      return { emoji: w.emoji, chip: `${Math.round(w.temp)}°`, tone: hh >= 19 || hh < 6 ? 'night' : 'sky', label: `Pogoda: ${Math.round(w.temp)}°, ${w.text}` };
+      const day = (w.days || [])[0];
+      const dn = ['Nd', 'Pn', 'Wt', 'Śr', 'Cz', 'Pt', 'Sb'][new Date().getDay()];
+      return { emoji: w.emoji, chip: `${Math.round(w.temp)}°`, tone: hh >= 19 || hh < 6 ? 'night' : 'sky', label: `Pogoda: ${Math.round(w.temp)}°, ${w.text}`,
+        city: w.label || w.text, dayName: dn, range: day ? `${day.hi}° / ${day.lo}°` : w.text };
     }
     case 'music': {
       const m = s.music;
-      if (m && m.connected && m.title) return { ic: m.playing ? 'music' : 'pause', chip: '', tone: 'violet', art: m.art, eq: !!m.playing, label: `${m.playing ? 'Gra' : 'Pauza'}: ${m.title} — ${m.artist}` };
+      if (m && m.connected && m.title) return { ic: m.playing ? 'music' : 'pause', chip: '', tone: 'violet', art: m.art, eq: !!m.playing, playing: !!m.playing, title: m.title, artist: m.artist, label: `${m.playing ? 'Gra' : 'Pauza'}: ${m.title} — ${m.artist}` };
       return { ic: 'music', chip: '', tone: 'violet', label: 'Muzyka: niepołączona' };
     }
     case 'countdown': {
@@ -347,8 +459,24 @@ function widgetData(a, s) {
 
 /** Widgety są kwadratowe jak ikony; szczegóły są po kliknięciu w panelu/notce. */
 const widgetTile = (w, a) => {
-  if (a.widget === 'weather') return `<span class="w-face tone-${w.tone}"><span class="w-symbol" aria-hidden="true">${esc(text(w.emoji || '☀️'))}</span><span class="w-wide-text"><b>${esc(text(w.chip || 'Pogoda'))}</b><span>${esc(text(w.label).replace(/^Pogoda:\s*/, ''))}</span></span></span>`;
-  if (a.widget === 'music') return `<span class="w-face tone-violet">${w.art ? `<span class="w-art" style="background-image:url('${esc(text(w.art))}')"></span>` : ''}<span class="w-wide-text"><b>${esc(text(w.label).replace(/^(Gra|Pauza):\s*/, '').split(' — ')[0])}</b><span>${w.eq ? 'Teraz gra' : 'Pauza'}</span></span>${w.eq ? '<span class="w-eq"><i></i><i></i><i></i><i></i></span>' : ''}</span>`;
+  if (a.widget === 'weather') {
+    if (!w.city) return `<span class="w-face wide tone-${w.tone}"><span class="ws-ic" aria-hidden="true">🌡️</span><span class="ws-col"><b>Pogoda</b><small>pobieram dane</small></span></span>`;
+    return `<span class="w-face wide tone-${w.tone}"><span class="ws-ic" aria-hidden="true">${esc(text(w.emoji))}</span>
+      <span class="ws-col ws-temp"><b>${esc(text(w.chip))}</b><small>${esc(text(w.city))}</small></span>
+      <span class="ws-div"></span>
+      <span class="ws-col ws-side"><b>${esc(w.dayName)}</b><small>${esc(w.range)}</small></span></span>`;
+  }
+  if (a.widget === 'music') {
+    if (!w.title) return `<span class="w-face wide tone-violet"><span class="ws-art">${icon('music', 18)}</span><span class="ws-col"><b>Muzyka</b><small>niepołączona</small></span></span>`;
+    const art = w.art ? ` style="background-image:url('${esc(text(w.art))}')"` : '';
+    return `<span class="w-face wide tone-violet"><span class="ws-art"${art}>${w.art ? '' : icon('music', 18)}</span>
+      <span class="ws-col"><small>${w.playing ? 'Teraz gra' : 'Pauza'}</small><b>${esc(text(w.artist) ? `${w.title} – ${w.artist}` : w.title)}</b></span>
+      <span class="ws-ctl">
+        <span data-act="previous" role="button" aria-label="Poprzedni">${icon('prev', 11)}</span>
+        <span data-act="toggle" role="button" aria-label="${w.playing ? 'Pauza' : 'Odtwórz'}">${icon(w.playing ? 'pause' : 'play', 11)}</span>
+        <span data-act="next" role="button" aria-label="Następny">${icon('next', 11)}</span>
+      </span></span>`;
+  }
   const art = w.art ? `<span class="w-art" style="background-image:url('${esc(text(w.art))}')"></span>` : '';
   const ring = w.ring != null ? `<span class="w-ring" style="--p:${Math.round(w.ring * 100)}"></span>` : '';
   const sym = w.emoji ? `<span class="w-symbol" aria-hidden="true">${esc(text(w.emoji))}</span>` : `<span class="w-glyph">${icon(text(w.ic), 22)}</span>`;
@@ -408,7 +536,16 @@ function render(s) {
     // szczegóły po kliknięciu (pogoda rozwija notkę), a dymek podglądów potrafił gubić tekst.
     if (b.dataset.widget) {
       const item = s.dock.find((x) => x.id === id);
-      b.onclick = () => { if (item && !suppressClick) widgetClick(item); };
+      b.onclick = (e) => {
+        const act = e.target.closest('[data-act]');
+        if (act) {
+          e.stopPropagation();
+          if (act.dataset.act === 'toggle') invoke('player_toggle').catch((err) => console.warn(err));
+          else invoke('spotify_control', { action: act.dataset.act }).catch((err) => console.warn(err));
+          return;
+        }
+        if (item && !suppressClick) widgetClick(item);
+      };
       continue;
     }
     b.onclick = (e) => {
