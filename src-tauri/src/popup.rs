@@ -3,6 +3,7 @@
 //! z którego je otwarto.
 
 use crate::{layout, state, sysx};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WindowEvent};
@@ -10,6 +11,9 @@ use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WindowE
 /// Karta schowana przez utratę fokusu — klik w ten sam przycisk ma ją zamknąć,
 /// a nie otworzyć ponownie.
 static LAST_HIDE: Mutex<Option<(String, Instant)>> = Mutex::new(None);
+
+/// Karta z lewego paska i z docka jest przyklejona dolną krawędzią do elementu.
+static ANCHOR_BOTTOM: AtomicBool = AtomicBool::new(false);
 
 fn size(view: &str) -> (f64, f64) {
     match view {
@@ -69,6 +73,7 @@ pub fn popup_open(app: AppHandle, view: String, from: String, x: f64, y: f64, w:
     };
     px = px.clamp(left + gap, (right - pw - gap).max(left));
     py = py.clamp(top + gap, (bottom - ph - gap).max(top));
+    ANCHOR_BOTTOM.store(from == "rail" || from == "dock", Ordering::Relaxed);
     state::update(&app, false, |rt| rt.popup_view = view.clone());
     let _ = pop.set_size(PhysicalSize::new(pw as u32, ph as u32));
     let _ = pop.set_position(PhysicalPosition::new(px, py));
@@ -86,9 +91,13 @@ pub fn popup_resize(app: AppHandle, height: f64) {
     let Ok(pos) = pop.outer_position() else { return };
     let new_h = (height.clamp(120.0, 640.0) * scale) as i32;
     let old_h = sz.height as i32;
-    // Karta lewego paska rośnie w górę (jest przyklejona dołem do przycisku).
-    let from_rail = state::read(&app, |rt| rt.popup_view == "power");
-    let y = if from_rail { pos.y + old_h - new_h } else { pos.y };
+    // Karta lewego paska i docka rośnie w górę (jest przyklejona dołem do elementu).
+    let y = if ANCHOR_BOTTOM.load(Ordering::Relaxed) {
+        let top = layout::screen(&app).monitor.top + (6.0 * scale) as i32;
+        (pos.y + old_h - new_h).max(top)
+    } else {
+        pos.y
+    };
     let _ = pop.set_size(PhysicalSize::new(sz.width, new_h as u32));
     let _ = pop.set_position(PhysicalPosition::new(pos.x, y));
 }

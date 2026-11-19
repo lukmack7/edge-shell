@@ -172,9 +172,28 @@ pub async fn control(app: &AppHandle, action: &str, body: Option<serde_json::Val
     let resp = req.send().await.map_err(|e| e.to_string())?;
     let status = resp.status();
     if status.is_success() {
-        poll_once(app).await;
+        if matches!(action, "play" | "pause") {
+            // Spotify przez moment zwraca stary stan: ustawiamy go od razu,
+            // a prawdziwy odczyt robimy z opóźnieniem.
+            let playing = action == "play";
+            state::update(app, false, |rt| rt.music.playing = playing);
+            let app2 = app.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(Duration::from_millis(1500)).await;
+                poll_once(&app2).await;
+            });
+        } else {
+            poll_once(app).await;
+        }
         Ok(())
     } else {
+        if status.as_u16() == 403 && matches!(action, "play" | "pause") {
+            // „Restriction violated”: odtwarzacz jest już w żądanym stanie.
+            poll_once(app).await;
+            if state::read(app, |rt| rt.music.playing) == (action == "play") {
+                return Ok(());
+            }
+        }
         let msg = match status.as_u16() {
             403 => "Sterowanie wymaga Spotify Premium".to_string(),
             404 => "Brak aktywnego urządzenia — włącz Spotify".to_string(),

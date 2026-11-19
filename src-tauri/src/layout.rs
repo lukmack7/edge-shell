@@ -409,7 +409,11 @@ pub fn place_dock_sized(app: &AppHandle, logical_width: Option<f64>, logical_hei
     } else {
         s.work.bottom - h - px(6.0, &s)
     };
-    place(&dock, x, y, width, h);
+    // Zmiana wysokości (dymek metryki) musi być atomowa, inaczej dock skacze.
+    let done = hwnd_of(&dock).is_some_and(|raw| platform::set_rect(raw, x, y, width, h));
+    if !done {
+        place(&dock, x, y, width, h);
+    }
     if let Ok(mut r) = DOCK_RECT.lock() {
         *r = Rect { left: x, top: y, right: x + width, bottom: y + h };
     }

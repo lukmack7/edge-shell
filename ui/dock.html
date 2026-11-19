@@ -170,8 +170,8 @@ const metricIcon = {
   battery: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="17" height="10" rx="2"/><path d="M21 10v4"/><path d="M12 5v14"/></svg>',
 };
 const METRIC = {
-  cpu: { color: '#ff9f0a', title: 'Procesor', pop: 430, more: true },
-  mem: { color: '#30d158', title: 'Pamięć', pop: 430, more: true },
+  cpu: { color: '#ff9f0a', title: 'Procesor', pop: 460, more: true },
+  mem: { color: '#30d158', title: 'Pamięć', pop: 460, more: true },
   battery: { color: '#ffd60a', title: 'Bateria', pop: 260, more: false },
 };
 const pct = (value) => Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
@@ -237,7 +237,7 @@ function updateMetrics() {
     m.querySelector('[data-f=rows]').innerHTML = metricRows(k);
     // Okno docka ma pomieścić cały dymek (wysokość zależy od liczby wierszy).
     const need = Math.ceil(m.querySelector('.metric-pop').offsetHeight) + 14 + 92 + 16;
-    setDockHeight(Math.max(METRIC[k].pop, need));
+    setDockHeight(Math.max(dockHeight, Math.ceil(Math.max(METRIC[k].pop, need) / 20) * 20));
   }
 }
 const onStats = (next) => {
