@@ -829,19 +829,15 @@ function msgsHtml() {
   const notif = r.notifications;
   const skipped = s.mail?.skippedToday ? ` · pominięte newslettery dziś: ${s.mail.skippedToday}` : '';
   const meta = (notif && notif !== 'ok' && typeof notif === 'string' ? `Powiadomienia Windows: ${esc(notif)}` : r.nextBatch ? `Następna paczka o ${esc(r.nextBatch)}` : '') + skipped;
-  return `<div class="n-pn" id="pn">
-    <div class="n-head fade"><button class="back" id="backBtn">← Panel</button><b>Powiadomienia i komunikaty</b><span class="meta">${meta}</span></div>
-    <div class="n-msgs fade">
-      <div class="n-col"><span class="lbl">TERAZ${showing.length > 1 ? ` · ${showing.length}` : ''}</span>
-        ${showing.map((m, i) => msgCard(m, { current: i === 0 })).join('') || '<span class="n-empty">Nic nie czeka na odpowiedź.</span>'}
-      </div>
-      <div class="n-col"><span class="lbl">CZEKA NA PACZKĘ${r.waiting ? ` · ${r.waiting}` : ''}${r.waiting ? '<button id="releaseBtn">Pokaż teraz</button>' : ''}</span>
-        ${waiting.map((m) => msgCard(m)).join('') || '<span class="n-empty">Pusto — nic nie jest odłożone.</span>'}
-      </div>
-      <div class="n-col"><span class="lbl">CO PRZEGAPIŁEŚ${missed.length ? ` · ${missed.length}<button id="clrMissed">Wyczyść</button>` : ''}</span>
-        ${missed.map((m, i) => msgCard(m, { missed: i })).join('') || '<span class="n-empty">Nic — jesteś na bieżąco.</span>'}
-      </div>
-    </div></div>`;
+   const col = (label, body) => `<div class="n-col"><span class="lbl">${label}</span>${body}</div>`;
+   const cols = [];
+   if (showing.length) cols.push(col(`TERAZ${showing.length > 1 ? ` · ${showing.length}` : ''}`, showing.map((m, i) => msgCard(m, { current: i === 0 })).join('')));
+   if (waiting.length) cols.push(col(`CZEKA NA PACZKĘ · ${r.waiting}${r.waiting ? '<button id="releaseBtn">Pokaż teraz</button>' : ''}`, waiting.map((m) => msgCard(m)).join('')));
+   if (missed.length) cols.push(col(`CO PRZEGAPIŁEŚ · ${missed.length}<button id="clrMissed">Wyczyść</button>`, missed.map((m, i) => msgCard(m, { missed: i })).join('')));
+   if (!cols.length) cols.push(col('POWIADOMIENIA', '<span class="n-empty">Jesteś na bieżąco.</span>'));
+   return `<div class="n-pn" id="pn">
+     <div class="n-head fade"><button class="back" id="backBtn">← Panel</button><b>Powiadomienia i komunikaty</b><span class="meta">${meta}</span></div>
+     <div class="n-msgs fade" style="grid-template-columns:repeat(${Math.min(3, cols.length)},minmax(0,1fr))">${cols.join('')}</div></div>`;
 }
 
 function panelHtml() {
@@ -904,8 +900,8 @@ function panelHtml() {
         <div class="n-center-card"><span class="hd">WYMAGA UWAGI<button id="allMsgs">WSZYSTKIE →</button></span>${missedRows}</div>
       </div>
       <div class="n-center-quick">
-        <button class="n-q" id="qWifi">${wifiIcon((stats || {}).wifi_signal)}<b>Wi‑Fi</b><small>${esc((stats || {}).wifi_ssid || 'brak połączenia')}</small></button>
-        <button class="n-q" id="qBt">${icon('bluetooth', 15)}<b>Bluetooth</b><small>${(stats || {}).bt_connected || 0} urządzenia</small></button>
+        <button class="n-q" id="qWifi">${wifiIcon((stats || {}).wifiSignal)}<b>Wi‑Fi</b><small>${esc((stats || {}).wifiSsid || 'brak połączenia')}</small></button>
+        <button class="n-q" id="qBt">${icon('bluetooth', 15)}<b>Bluetooth</b><small>${(stats || {}).btConnected || 0} urządzenia</small></button>
         <button class="n-q" id="qQuiet">${icon('moon', 15)}<b>Cisza</b><small>${s.quietUntil ? `do ${hhmm(s.quietUntil)}` : 'wyłączona'}</small></button>
         <button class="n-q" id="qShot">${icon('camera', 15)}<b>Zrzut</b><small>cały ekran</small></button>
       </div>
