@@ -209,6 +209,8 @@ fn main() {
             previews::previews_layout,
             previews::previews_hide,
             previews::previews_tip,
+            previews::previews_metric,
+            previews::previews_metric_fit,
             previews::window_activate,
             previews::window_close,
             insights::get_week,

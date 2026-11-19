@@ -97,21 +97,6 @@
      background:conic-gradient(var(--c) calc(var(--p) * 1%), rgba(255,255,255,0.12) 0); }
    .metric-ring::before { content:""; position:absolute; inset:3px; border-radius:50%; background:#17181d; }
    .metric-ring svg { position:relative; width:12px; height:12px; fill:none; stroke:var(--c); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
-   .metric-pop { position:absolute; right:-6px; bottom:calc(100% + 14px); width:244px; padding:14px 15px 13px; border-radius:20px; background:rgba(22,23,28,.98);
-     border:1px solid rgba(255,255,255,.1); box-shadow:0 24px 50px -18px #000; text-align:left; color:var(--text); opacity:0; visibility:hidden; pointer-events:none; transform:translateY(6px); transition:opacity .14s, transform .14s, visibility 0s .14s; z-index:5; cursor:default; }
-   .metric-pop::after { content:""; position:absolute; left:0; right:0; top:100%; height:16px; }
-   .metric.open .metric-pop { opacity:1; visibility:visible; pointer-events:auto; transform:none; transition:opacity .14s, transform .14s; }
-   .mp-t { display:flex; align-items:center; gap:8px; font-size:12.5px; font-weight:700; }
-   .mp-t i { width:8px; height:8px; border-radius:50%; background:var(--c); }
-   .mp-big { margin-top:10px; font-size:26px; font-weight:800; letter-spacing:-.5px; }
-   .mp-big small { margin-left:7px; font:11px var(--mono); color:var(--muted); letter-spacing:0; font-weight:400; }
-   .mp-bars { display:flex; align-items:flex-end; justify-content:flex-end; gap:3px; height:34px; margin:11px 0 10px; }
-   .mp-bars i { flex:none; width:6px; min-height:3px; border-radius:2px; background:var(--c); opacity:.78; }
-   .mp-rows { display:flex; flex-direction:column; gap:7px; padding:9px 0 11px; border-top:1px solid rgba(255,255,255,.08); }
-   .mp-row { display:flex; justify-content:space-between; gap:10px; font-size:12px; color:var(--text-2); }
-   .mp-row b { font-weight:700; color:var(--text); }
-   .mp-more { width:100%; height:32px; border-radius:11px; border:1px solid rgba(255,255,255,.18); background:rgba(255,255,255,.04); color:var(--text); font-size:12px; font-weight:600; }
-   .mp-more:hover { background:rgba(255,255,255,.1); }
 </style>
 </head>
 <body>
@@ -126,7 +111,6 @@ let snap = null;
 let stats = {};
 let hoverTimer = null;
 let dockWidth = 0;
-let dockHeight = 92;
 const { emitTo } = window.__TAURI__.event;
 
 async function loadIcons() {
@@ -170,49 +154,50 @@ const metricIcon = {
   battery: '<svg viewBox="0 0 24 24"><rect x="3" y="7" width="17" height="10" rx="2"/><path d="M21 10v4"/><path d="M12 5v14"/></svg>',
 };
 const METRIC = {
-  cpu: { color: '#ff9f0a', title: 'Procesor', pop: 460, more: true },
-  mem: { color: '#30d158', title: 'Pamięć', pop: 460, more: true },
-  battery: { color: '#ffd60a', title: 'Bateria', pop: 260, more: false },
+  cpu: { color: '#ff9f0a', title: 'Procesor', more: true },
+  mem: { color: '#30d158', title: 'Pamięć', more: true },
+  battery: { color: '#ffd60a', title: 'Bateria', more: false },
 };
 const pct = (value) => Math.max(0, Math.min(100, Math.round(Number(value) || 0)));
 const history = { cpu: [], mem: [], battery: [] };
 let procs = [];
 let openKey = null;
 let openTimer = null;
-let closeTimer = null;
 let procTimer = null;
 
 const metricKeys = () => ['cpu', 'mem', 'battery'].filter((k) => stats[k] != null);
+/** W docku zostaje sam pierścień; szczegóły są w osobnym oknie (dock nie zmienia rozmiaru). */
 function metricsHtml() {
   const keys = metricKeys();
   return `<span class="metrics" data-metrics data-keys="${keys.join(',')}">${keys.map((k) => `
-    <div class="metric" data-k="${k}" tabindex="0" role="button" style="--c:${METRIC[k].color}">
+    <div class="metric" data-k="${k}" tabindex="0" role="button">
       <span class="metric-ring" style="--c:${METRIC[k].color}">${metricIcon[k]}</span>
-      <div class="metric-pop">
-        <div class="mp-t"><i></i><span data-f="title"></span></div>
-        <div class="mp-big" data-f="big"></div>
-        <div class="mp-bars" data-f="bars"></div>
-        <div class="mp-rows" data-f="rows"></div>
-        ${METRIC[k].more ? '<button class="mp-more" type="button" data-more>Pokaż szczegóły</button>' : ''}
-      </div>
     </div>`).join('')}</span>`;
 }
 const sizeText = (mb) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`);
 function metricRows(k) {
-  const row = (name, val) => `<div class="mp-row"><span>${esc(name)}</span><b>${esc(val)}</b></div>`;
-  if (k === 'battery') return row('stan', stats.charging ? 'ładowanie' : 'na baterii') + row('poziom', `${pct(stats.battery)}%`);
+  if (k === 'battery') return [['stan', stats.charging ? 'ładowanie' : 'na baterii'], ['poziom', `${pct(stats.battery)}%`]];
   if (k === 'mem') {
     const used = Number(stats.memUsedGb) || 0;
     const top = [...procs].sort((a, b) => b.memMb - a.memMb).slice(0, 3);
     const rest = Math.max(0, used * 1024 - top.reduce((n, p) => n + p.memMb, 0));
-    return row('użyte', `${used.toFixed(1)} GB`) + row('całość', `${Number(stats.memTotalGb || 0).toFixed(1)} GB`)
-      + (top.length ? top.map((p) => row(p.name, sizeText(p.memMb))).join('') + row('reszta', sizeText(rest)) : '');
+    return [['użyte', `${used.toFixed(1)} GB`], ['całość', `${Number(stats.memTotalGb || 0).toFixed(1)} GB`],
+      ...(top.length ? [...top.map((p) => [p.name, sizeText(p.memMb)]), ['reszta', sizeText(rest)]] : [])];
   }
   const top = [...procs].sort((a, b) => b.cpu - a.cpu).slice(0, 3);
   const rest = Math.max(0, pct(stats.cpu) - top.reduce((n, p) => n + p.cpu, 0));
-  return top.length ? top.map((p) => row(p.name, `${Math.round(p.cpu)}%`)).join('') + row('reszta', `${Math.round(rest)}%`) : row('procesy', 'mierzę…');
+  return top.length ? [...top.map((p) => [p.name, `${Math.round(p.cpu)}%`]), ['reszta', `${Math.round(rest)}%`]] : [['procesy', 'mierzę…']];
 }
-/** Aktualizacja w miejscu — bez podmiany elementów, żeby hover nie migał co sekundę. */
+function cardData(k) {
+  const extra = k === 'cpu' ? `z ${navigator.hardwareConcurrency || '?'} rdzeni`
+    : k === 'mem' ? `${Number(stats.memUsedGb || 0).toFixed(1)} / ${Number(stats.memTotalGb || 0).toFixed(1)} GB`
+    : stats.charging ? 'ładowanie' : '';
+  return { k, color: METRIC[k].color, title: `${METRIC[k].title} · teraz`, value: pct(stats[k]), extra,
+    bars: history[k].map(pct), rows: metricRows(k), more: METRIC[k].more };
+}
+const pushCard = () => { if (openKey && stats[openKey] != null) emitTo('preview', 'metric-card', cardData(openKey)); };
+
+/** Pierścienie aktualizują się w miejscu — bez podmiany elementów. */
 function updateMetrics() {
   const box = dock.querySelector('[data-metrics]');
   if (!box) return;
@@ -224,21 +209,10 @@ function updateMetrics() {
   }
   for (const m of box.querySelectorAll('.metric')) {
     const k = m.dataset.k;
-    const v = pct(stats[k]);
-    m.querySelector('.metric-ring').style.setProperty('--p', v);
-    m.setAttribute('aria-label', `${METRIC[k].title} ${v}%`);
-    if (!m.classList.contains('open')) continue;
-    m.querySelector('[data-f=title]').textContent = `${METRIC[k].title} · teraz`;
-    const extra = k === 'cpu' ? `z ${navigator.hardwareConcurrency || '?'} rdzeni`
-      : k === 'mem' ? `${Number(stats.memUsedGb || 0).toFixed(1)} / ${Number(stats.memTotalGb || 0).toFixed(1)} GB`
-      : stats.charging ? 'ładowanie' : '';
-    m.querySelector('[data-f=big]').innerHTML = `${v}%${extra ? `<small>${esc(extra)}</small>` : ''}`;
-    m.querySelector('[data-f=bars]').innerHTML = history[k].map((x) => `<i style="height:${Math.max(8, pct(x))}%"></i>`).join('');
-    m.querySelector('[data-f=rows]').innerHTML = metricRows(k);
-    // Okno docka ma pomieścić cały dymek (wysokość zależy od liczby wierszy).
-    const need = Math.ceil(m.querySelector('.metric-pop').offsetHeight) + 14 + 92 + 16;
-    setDockHeight(Math.max(dockHeight, Math.ceil(Math.max(METRIC[k].pop, need) / 20) * 20));
+    m.querySelector('.metric-ring').style.setProperty('--p', pct(stats[k]));
+    m.setAttribute('aria-label', `${METRIC[k].title} ${pct(stats[k])}%`);
   }
+  pushCard();
 }
 const onStats = (next) => {
   stats = next || {};
@@ -252,61 +226,55 @@ const onStats = (next) => {
 listen('stats', onStats);
 invoke('get_stats').then(onStats).catch(() => {});
 
-function setDockHeight(height) {
-  const next = height || 92;
-  if (next === dockHeight) return;
-  dockHeight = next;
-  invoke('dock_resize', { width: dockWidth || Math.ceil(dock.getBoundingClientRect().width), height: next });
-}
 async function loadProcs() {
   if (!openKey || !METRIC[openKey].more) return;
   procs = await invoke('sys_processes').catch(() => procs);
-  updateMetrics();
+  pushCard();
 }
-// Dymek musi dostać miejsce w natywnym oknie docka (CSS nie wychodzi poza WebView):
-// okno rośnie na czas najechania, dopiero potem dymek się pokazuje.
-function openMetric(m) {
-  clearTimeout(closeTimer);
-  if (openKey === m.dataset.k) return;
+function closeCard() {
   clearTimeout(openTimer);
+  clearInterval(procTimer);
+  openKey = null;
+  for (const x of dock.querySelectorAll('.metric.open')) x.classList.remove('open');
+}
+// Karta pojawia się dopiero po krótkim zatrzymaniu kursora — samo przejechanie nic nie otwiera.
+function openMetric(m) {
   const k = m.dataset.k;
-  setDockHeight(METRIC[k].pop);
-  openTimer = setTimeout(() => {
-    for (const x of dock.querySelectorAll('.metric.open')) x.classList.remove('open');
+  if (openKey === k) { emitTo('preview', 'preview-enter', null); return; }
+  clearTimeout(openTimer);
+  openTimer = setTimeout(async () => {
+    closeCard();
     openKey = k;
     m.classList.add('open');
-    updateMetrics();
+    const r = m.getBoundingClientRect();
+    await invoke('previews_metric', { anchor: r.left + r.width / 2 }).catch(() => {});
+    pushCard();
     loadProcs();
-    clearInterval(procTimer);
     procTimer = setInterval(loadProcs, 3000);
-  }, 70);
+  }, 160);
 }
-function closeMetric() {
+function leaveMetric() {
   clearTimeout(openTimer);
-  clearTimeout(closeTimer);
-  closeTimer = setTimeout(() => {
-    for (const x of dock.querySelectorAll('.metric.open')) x.classList.remove('open');
-    openKey = null;
-    clearInterval(procTimer);
-    setTimeout(() => { if (!openKey) setDockHeight(92); }, 160);
-  }, 120);
+  if (openKey) emitTo('preview', 'preview-leave', null);
 }
+// Okno karty zostało schowane (kursor odszedł) — dock przestaje je zasilać.
+listen('preview-hidden', closeCard);
+listen('metric-more', ({ k }) => {
+  const m = dock.querySelector(`.metric[data-k="${k}"]`);
+  if (!m) return;
+  const r = m.getBoundingClientRect();
+  invoke('popup_open', { view: k, from: 'dock', x: r.left, y: r.top - window.innerHeight, w: r.width, h: r.height });
+});
 dock.addEventListener('mouseover', (e) => {
   const m = e.target.closest?.('.metric');
-  if (m) openMetric(m);
+  if (m && !m.contains(e.relatedTarget)) openMetric(m);
 });
 dock.addEventListener('mouseout', (e) => {
   const m = e.target.closest?.('.metric');
-  if (m && !m.contains(e.relatedTarget)) closeMetric();
+  if (m && !m.contains(e.relatedTarget)) leaveMetric();
 });
 dock.addEventListener('focusin', (e) => { const m = e.target.closest?.('.metric'); if (m) openMetric(m); });
-dock.addEventListener('focusout', (e) => { if (e.target.closest?.('.metric')) closeMetric(); });
-dock.addEventListener('click', (e) => {
-  const more = e.target.closest?.('[data-more]');
-  if (!more) return;
-  const r = more.closest('.metric').getBoundingClientRect();
-  invoke('popup_open', { view: more.closest('.metric').dataset.k, from: 'dock', x: r.left, y: r.top - window.innerHeight, w: r.width, h: r.height });
-});
+dock.addEventListener('focusout', (e) => { if (e.target.closest?.('.metric')) leaveMetric(); });
 
 // Lekkie powiększenie pod kursorem (najbliższa ikona 1.14, sąsiednie trochę mniej).
 dock.addEventListener('mousemove', (e) => {
@@ -631,6 +599,7 @@ function render(s) {
     }
     // Najechanie: po chwili żywe podglądy okien tej aplikacji.
     b.onmouseenter = () => {
+      closeCard();
       clearTimeout(hoverTimer);
       emitTo('preview', 'preview-enter', null);
       const r = b.getBoundingClientRect();
@@ -646,7 +615,7 @@ function render(s) {
   // Okno docka dopasowuje się do szerokości ikon (+ miejsce na podpowiedź).
   requestAnimationFrame(() => {
     dockWidth = Math.ceil(dock.getBoundingClientRect().width) + 8;
-    invoke('dock_resize', { width: dockWidth, height: dockHeight });
+    invoke('dock_resize', { width: dockWidth });
   });
 }
 </script>
