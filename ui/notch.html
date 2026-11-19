@@ -60,7 +60,7 @@
   .n-center-item .now { margin-left:auto; flex:none; border-radius:6px; padding:3px 5px; background:rgba(34,197,94,.13); color:#86efac; font-size:9px; font-weight:700; }
   .n-center-item .dot { width:6px; height:6px; flex:none; border-radius:50%; background:#38bdf8; }
   .n-center-item .sender { color:#7dd3fc; font-weight:700; }
-  .n-center-quick { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; }
+  .n-center-quick { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:7px; }
   .n-center-quick .n-q { height:62px; padding:8px 9px; align-items:flex-start; justify-content:flex-start; flex-direction:column; gap:5px; border:1px solid rgba(255,255,255,.07); }
   .n-center-quick .n-q svg { width:15px; height:15px; }
   .n-center-quick .n-q b { font-size:10.5px; font-weight:600; }.n-center-quick .n-q small { font-size:9px; color:#8b8b98; }
@@ -332,9 +332,6 @@ function statusHtml() {
   const unread = (s?.radio?.waiting || 0) + (s?.missed || []).length;
   parts.push(`<button class="n-sb n-bell" id="bellBtn" title="Powiadomienia i komunikaty${unread ? ` · ${unread} do przejrzenia` : ''}">${icon('bell', 15)}${unread ? `<span class="bd">${unread > 9 ? '9+' : unread}</span>` : ''}</button>`);
   const on = (k) => !s?.barStats || s.barStats.includes(k);
-  parts.push(`<button class="n-sb" id="bri" title="Jasność ekranu · kółko myszy albo klik">${SUN_SVG}</button>`);
-  if (on('wifi')) parts.push(`<button class="n-sb" data-pop="wifi" title="${st.wifiSsid ? esc(st.wifiSsid) + ' · ' + st.wifiSignal + '%' : 'Wi‑Fi: brak połączenia'}">${wifiIcon(st.wifiSignal)}</button>`);
-  if (on('volume') && st.volume != null) parts.push(`<button class="n-sb" id="vol" data-pop="sound" title="Dźwięk ${st.muted ? '— wyciszony' : st.volume + '%'} · kółko: głośność · środkowy klik: wycisz">${icon(st.muted ? 'mute' : 'volume', 16)}</button>`);
   if (on('bluetooth') && st.btPresent && st.btConnected) parts.push(`<button class="n-sb" data-pop="bt" title="Bluetooth: ${st.btConnected} połączonych">${icon('bluetooth', 15)}</button>`);
   const bat = st.battery ?? s?.battery?.percent;
   const chg = st.battery != null ? st.charging : s?.battery?.charging;
@@ -903,6 +900,8 @@ function panelHtml() {
         <button class="n-q" id="qWifi">${wifiIcon((stats || {}).wifiSignal)}<b>Wi‑Fi</b><small>${esc((stats || {}).wifiSsid || 'brak połączenia')}</small></button>
         <button class="n-q" id="qBt">${icon('bluetooth', 15)}<b>Bluetooth</b><small>${(stats || {}).btConnected || 0} urządzenia</small></button>
         <button class="n-q" id="qQuiet">${icon('moon', 15)}<b>Cisza</b><small>${s.quietUntil ? `do ${hhmm(s.quietUntil)}` : 'wyłączona'}</small></button>
+        <button class="n-q" id="qBright">${SUN_SVG}<b>Jasność</b><small>${briVal ?? 50}%</small></button>
+        <button class="n-q" id="qSound">${icon((stats || {}).muted ? 'mute' : 'volume', 15)}<b>Dźwięk</b><small>${(stats || {}).muted ? 'wyciszony' : `${(stats || {}).volume ?? 0}%`}</small></button>
         <button class="n-q" id="qShot">${icon('camera', 15)}<b>Zrzut</b><small>cały ekran</small></button>
       </div>
       ${media}
@@ -1131,6 +1130,8 @@ function wire(st, msg) {
     on('qWifi', (e) => popup('wifi', e.currentTarget));
     on('qBt', (e) => popup('bt', e.currentTarget));
     on('qQuiet', () => showMsgs());
+    on('qBright', () => showHud());
+    on('qSound', (e) => popup('sound', e.currentTarget));
     on('qShot', () => { setOpen(false); setTimeout(() => invoke('shot_start'), 300); });
     on('qReplan', () => invoke('replan'));
     on('dMusic', () => showMusic());

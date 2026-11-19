@@ -388,16 +388,27 @@ pub fn set_dock_visible(app: &AppHandle, visible: bool) {
 
 /// Dock ustala szerokość sam (po wyrenderowaniu ikon) i prosi o nią komendą.
 pub fn place_dock(app: &AppHandle, logical_width: Option<f64>) {
+    place_dock_sized(app, logical_width, None);
+}
+
+/// Wysokość docka może chwilowo wzrosnąć, gdy pokazuje dymek metryki. Dzięki
+/// temu dymek pozostaje w tym samym WebView i nie jest przycinany przez okno.
+pub fn place_dock_sized(app: &AppHandle, logical_width: Option<f64>, logical_height: Option<f64>) {
     let Some(dock) = win(app, "dock") else { return };
     let s = screen(app);
     let width = match logical_width {
         Some(w) => px(w, &s),
         None => dock.outer_size().map(|z| z.width as i32).unwrap_or(px(820.0, &s)),
     };
-    let h = px(DOCK_H, &s);
+    let h = px(logical_height.unwrap_or(DOCK_H).max(DOCK_H), &s);
     let x = (s.work.left + s.work.right - width) / 2;
-    // Z rezerwacją dock stoi w zarezerwowanym pasie pod obszarem roboczym.
-    let y = if DOCK_RESERVED.load(Ordering::Relaxed) { s.work.bottom } else { s.work.bottom - h - px(6.0, &s) };
+    // Z rezerwacją dolna krawędź pozostaje przy ekranie; dodatkowa wysokość
+    // dymku rośnie ponad dock, nie poza dolną krawędź monitora.
+    let y = if DOCK_RESERVED.load(Ordering::Relaxed) {
+        s.work.bottom - (h - px(DOCK_H, &s))
+    } else {
+        s.work.bottom - h - px(6.0, &s)
+    };
     place(&dock, x, y, width, h);
     if let Ok(mut r) = DOCK_RECT.lock() {
         *r = Rect { left: x, top: y, right: x + width, bottom: y + h };

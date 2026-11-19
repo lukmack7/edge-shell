@@ -39,7 +39,12 @@
   .sep { width: 1px; height: 34px; margin-bottom: 14px; background: rgba(255,255,255,0.12); }
   /* Widgety: żywe kafle obok ikon (blok, fokus, radio, pogoda, muzyka, odliczanie). */
   /* Widgety są kafelkami tej samej siatki co aplikacje — każdy ma własny „charakter”. */
-  .app.wgt { width: 52px; height: 52px; padding: 0; border-radius: 15px; background: transparent; }
+   .app.wgt { width: 52px; height: 52px; padding: 0; border-radius: 15px; background: transparent; }
+   .app.wgt.w-weather { width: 112px; }
+   .app.wgt.w-music { width: 190px; }
+   .app.wgt.w-weather .w-face, .app.wgt.w-music .w-face { width:100%; justify-content:flex-start; gap:8px; padding:0 10px; }
+   .w-wide-text { display:flex; flex-direction:column; align-items:flex-start; min-width:0; gap:2px; }.w-wide-text b { font-size:11px; color:var(--fg); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }.w-wide-text span { font-size:9px; color:color-mix(in srgb,var(--fg) 70%,transparent); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }
+   .app.wgt.w-weather .w-symbol { margin:0; font-size:25px; }.app.wgt.w-music .w-art { position:relative; inset:auto; width:32px; height:32px; flex:none; border-radius:9px; }.app.wgt.w-music .w-eq { right:9px; left:auto; bottom:8px; }.app.wgt.w-music .w-glyph { display:none; }
   .app.wgt:hover { transform: translateY(-3px); }
   .w-face { --t1: rgba(255,255,255,0.1); --t2: rgba(255,255,255,0.04); --edge: rgba(255,255,255,0.1); --fg: #e4e4e7;
     position: relative; width: 52px; height: 52px; border-radius: 15px; display: flex; align-items: center; justify-content: center; overflow: hidden;
@@ -94,6 +99,8 @@ let icons = {};
 let snap = null;
 let stats = {};
 let hoverTimer = null;
+let dockWidth = 0;
+let dockHeight = 92;
 const { emitTo } = window.__TAURI__.event;
 
 async function loadIcons() {
@@ -168,6 +175,24 @@ function updateMetrics() {
   shell.innerHTML = metricsHtml();
   current.replaceWith(shell.firstElementChild);
 }
+
+function setDockHeight(height) {
+  const next = height || 92;
+  if (next === dockHeight) return;
+  dockHeight = next;
+  invoke('dock_resize', { width: dockWidth || Math.ceil(dock.getBoundingClientRect().width), height: next });
+}
+
+// Dymek metryki musi dostać miejsce w natywnym oknie docka — CSS nie może
+// rysować poza granicą WebView. Okno rośnie tylko na czas najechania.
+dock.addEventListener('pointerover', (e) => {
+  if (e.target.closest('.metric')) setDockHeight(184);
+});
+dock.addEventListener('pointerout', (e) => {
+  const from = e.target.closest('.metric');
+  const to = e.relatedTarget?.closest?.('.metric');
+  if (from && from !== to) setDockHeight(92);
+});
 
 // Lekkie powiększenie pod kursorem (najbliższa ikona 1.14, sąsiednie trochę mniej).
 dock.addEventListener('mousemove', (e) => {
@@ -321,7 +346,9 @@ function widgetData(a, s) {
 }
 
 /** Widgety są kwadratowe jak ikony; szczegóły są po kliknięciu w panelu/notce. */
-const widgetTile = (w) => {
+const widgetTile = (w, a) => {
+  if (a.widget === 'weather') return `<span class="w-face tone-${w.tone}"><span class="w-symbol" aria-hidden="true">${esc(text(w.emoji || '☀️'))}</span><span class="w-wide-text"><b>${esc(text(w.chip || 'Pogoda'))}</b><span>${esc(text(w.label).replace(/^Pogoda:\s*/, ''))}</span></span></span>`;
+  if (a.widget === 'music') return `<span class="w-face tone-violet">${w.art ? `<span class="w-art" style="background-image:url('${esc(text(w.art))}')"></span>` : ''}<span class="w-wide-text"><b>${esc(text(w.label).replace(/^(Gra|Pauza):\s*/, '').split(' — ')[0])}</b><span>${w.eq ? 'Teraz gra' : 'Pauza'}</span></span>${w.eq ? '<span class="w-eq"><i></i><i></i><i></i><i></i></span>' : ''}</span>`;
   const art = w.art ? `<span class="w-art" style="background-image:url('${esc(text(w.art))}')"></span>` : '';
   const ring = w.ring != null ? `<span class="w-ring" style="--p:${Math.round(w.ring * 100)}"></span>` : '';
   const sym = w.emoji ? `<span class="w-symbol" aria-hidden="true">${esc(text(w.emoji))}</span>` : `<span class="w-glyph">${icon(text(w.ic), 22)}</span>`;
@@ -365,8 +392,8 @@ function render(s) {
     const wd = a.widget ? widgetData(a, s) : null;
     const count = wd && wd.count ? ` data-count="${esc(wd.count)}" ` : '';
     return `
-    <button class="app ${a.dim ? 'dim' : ''} ${a.stack ? 'stack' : ''} ${a.unpinned ? 'unpinned' : ''} ${card ? 'card' : ''} ${active ? 'active' : ''} ${wd ? 'wgt' : ''}" data-widget="${wd ? esc(a.widget) : ''}" data-stack="${a.stack ? 1 : ''}" data-id="${esc(a.id)}" data-name="${esc(a.name)}" aria-label="${esc(wd ? wd.label : a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}"${count}>
-      ${wd ? widgetTile(wd) : tile(a)}
+    <button class="app ${a.dim ? 'dim' : ''} ${a.stack ? 'stack' : ''} ${a.unpinned ? 'unpinned' : ''} ${card ? 'card' : ''} ${active ? 'active' : ''} ${wd ? `wgt w-${a.widget}` : ''}" data-widget="${wd ? esc(a.widget) : ''}" data-stack="${a.stack ? 1 : ''}" data-id="${esc(a.id)}" data-name="${esc(a.name)}" aria-label="${esc(wd ? wd.label : a.name)}${a.dim ? ' (wyciszone w tym trybie)' : ''}"${count}>
+       ${wd ? widgetTile(wd, a) : tile(a)}
       ${card ? `<span class="lbl"><b>${esc(lbl.title)}</b>${lbl.sub ? `<span>${esc(lbl.sub)}</span>` : ''}</span>` : ''}
       <span class="stripe" style="background:${a.stripe}"></span>
       ${wd ? '' : (a.badgeMuted ? '<span class="badge muted" aria-label="nieprzeczytana poczta — wyciszone w fokusie" title="Poczta czeka — licznik wyciszony w fokusie"></span>'
@@ -476,8 +503,8 @@ function render(s) {
   dock.oncontextmenu = (e) => { e.preventDefault(); invoke('open_settings'); };
   // Okno docka dopasowuje się do szerokości ikon (+ miejsce na podpowiedź).
   requestAnimationFrame(() => {
-    const width = Math.ceil(dock.getBoundingClientRect().width) + 8;
-    invoke('dock_resize', { width });
+    dockWidth = Math.ceil(dock.getBoundingClientRect().width) + 8;
+    invoke('dock_resize', { width: dockWidth, height: dockHeight });
   });
 }
 </script>
