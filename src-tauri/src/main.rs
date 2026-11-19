@@ -35,6 +35,7 @@ mod backup;
 mod stacks;
 mod mail;
 mod weather;
+mod trash;
 
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
@@ -210,6 +211,10 @@ fn main() {
             previews::previews_hide,
             previews::previews_tip,
             previews::previews_metric,
+            trash::trash_info,
+            trash::trash_open,
+            trash::trash_empty,
+            trash::trash_drop,
             previews::previews_metric_fit,
             previews::window_activate,
             previews::window_close,

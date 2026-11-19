@@ -69,8 +69,8 @@ pub fn show_capture(app: AppHandle) {
 }
 
 #[tauri::command]
-pub fn dock_resize(app: AppHandle, width: f64, height: Option<f64>) {
-    layout::place_dock_sized(&app, Some(width), height);
+pub fn dock_resize(app: AppHandle, width: f64) {
+    layout::place_dock(&app, Some(width));
 }
 
 fn open_target(app: &AppHandle, path: &str, args: &[String]) -> Res<()> {

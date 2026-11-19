@@ -588,6 +588,10 @@ pub struct ShellCfg {
     pub notch: bool,
     /// Prawa szyna z planem dnia (gdy notch zastępuje górny pasek).
     pub day_rail: bool,
+    /// Skala docka w procentach (70–140): ikony, widgety i wysokość okna.
+    pub dock_scale: u32,
+    /// Kosz na końcu docka (klik: otwórz, prawy klik: opróżnij, upuszczenie pliku: do kosza).
+    pub show_trash: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -788,6 +792,8 @@ impl Default for ShellCfg {
             hide_in_fullscreen: true,
             notch: true,
             day_rail: true,
+            dock_scale: 100,
+            show_trash: true,
         }
     }
 }

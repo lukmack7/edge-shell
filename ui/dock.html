@@ -6,7 +6,7 @@
 <link rel="stylesheet" href="shared.css">
 <style>
   body { display: flex; align-items: flex-end; justify-content: center; }
-  nav { display: inline-flex; align-items: flex-end; gap: 8px; padding: 10px 10px 7px; margin-bottom: 4px; border-radius: 22px; background: rgba(16,16,19,0.86); border: 1px solid var(--line); }
+  nav { --z: 1; flex: none; transform: scale(var(--z)); transform-origin: 50% 100%; display: inline-flex; align-items: flex-end; gap: 8px; padding: 10px 10px 7px; margin-bottom: 4px; border-radius: 22px; background: rgba(16,16,19,0.86); border: 1px solid var(--line); }
   .app { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 0; border: 0; background: transparent; transition: transform 0.12s ease; }
   .app:hover { transform: translateY(-3px); }
   .tile { width: 52px; height: 52px; border-radius: 15px; display: flex; align-items: center; justify-content: center; }
@@ -21,7 +21,7 @@
   .badge.muted { min-width: 10px; width: 10px; height: 10px; padding: 0; top: -2px; right: -2px; background: #71717a; }
   .badge { position: absolute; top: -5px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center; box-shadow: 0 0 0 2px #18181b; }
   .app.stack .tile.real img { width: 46px; height: 46px; }
-  @keyframes reveal { from { transform: translateY(70%); opacity: 0.4; } to { transform: none; opacity: 1; } }
+  @keyframes reveal { from { transform: scale(var(--z)) translateY(70%); opacity: 0.4; } to { transform: scale(var(--z)); opacity: 1; } }
   nav.reveal { animation: reveal 0.14s ease-out; }
   .app.dragging { opacity: 0.55; transform: translateY(-8px) scale(1.06); transition: none; }
   .app.drop-target .tile { outline: 2px solid #fbbf24; outline-offset: 3px; }
@@ -97,6 +97,12 @@
      background:conic-gradient(var(--c) calc(var(--p) * 1%), rgba(255,255,255,0.12) 0); }
    .metric-ring::before { content:""; position:absolute; inset:3px; border-radius:50%; background:#17181d; }
    .metric-ring svg { position:relative; width:12px; height:12px; fill:none; stroke:var(--c); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  /* Kosz: ikona w stylu wzorca, stan pusty / pełny. */
+  .app.trash .tile { background: linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04)); border: 1px solid rgba(255,255,255,0.1); color: #d4d4d8; }
+  .app.trash .tile svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+  .app.trash.full .tile { color: #fff; }
+  .app.trash .stripe { background: transparent; }
+  .app.trash.drop-target .tile { outline: 2px solid #f87171; outline-offset: 3px; }
 </style>
 </head>
 <body>
@@ -109,6 +115,8 @@ let lastKey = '';
 let icons = {};
 let snap = null;
 let stats = {};
+let trash = { items: 0 };
+let zoom = 1;
 let hoverTimer = null;
 let dockWidth = 0;
 const { emitTo } = window.__TAURI__.event;
@@ -133,6 +141,27 @@ function runIcon(a) {
   }
   return runIcons[a.id];
 }
+
+const trashSvg = (full) => `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13"/>${full ? '<path d="M9.5 11.5l.4 5M14.5 11.5l-.4 5M12 11v6"/>' : ''}</svg>`;
+function trashHtml() {
+  return `<span class="sep" aria-hidden="true"></span>
+    <button class="app trash ${trash.items ? 'full' : ''}" data-widget="trash" data-trash="1" data-id="trash" data-name="Kosz" aria-label="Kosz">
+      <span class="tile">${trashSvg(trash.items > 0)}</span>
+      <span class="stripe"></span>
+    </button>`;
+}
+const trashTip = () => `Kosz · ${trash.items ? `${trash.items} ${trash.items === 1 ? 'element' : 'elementów'}` : 'pusty'}\nKlik: otwórz · prawy klik: opróżnij`;
+async function refreshTrash() {
+  const next = await invoke('trash_info').catch(() => null);
+  if (!next || (next.items === trash.items)) return;
+  trash = next;
+  const b = dock.querySelector('.app.trash');
+  if (!b) return;
+  b.classList.toggle('full', trash.items > 0);
+  b.querySelector('.tile').innerHTML = trashSvg(trash.items > 0);
+}
+setInterval(refreshTrash, 15000);
+refreshTrash();
 
 function tile(a) {
   if (a.unpinned) {
@@ -299,7 +328,7 @@ function dropTarget(pos) {
   const r = window.devicePixelRatio || 1;
   const el = document.elementFromPoint(pos.x / r, pos.y / r);
   const app = el ? el.closest('.app') : null;
-  return app && !app.dataset.widget ? app : null;
+  return app && (!app.dataset.widget || app.dataset.trash) ? app : null;
 }
 function clearDrop() {
   for (const x of dock.querySelectorAll('.drop-target')) x.classList.remove('drop-target');
@@ -312,7 +341,8 @@ webview.onDragDropEvent((ev) => {
     const t = p.position && dropTarget(p.position);
     if (t) t.classList.add('drop-target'); else dock.classList.add('drop-add');
     // Podpis: co się stanie po upuszczeniu.
-    const label = t
+    const label = t && t.dataset.trash ? 'Przenieś do kosza'
+      : t
       ? (t.dataset.stack === '1' ? `Skopiuj do: ${t.dataset.name}` : `Otwórz w: ${t.dataset.name}`)
       : 'Przypnij do docka';
     const r = (t || dock).getBoundingClientRect();
@@ -323,7 +353,8 @@ webview.onDragDropEvent((ev) => {
     lastDropLabel = '';
     invoke('previews_hide');
     if (!p.paths?.length) return;
-    if (t) invoke('dock_open_with', { id: t.dataset.id, paths: p.paths }).catch((err) => console.warn(err));
+    if (t && t.dataset.trash) invoke('trash_drop', { paths: p.paths }).then(refreshTrash).catch((err) => console.warn(err));
+    else if (t) invoke('dock_open_with', { id: t.dataset.id, paths: p.paths }).catch((err) => console.warn(err));
     else invoke('dock_add_paths', { paths: p.paths }).catch((err) => console.warn(err));
   } else {
     clearDrop();
@@ -348,7 +379,7 @@ function cardsFor(s) {
   const widgets = s.dock.filter((a) => a.widget).length;
   const maxW = (screen.availWidth || 1920) * 0.78;
   const est = (s.dock.length - widgets) * 60 + widgets * 60 + withWin.length * 150;
-  return withWin.length <= 7 && est < maxW;
+  return withWin.length <= 7 && est * zoom < maxW;
 }
 function cardLabel(s, a) {
   const titles = (s.windowTitles || {})[a.exe] || [];
@@ -480,10 +511,12 @@ setInterval(tickCounts, 1000);
 
 function render(s) {
   if (dragging) return;
+  zoom = Math.max(0.7, Math.min(1.4, (s.dockScale || 100) / 100));
+  dock.style.setProperty('--z', zoom);
   const cards = cardsFor(s);
   const key = JSON.stringify(s.dock) + Object.keys(icons).length + Object.values(runIcons).filter(Boolean).length
     + (cards ? JSON.stringify(s.windowTitles) : '') + s.fgExe + cards
-    + JSON.stringify([s.focus, s.next, s.radio, s.quietUntil, s.weather, s.music && s.music.title, s.music && s.music.playing, s.clock]);
+    + JSON.stringify([s.dockScale, s.showTrash, s.focus, s.next, s.radio, s.quietUntil, s.weather, s.music && s.music.title, s.music && s.music.playing, s.clock]);
   if (key === lastKey) return;
   lastKey = key;
   dock.innerHTML = s.dock.map((a) => {
@@ -501,8 +534,26 @@ function render(s) {
         : a.badge ? `<span class="badge" aria-label="${a.badge} nowych">${a.badge > 99 ? '99+' : a.badge}</span>`
         : !card && (a.windows || a.running) ? `<span class="dots" aria-hidden="true">${'<i></i>'.repeat(Math.min(3, Math.max(1, a.windows || 1)))}</span>` : '')}
     </button>${a.separatorAfter ? '<span class="sep" aria-hidden="true"></span>' : ''}`;
-  }).join('') + metricsHtml();
+  }).join('') + (s.showTrash === false ? '' : trashHtml()) + metricsHtml();
   for (const b of dock.querySelectorAll('.app')) {
+    if (b.dataset.trash) {
+      b.onclick = () => { invoke('previews_hide'); invoke('trash_open'); };
+      b.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        invoke('previews_hide');
+        invoke('trash_empty').then(refreshTrash).catch((err) => console.warn(err));
+      };
+      b.onmouseenter = () => {
+        closeCard();
+        clearTimeout(hoverTimer);
+        emitTo('preview', 'preview-enter', null);
+        const r = b.getBoundingClientRect();
+        invoke('previews_tip', { text: trashTip(), anchor: r.left + r.width / 2 });
+      };
+      b.onmouseleave = () => { emitTo('preview', 'preview-leave', null); };
+      continue;
+    }
     const id = b.dataset.id;
     const isStack = b.dataset.stack === '1';
     // Widgety: klik → akcja (bez kółka, przeciągania i podglądów okien). Bez tooltipa —

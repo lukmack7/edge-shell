@@ -625,6 +625,8 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "showBubbles": cfg.shell.show_bubbles,
         "barStats": cfg.bar.stats,
         "showRail": cfg.shell.show_rail,
+        "dockScale": cfg.shell.dock_scale,
+        "showTrash": cfg.shell.show_trash,
         "clock": format!("{:02}:{:02}", now.hour(), now.minute()),
     })
 }
