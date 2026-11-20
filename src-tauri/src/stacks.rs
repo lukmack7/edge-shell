@@ -40,6 +40,7 @@ pub struct Item {
     pub name: String,
     pub path: String,
     pub dir: bool,
+    pub modified: i64,
     pub icon: Option<String>,
 }
 
@@ -90,10 +91,11 @@ fn read(dir: &str) -> (Vec<Item>, usize) {
     let items = all
         .into_iter()
         .take(MAX_ITEMS)
-        .map(|(_, p, d)| Item {
+        .map(|(t, p, d)| Item {
             name: p.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
             path: p.to_string_lossy().to_string(),
             dir: d,
+            modified: t.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs() as i64).unwrap_or_default(),
             icon: icon(&p, d),
         })
         .collect();

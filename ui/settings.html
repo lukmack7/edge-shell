@@ -175,7 +175,7 @@ let page = 'general';
 
 const uid = (name) => `${(name || 'app').toLowerCase().normalize('NFD').replace(/[^\w]+/g, '-').replace(/^-|-$/g, '').slice(0, 20) || 'app'}-${Math.random().toString(36).slice(2, 6)}`;
 const sw = (on, key) => `<button class="switch" role="switch" aria-checked="${on ? 'true' : 'false'}" data-sw="${key}"></button>`;
-const WIDGETS = [['', '— zwykła ikona —'], ['next-block', 'Następny blok z Horologa'], ['focus', 'Bieżący fokus'], ['radio', 'Radio (co gra)'], ['weather', 'Pogoda'], ['music', 'Muzyka (Spotify)'], ['countdown', 'Odliczanie']];
+const WIDGETS = [['', '— zwykła ikona —'], ['next-block', 'Następny blok z Horologa'], ['focus', 'Bieżący fokus'], ['radio', 'Radio (co gra)'], ['weather', 'Pogoda'], ['calendar', 'Kalendarz — dzisiejsza data'], ['music', 'Muzyka (Spotify)'], ['countdown', 'Odliczanie']];
 
 function get(path) { return path.split('.').reduce((o, k) => (o == null ? o : o[k]), cfg); }
 function set(path, value) {

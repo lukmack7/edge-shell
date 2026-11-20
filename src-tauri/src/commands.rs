@@ -215,7 +215,7 @@ fn dock_exe(app: &AppHandle, id: &str) -> Option<String> {
     })
 }
 
-/// Pliki upuszczone na ikonę: otwórz je w tej aplikacji (na stosie — skopiuj do folderu).
+/// Pliki upuszczone na ikonę: otwórz je w tej aplikacji (na stosie — przenieś do folderu).
 #[tauri::command]
 pub fn dock_open_with(app: AppHandle, id: String, paths: Vec<String>) -> Res<String> {
     let cfg = state::cfg(&app);
@@ -226,12 +226,25 @@ pub fn dock_open_with(app: AppHandle, id: String, paths: Vec<String>) -> Res<Str
             for p in &paths {
                 let src = std::path::Path::new(p);
                 if let Some(name) = src.file_name() {
-                    if src.is_file() && std::fs::copy(src, dir.join(name)).is_ok() {
+                    let dest = dir.join(name);
+                    // `rename` jest natychmiastowy na tym samym dysku; na
+                    // innym woluminie bezpiecznie kopiujemy i kasujemy źródło
+                    // dopiero po udanym zapisie. Nie nadpisujemy plików.
+                    let moved = if dest.exists() {
+                        false
+                    } else if std::fs::rename(src, &dest).is_ok() {
+                        true
+                    } else if src.is_file() && std::fs::copy(src, &dest).is_ok() {
+                        std::fs::remove_file(src).is_ok()
+                    } else {
+                        false
+                    };
+                    if moved {
                         n += 1;
                     }
                 }
             }
-            return Ok(format!("Skopiowano {n} do {}", a.name));
+            return Ok(format!("Przeniesiono {n} do {}", a.name));
         }
     }
     match dock_exe(&app, &id) {

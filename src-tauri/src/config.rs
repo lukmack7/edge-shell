@@ -488,7 +488,7 @@ pub struct DockApp {
     pub icon_path: String,
     /// Wstaw separator za tą ikoną.
     pub separator_after: bool,
-    /// Widget zamiast ikony: next-block | focus | radio | weather | music | countdown.
+    /// Widget zamiast ikony: next-block | focus | radio | weather | calendar | music | countdown.
     /// Puste = zwykła ikona aplikacji.
     pub widget: String,
     /// Cel widgetu — dla `countdown` identyfikator z listy, na razie nieużywany.

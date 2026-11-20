@@ -513,6 +513,12 @@ function widgetData(a, s) {
       return { emoji: w.emoji, chip: `${Math.round(w.temp)}°`, tone: hh >= 19 || hh < 6 ? 'night' : 'sky', label: `Pogoda: ${Math.round(w.temp)}°, ${w.text}`,
         city: w.label || w.text, dayName: dn, range: day ? `${day.hi}° / ${day.lo}°` : w.text };
     }
+    case 'calendar': {
+      const d = new Date();
+      const day = d.getDate();
+      const mon = d.toLocaleDateString('pl-PL', { month: 'short' }).replace('.', '');
+      return { ic: 'calendar', chip: String(day), tone: 'red', label: `Kalendarz: ${day} ${mon}` };
+    }
     case 'music': {
       const m = s.music;
       if (m && m.connected && m.title) return { ic: m.playing ? 'music' : 'pause', chip: '', tone: 'violet', art: m.art, eq: !!m.playing, playing: !!m.playing, title: m.title, artist: m.artist, label: `${m.playing ? 'Gra' : 'Pauza'}: ${m.title} — ${m.artist}` };
@@ -562,6 +568,7 @@ function widgetClick(a) {
   if (a.widget === 'radio') { invoke('radio_show_waiting').catch((err) => console.warn(err)); return; }
   if (a.widget === 'music') { invoke('player_toggle').catch((err) => console.warn(err)); return; }
   if (a.widget === 'weather') { invoke('weather_show').catch((err) => console.warn(err)); return; }
+  if (a.widget === 'calendar') { invoke('toggle_calendar').catch((err) => console.warn(err)); return; }
   invoke('toggle_panel', { label: 'now' }).catch((err) => console.warn(err));
 }
 
