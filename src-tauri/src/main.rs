@@ -36,6 +36,7 @@ mod stacks;
 mod mail;
 mod weather;
 mod trash;
+mod downloads;
 
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
@@ -90,6 +91,7 @@ fn main() {
             engine::start(handle.clone());
             notifications::start(handle.clone());
             stats::start(handle.clone());
+            downloads::start(handle.clone());
             if cfg.shell.tray_in_rail {
                 let h = handle.clone();
                 tray::start(Box::new(move || {

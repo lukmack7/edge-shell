@@ -301,6 +301,21 @@ fn dock_app_for(app: &AppHandle, aumid: &str, source: &str) -> Option<String> {
         .map(|a| a.id.clone())
 }
 
+/// Działająca aplikacja spoza docka (`run:exe`), do której należy powiadomienie.
+fn running_app_for(app: &AppHandle, aumid: &str, source: &str) -> Option<String> {
+    let aumid = aumid.to_lowercase();
+    let source = source.to_lowercase();
+    state::read(app, |rt| {
+        rt.open_apps
+            .iter()
+            .find(|o| {
+                let stem = o.exe.trim_end_matches(".exe").trim_start_matches("ms-").to_lowercase();
+                stem.len() >= 3 && (aumid.contains(&stem) || source == stem || o.name.to_lowercase() == source)
+            })
+            .map(|o| format!("run:{}", o.exe))
+    })
+}
+
 fn rule<'a>(rules: &'a [NotifApp], aumid: &str, name: &str) -> Option<&'a NotifApp> {
     rules.iter().find(|r| {
         let m = r.matches.to_lowercase();
@@ -384,7 +399,9 @@ pub fn start(app: AppHandle) {
                     for raw in rows {
                         last_id = last_id.max(raw.id);
                         if let Some(msg) = to_radio(&app, &raw) {
-                            if let Some(id) = dock_app_for(&app, &raw.aumid, msg.app.as_deref().unwrap_or("")) {
+                            let source = msg.app.as_deref().unwrap_or("");
+                            // Najpierw ikona przypięta w docku, potem działająca aplikacja spoza docka (np. Teams).
+                            if let Some(id) = dock_app_for(&app, &raw.aumid, source).or_else(|| running_app_for(&app, &raw.aumid, source)) {
                                 state::update(&app, false, |rt| *rt.badges.entry(id).or_insert(0) += 1);
                             }
                             radio::deliver(&app, msg);

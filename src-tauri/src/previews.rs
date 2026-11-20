@@ -128,7 +128,7 @@ pub fn previews_tip(app: AppHandle, text: String, anchor: f64) {
     let (Some(pv), Some(dock)) = (app.get_webview_window("preview"), app.get_webview_window("dock")) else { return };
     clear_thumbs();
     let scale = dock.scale_factor().unwrap_or(1.0);
-    let lines = text.lines().count().max(1) as f64;
+    let lines = text.lines().map(|l| l.chars().count() / 44 + 1).sum::<usize>().max(1) as f64;
     let (w, h) = (320.0 * scale, (24.0 + 16.0 * lines) * scale);
     let dpos = dock.outer_position().unwrap_or(PhysicalPosition::new(0, 0));
     let x = dpos.x as f64 + anchor * scale - w / 2.0;
