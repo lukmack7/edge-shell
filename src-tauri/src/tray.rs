@@ -67,6 +67,10 @@ mod imp {
     static PNG: Mutex<Option<HashMap<isize, Option<String>>>> = Mutex::new(None);
     static OUR: AtomicIsize = AtomicIsize::new(0);
     static TASKBAR_CREATED: AtomicU32 = AtomicU32::new(0);
+    /// Po starcie razem z Windows Explorer i aplikacje mogą jeszcze nie być
+    /// gotowe na pierwsze `TaskbarCreated`. Kilka kontrolowanych ponowień
+    /// przywraca ikony bez konieczności restartowania Edge Shell.
+    static ANNOUNCE_TICK: AtomicU32 = AtomicU32::new(0);
     static NOTIFY: OnceLock<Box<dyn Fn() + Send + Sync>> = OnceLock::new();
 
     fn changed() {
@@ -193,6 +197,16 @@ mod imp {
             if removed {
                 changed();
             }
+            let tick = ANNOUNCE_TICK.fetch_add(1, Ordering::SeqCst) + 1;
+            // 3 s, 7.5 s i 15 s po utworzeniu naszego Shell_TrayWnd.
+            // NIM_ADD jest identyfikowany przez hwnd/uid, więc aplikacje nie
+            // dostaną zdublowanych pozycji w wewnętrznej liście.
+            if matches!(tick, 2 | 5 | 10) {
+                let tc = TASKBAR_CREATED.load(Ordering::SeqCst);
+                if tc != 0 {
+                    let _ = PostMessageW(HWND_BROADCAST, tc, WPARAM(0), LPARAM(0));
+                }
+            }
             return LRESULT(0);
         }
         if msg == WM_STOP {
@@ -240,6 +254,7 @@ mod imp {
                 return;
             };
             OUR.store(hwnd.0 as isize, Ordering::SeqCst);
+            ANNOUNCE_TICK.store(0, Ordering::SeqCst);
             let _ = SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
             SetTimer(hwnd, 1, 1500, None);
 

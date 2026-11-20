@@ -1,4 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+// Duże makra `json!` (snapshot) potrzebują głębszej rekursji niż domyślne 128.
+#![recursion_limit = "512"]
 
 mod commands;
 mod config;
@@ -33,6 +35,9 @@ mod backup;
 mod stacks;
 mod mail;
 mod weather;
+mod trash;
+mod downloads;
+mod dock_drop;
 
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
@@ -55,8 +60,20 @@ fn main() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(hotkeys::plugin())
         .manage(shared)
+        .on_page_load(|webview, payload| {
+            if webview.label() == "dock"
+                && matches!(payload.event(), tauri::webview::PageLoadEvent::Finished)
+            {
+                dock_drop::page_loaded();
+            }
+        })
         .setup(|app| {
             let handle = app.handle().clone();
+            // WebView2 musi zobaczyć widoczne okno przy rejestracji drop targetu.
+            // arrange poniżej nadal decyduje, czy dock ma pozostać widoczny.
+            if let Some(dock) = app.get_webview_window("dock") {
+                dock_drop::attach(&dock);
+            }
             // Zapamiętaj pierwotny stan paska zadań (do przywrócenia przy wyjściu).
             if !state::read(&handle, |rt| rt.store.taskbar_saved) {
                 let original = sys::taskbar_state();
@@ -87,6 +104,7 @@ fn main() {
             engine::start(handle.clone());
             notifications::start(handle.clone());
             stats::start(handle.clone());
+            downloads::start(handle.clone());
             if cfg.shell.tray_in_rail {
                 let h = handle.clone();
                 tray::start(Box::new(move || {
@@ -186,6 +204,7 @@ fn main() {
             settings::get_config,
             settings::save_config,
             settings::open_settings,
+            settings::restart_app,
             settings::pick_path,
             settings::horolog_test,
             settings::get_stats,
@@ -193,18 +212,31 @@ fn main() {
             settings::toggle_mute,
             settings::set_brightness,
             settings::get_brightness,
+            settings::weather_refresh,
+            weather::weather_show,
             icons::dock_icons,
             icons::app_icon,
             commands::launch_new,
             commands::dock_pin,
+            commands::dock_unpin,
+            commands::dock_close_windows,
+            commands::dock_quick_action,
             commands::dock_cycle,
             commands::dock_reorder,
             commands::dock_open_with,
             commands::dock_add_paths,
+            dock_drop::dock_drop_trace,
             previews::previews_show,
             previews::previews_layout,
             previews::previews_hide,
             previews::previews_tip,
+            previews::previews_metric,
+            trash::trash_info,
+            trash::trash_open,
+            trash::trash_empty,
+            trash::trash_drop,
+            previews::previews_metric_fit,
+            previews::previews_context,
             previews::window_activate,
             previews::window_close,
             insights::get_week,

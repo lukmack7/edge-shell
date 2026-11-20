@@ -68,6 +68,15 @@ pub fn open_settings(app: AppHandle) {
     }
 }
 
+#[tauri::command]
+pub fn restart_app(app: AppHandle, webview: tauri::Webview) -> Res<()> {
+    if webview.label() != "settings" {
+        return Err("Restart jest dostępny tylko w ustawieniach".into());
+    }
+    app.request_restart();
+    Ok(())
+}
+
 /// Okno wyboru pliku (programu) albo folderu.
 #[tauri::command]
 pub async fn pick_path(app: AppHandle, folder: bool, images: Option<bool>) -> Option<String> {
@@ -124,6 +133,12 @@ pub fn set_brightness(_app: AppHandle, level: u8) {
 #[tauri::command]
 pub async fn get_brightness() -> Option<u8> {
     tauri::async_runtime::spawn_blocking(sys::get_brightness).await.ok().flatten()
+}
+
+/// Odświeżenie pogody na żądanie (Ustawienia → Pogoda).
+#[tauri::command]
+pub async fn weather_refresh(app: AppHandle) {
+    crate::weather::refresh(app).await;
 }
 
 #[tauri::command]

@@ -92,6 +92,9 @@ fn open_target(app: &AppHandle, path: &str, args: &[String]) -> Res<()> {
 /// Uruchamia aplikację z docka. Wyciszona w bieżącym trybie → żółta flaga.
 #[tauri::command]
 pub fn launch(app: AppHandle, id: String) -> Res<String> {
+    if state::read(&app, |rt| rt.badges.contains_key(&id)) {
+        state::update(&app, false, |rt| rt.badges.remove(&id));
+    }
     // Otwarta aplikacja spoza docka: przejdź do jej okna (kolejne kliknięcia — następne okna).
     if id.starts_with("run:") {
         let wins = crate::previews::windows_of(&app, &id);
@@ -215,46 +218,83 @@ fn dock_exe(app: &AppHandle, id: &str) -> Option<String> {
     })
 }
 
-/// Pliki upuszczone na ikonę: otwórz je w tej aplikacji (na stosie — skopiuj do folderu).
+/// Pliki upuszczone na ikonę: otwórz je w tej aplikacji (na stosie — przenieś do folderu).
+/// Zwraca krótki komunikat dla użytkownika.
 #[tauri::command]
 pub fn dock_open_with(app: AppHandle, id: String, paths: Vec<String>) -> Res<String> {
     let cfg = state::cfg(&app);
+    let name = cfg.dock.iter().find(|a| a.id == id).map(|a| a.name.clone()).unwrap_or_else(|| id.clone());
     if let Some(a) = cfg.dock.iter().find(|a| a.id == id) {
         if crate::stacks::is_folder(&a.path) {
             let dir = std::path::PathBuf::from(expand_env(a.path.trim()));
             let mut n = 0;
             for p in &paths {
                 let src = std::path::Path::new(p);
-                if let Some(name) = src.file_name() {
-                    if src.is_file() && std::fs::copy(src, dir.join(name)).is_ok() {
+                if let Some(file) = src.file_name() {
+                    let dest = dir.join(file);
+                    // `rename` jest natychmiastowy na tym samym dysku; na innym woluminie
+                    // kopiujemy i kasujemy źródło dopiero po udanym zapisie. Nie nadpisujemy plików.
+                    let moved = if dest.exists() {
+                        false
+                    } else if std::fs::rename(src, &dest).is_ok() {
+                        true
+                    } else if src.is_file() && std::fs::copy(src, &dest).is_ok() {
+                        std::fs::remove_file(src).is_ok()
+                    } else {
+                        false
+                    };
+                    if moved {
                         n += 1;
                     }
                 }
             }
-            return Ok(format!("Skopiowano {n} do {}", a.name));
+            return if n > 0 {
+                Ok(format!("Przeniesiono {n} do: {}", a.name))
+            } else {
+                Err(format!("Nie przeniesiono do {}: plik już tam jest albo brak dostępu", a.name))
+            };
         }
     }
     match dock_exe(&app, &id) {
         Some(exe) => {
-            std::process::Command::new(&exe).args(&paths).spawn().map_err(|e| e.to_string())?;
-            Ok("ok".into())
+            std::process::Command::new(&exe).args(&paths).spawn().map_err(|e| format!("Nie mogę uruchomić {name}: {e}"))?;
+            Ok(format!("Otwarto w: {name}"))
         }
         None => {
             for p in &paths {
                 open_target(&app, p, &[])?;
             }
-            Ok("ok".into())
+            Ok(format!("Otwarto plik domyślną aplikacją ({name} nie ma pliku .exe)"))
         }
     }
 }
 
-/// Pliki upuszczone na pusty fragment docka: przypnij (program, skrót, folder = stos, plik).
+/// Rozszerzenia, które przypinamy jako aplikacje; zwykłe dokumenty nie trafiają do docka.
+fn pinnable(path: &std::path::Path) -> bool {
+    if path.is_dir() {
+        return true;
+    }
+    path.extension()
+        .map(|e| e.to_string_lossy().to_lowercase())
+        .is_some_and(|e| matches!(e.as_str(), "exe" | "lnk" | "url" | "appref-ms" | "bat" | "cmd"))
+}
+
+/// Pliki upuszczone na pusty fragment docka: przypnij program, skrót albo folder (stos).
 #[tauri::command]
-pub fn dock_add_paths(app: AppHandle, paths: Vec<String>) -> Res<()> {
+pub fn dock_add_paths(app: AppHandle, paths: Vec<String>) -> Res<String> {
     let mut cfg = state::cfg(&app);
     let category = cfg.sections.last().map(|s| s.id.clone()).unwrap_or_else(|| "system".into());
+    let mut added: Vec<String> = Vec::new();
+    let mut skipped = 0;
     for p in paths {
         let path = std::path::Path::new(&p);
+        if !pinnable(path) {
+            skipped += 1;
+            continue;
+        }
+        if cfg.dock.iter().any(|a| a.path.eq_ignore_ascii_case(&p)) {
+            continue;
+        }
         let stem = path.file_stem().map(|s| s.to_string_lossy().to_string()).unwrap_or_else(|| p.clone());
         let base: String = stem.to_lowercase().chars().filter(|c| c.is_alphanumeric()).take(20).collect();
         let mut id = if base.is_empty() { "plik".to_string() } else { base };
@@ -264,15 +304,24 @@ pub fn dock_add_paths(app: AppHandle, paths: Vec<String>) -> Res<()> {
         let process = if p.to_lowercase().ends_with(".exe") { platform::exe_name(&p) } else { String::new() };
         cfg.dock.push(crate::config::DockApp {
             id,
-            name: stem,
+            name: stem.clone(),
             path: p,
             category: category.clone(),
             icon: "auto".into(),
             process,
             ..crate::config::DockApp::default()
         });
+        added.push(stem);
     }
-    crate::settings::save_config(app, cfg)
+    if added.is_empty() {
+        return Err(if skipped > 0 {
+            "Do docka przypinam programy (.exe), skróty (.lnk) i foldery. Upuść plik na ikonę aplikacji, żeby go otworzyć.".into()
+        } else {
+            "Ta pozycja jest już w docku".into()
+        });
+    }
+    crate::settings::save_config(app, cfg)?;
+    Ok(format!("Przypięto: {}", added.join(", ")))
 }
 
 /// Przypina otwartą aplikację do docka (prawy klik na jej ikonie).
@@ -298,6 +347,51 @@ pub fn dock_pin(app: AppHandle, exe: String) -> Res<()> {
         ..crate::config::DockApp::default()
     });
     crate::settings::save_config(app, cfg)
+}
+
+/// Odpina aplikację z docka, ale nie zamyka jej okien.
+#[tauri::command]
+pub fn dock_unpin(app: AppHandle, id: String) -> Res<()> {
+    let mut cfg = state::cfg(&app);
+    let before = cfg.dock.len();
+    cfg.dock.retain(|a| a.id != id);
+    if cfg.dock.len() == before {
+        return Err("aplikacja nie jest przypięta".into());
+    }
+    crate::settings::save_config(app, cfg)
+}
+
+/// Zamyka wszystkie okna należące do danej ikony docka.
+#[tauri::command]
+pub fn dock_close_windows(app: AppHandle, id: String) -> usize {
+    let wins = crate::previews::windows_of(&app, &id);
+    let n = wins.len();
+    for w in wins {
+        crate::sys::close_window(w.hwnd);
+    }
+    n
+}
+
+/// Szybkie akcje menu kontekstowego: Outlook, przeglądarki i Teams.
+#[tauri::command]
+pub fn dock_quick_action(app: AppHandle, id: String, action: String) -> Res<()> {
+    let exe = dock_exe(&app, &id).ok_or("nie znam pliku aplikacji")?;
+    let lower = exe.to_lowercase();
+    match action.as_str() {
+        // Klasyczny Outlook obsługuje formularze MAPI. Przy nowym Outlooku
+        // `mailto:` jest bezpiecznym fallbackiem dla nowej wiadomości.
+        "outlook-mail" if lower.ends_with("outlook.exe") => open_target(&app, &exe, &["/c".into(), "ipm.note".into()]),
+        "outlook-meeting" if lower.ends_with("outlook.exe") => open_target(&app, &exe, &["/c".into(), "ipm.appointment".into()]),
+        "outlook-contact" if lower.ends_with("outlook.exe") => open_target(&app, &exe, &["/c".into(), "ipm.contact".into()]),
+        "outlook-task" if lower.ends_with("outlook.exe") => open_target(&app, &exe, &["/c".into(), "ipm.task".into()]),
+        "outlook-mail" => open_target(&app, "mailto:", &[]),
+        "browser-tab" => open_target(&app, &exe, &["--new-tab".into()]),
+        "browser-window" => open_target(&app, &exe, &["--new-window".into()]),
+        "browser-private" => open_target(&app, &exe, &["--incognito".into()]),
+        "teams-chat" => open_target(&app, "msteams:/l/chat/0/0", &[]),
+        "teams-meeting" => open_target(&app, "msteams:/l/meeting/new", &[]),
+        _ => Err("ta akcja nie jest dostępna dla tej aplikacji".into()),
+    }
 }
 
 #[tauri::command]

@@ -107,11 +107,13 @@ pub struct WeatherCfg {
     pub lon: String,
     /// Podpis kafelka, np. `Kraków`.
     pub label: String,
+    /// Podgląd po najechaniu na kafelek: `h3` | `h6` | `h9` | `days`.
+    pub preview: String,
 }
 
 impl Default for WeatherCfg {
     fn default() -> Self {
-        Self { lat: String::new(), lon: String::new(), label: String::new() }
+        Self { lat: String::new(), lon: String::new(), label: String::new(), preview: "h6".into() }
     }
 }
 
@@ -486,7 +488,7 @@ pub struct DockApp {
     pub icon_path: String,
     /// Wstaw separator za tą ikoną.
     pub separator_after: bool,
-    /// Widget zamiast ikony: next-block | focus | radio | weather | music | countdown.
+    /// Widget zamiast ikony: next-block | focus | radio | weather | calendar | music | countdown.
     /// Puste = zwykła ikona aplikacji.
     pub widget: String,
     /// Cel widgetu — dla `countdown` identyfikator z listy, na razie nieużywany.
@@ -586,6 +588,10 @@ pub struct ShellCfg {
     pub notch: bool,
     /// Prawa szyna z planem dnia (gdy notch zastępuje górny pasek).
     pub day_rail: bool,
+    /// Skala docka w procentach (70–140): ikony, widgety i wysokość okna.
+    pub dock_scale: u32,
+    /// Kosz na końcu docka (klik: otwórz, prawy klik: opróżnij, upuszczenie pliku: do kosza).
+    pub show_trash: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -786,6 +792,8 @@ impl Default for ShellCfg {
             hide_in_fullscreen: true,
             notch: true,
             day_rail: true,
+            dock_scale: 100,
+            show_trash: true,
         }
     }
 }

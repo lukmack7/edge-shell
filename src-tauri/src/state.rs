@@ -345,6 +345,8 @@ pub struct Runtime {
     pub notif_status: String,
     /// Nieprzeczytane powiadomienia na ikonach docka (id aplikacji → liczba).
     pub badges: HashMap<String, u32>,
+    /// Trwające pobieranie z przeglądarki (pasek postępu na ikonie docka).
+    pub download: Option<crate::downloads::DownloadInfo>,
     /// Uruchomione aplikacje z oknami, których nie ma w docku (w kolejności otwarcia).
     pub open_apps: Vec<OpenApp>,
     /// Tytuły okien per plik .exe (do kart w docku).
@@ -483,7 +485,11 @@ pub fn snapshot(app: &AppHandle) -> Value {
             } else {
                 (false, 0usize, 0u32, false, Vec::new())
             };
+            let dl_target = a.widget.is_empty()
+                && ((stack && crate::downloads::is_downloads_dir(&a.path))
+                    || exes.iter().any(|e| crate::downloads::BROWSERS.contains(&e.as_str())));
             json!({
+                "dlTarget": dl_target,
                 "id": a.id, "name": a.name, "icon": a.icon, "category": a.category,
                 "bg": bg, "fg": fg, "stripe": stripe,
                 "dim": mode.dim.iter().any(|d| d == &a.id),
@@ -504,7 +510,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
                 "id": format!("run:{}", o.exe), "name": o.name, "icon": "auto", "category": "",
                 "bg": "#27272a", "fg": "#e4e4e7", "stripe": "rgba(255,255,255,0.35)",
                 "dim": false, "running": true, "windows": o.windows, "separatorAfter": false,
-                "badge": 0, "stack": false, "unpinned": true, "path": o.path, "exe": o.exe,
+                "badge": rt.badges.get(&format!("run:{}", o.exe)).copied().unwrap_or(0), "stack": false, "unpinned": true, "path": o.path, "exe": o.exe,
             }));
         }
     }
@@ -597,11 +603,13 @@ pub fn snapshot(app: &AppHandle) -> Value {
             json!({ "name": p.name, "path": p.path, "stripe": stripe })
         }).collect::<Vec<_>>(),
         "recent": rt.recent,
+        "download": rt.download,
         "clipboard": rt.clipboard,
         "app": rt.foreground,
         "battery": rt.battery.map(|(p, c)| json!({ "percent": p, "charging": c })),
         "music": rt.music,
         "weather": rt.weather,
+        "wpreview": cfg.weather.preview,
         "spotifyEnabled": !cfg.spotify.client_id.is_empty(),
         "player": rt.store.player,
         "quietUntil": rt.store.quiet_until,
@@ -624,6 +632,8 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "showBubbles": cfg.shell.show_bubbles,
         "barStats": cfg.bar.stats,
         "showRail": cfg.shell.show_rail,
+        "dockScale": cfg.shell.dock_scale,
+        "showTrash": cfg.shell.show_trash,
         "clock": format!("{:02}:{:02}", now.hour(), now.minute()),
     })
 }
