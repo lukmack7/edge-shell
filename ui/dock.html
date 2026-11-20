@@ -395,16 +395,15 @@ dock.addEventListener('mouseleave', () => {
 });
 
 // Upuszczanie plików z Eksploratora: na ikonę = otwórz w tej aplikacji
-// (na stos = skopiuj do folderu), na pusty fragment docka = przypnij.
-// Zdarzenia upuszczenia należą do *okna* WebView2, nie do obiektu osadzonego
-// webview. Przy pojedynczym WebviewWindow (jak dock) `webview` nie odbierał
-// ich niezawodnie na Windows. To jest API wskazane przez Tauri dla plików.
-const dropWindow = window.__TAURI__.webviewWindow.getCurrentWebviewWindow();
-function dropTarget(pos) {
+// (na stos = przenieś do folderu), na pusty fragment docka = przypnij.
+const traceDrop = (stage) => invoke('dock_drop_trace', { stage }).catch(console.warn);
+function dropHit(pos) {
+  if (!pos) return {};
   const r = window.devicePixelRatio || 1;
   const el = document.elementFromPoint(pos.x / r, pos.y / r);
-  const app = el ? el.closest('.app') : null;
-  return app && (!app.dataset.widget || app.dataset.trash) ? app : null;
+  const app = el?.closest('.app');
+  return { target: app && (!app.dataset.widget || app.dataset.trash) ? app : null,
+    pin: el === dock || !!el?.closest('#dock .sep') };
 }
 function clearDrop() {
   for (const x of dock.querySelectorAll('.drop-target')) x.classList.remove('drop-target');
@@ -417,41 +416,49 @@ function dropToast(text, anchor, error = false) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => invoke('previews_hide'), error ? 4200 : 2200);
 }
-dropWindow.onDragDropEvent((ev) => {
-  const p = ev.payload;
+let externalDrag = false;
+listen('dock-native-drop', (p) => {
+  const { target: t, pin } = dropHit(p.position);
   if (p.type === 'over' || p.type === 'enter') {
-    clearTimeout(toastTimer);
+    if (!externalDrag) {
+      externalDrag = true;
+      clearTimeout(hoverTimer);
+      clearTimeout(toastTimer);
+      // Osobne okno podglądu nie może przejąć kursora podczas przeciągania.
+      invoke('previews_hide');
+    }
     clearDrop();
-    const t = p.position && dropTarget(p.position);
-    if (t) t.classList.add('drop-target'); else dock.classList.add('drop-add');
-    // Podpis: co się stanie po upuszczeniu.
-    const label = t && t.dataset.trash ? 'Przenieś do kosza'
-      : t
-      ? (t.dataset.stack === '1' ? `Przenieś do: ${t.dataset.name}` : `Otwórz w: ${t.dataset.name}`)
-      : 'Przypnij do docka';
-    const r = (t || dock).getBoundingClientRect();
-    if (label !== lastDropLabel) { lastDropLabel = label; invoke('previews_tip', { text: label, anchor: r.left + r.width / 2 }); }
+    if (t) t.classList.add('drop-target'); else if (pin) dock.classList.add('drop-add');
   } else if (p.type === 'drop') {
-    const t = p.position && dropTarget(p.position);
+    traceDrop('ui:drop');
+    externalDrag = false;
     const r = (t || dock).getBoundingClientRect();
     const anchor = r.left + r.width / 2;
     clearDrop();
-    lastDropLabel = '';
+    if (!t && !pin) {
+      traceDrop('ui:outside');
+      dropToast('Upuść plik na ikonę aplikacji albo skrót na wolny fragment docka.', anchor, true);
+      return;
+    }
     if (!p.paths?.length) {
+      traceDrop('ui:no-paths');
       dropToast('Windows nie przekazał ścieżki pliku. Przeciągnij plik albo skrót .exe/.lnk z Eksploratora lub pulpitu (elementy z menu Start i paska zadań nie mają ścieżki).', anchor, true);
       return;
     }
+    traceDrop(t?.dataset.trash ? 'action:trash' : !t ? 'action:pin' : t.dataset.stack === '1' ? 'action:folder' : 'action:open');
     const run = t && t.dataset.trash ? invoke('trash_drop', { paths: p.paths }).then((n) => `Do kosza: ${n}`).finally(refreshTrash)
       : t ? invoke('dock_open_with', { id: t.dataset.id, paths: p.paths })
       : invoke('dock_add_paths', { paths: p.paths });
-    run.then((msg) => dropToast(msg, anchor)).catch((err) => dropToast(String(err), anchor, true));
+    run.then((msg) => { traceDrop('action:ok'); dropToast(msg, anchor); })
+      .catch((err) => { traceDrop('action:error'); dropToast(String(err), anchor, true); });
   } else {
+    externalDrag = false;
     clearDrop();
-    lastDropLabel = '';
-    invoke('previews_hide');
   }
+}).then(() => traceDrop('ui:ready')).catch((err) => {
+  console.warn('Nasłuch upuszczania w docku:', err);
+  traceDrop('ui:listen-error');
 });
-let lastDropLabel = '';
 // Wysunięcie docka (autoukrywanie): krótki wjazd od dołu.
 listen('dock-reveal', () => {
   dock.classList.remove('reveal');
@@ -758,6 +765,7 @@ function render(s) {
     };
     // Najechanie: po chwili żywe podglądy okien tej aplikacji.
     b.onmouseenter = () => {
+      if (externalDrag) return;
       closeCard();
       clearTimeout(hoverTimer);
       emitTo('preview', 'preview-enter', null);

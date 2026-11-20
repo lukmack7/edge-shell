@@ -37,6 +37,7 @@ mod mail;
 mod weather;
 mod trash;
 mod downloads;
+mod dock_drop;
 
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
@@ -61,6 +62,9 @@ fn main() {
         .manage(shared)
         .setup(|app| {
             let handle = app.handle().clone();
+            if let Some(dock) = app.get_webview_window("dock") {
+                dock_drop::attach(&dock);
+            }
             // Zapamiętaj pierwotny stan paska zadań (do przywrócenia przy wyjściu).
             if !state::read(&handle, |rt| rt.store.taskbar_saved) {
                 let original = sys::taskbar_state();
@@ -211,6 +215,7 @@ fn main() {
             commands::dock_reorder,
             commands::dock_open_with,
             commands::dock_add_paths,
+            dock_drop::dock_drop_trace,
             previews::previews_show,
             previews::previews_layout,
             previews::previews_hide,
