@@ -204,6 +204,7 @@ fn main() {
             commands::dock_pin,
             commands::dock_unpin,
             commands::dock_close_windows,
+            commands::dock_quick_action,
             commands::dock_cycle,
             commands::dock_reorder,
             commands::dock_open_with,

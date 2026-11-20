@@ -323,6 +323,28 @@ pub fn dock_close_windows(app: AppHandle, id: String) -> usize {
     n
 }
 
+/// Szybkie akcje menu kontekstowego: Outlook, przeglądarki i Teams.
+#[tauri::command]
+pub fn dock_quick_action(app: AppHandle, id: String, action: String) -> Res<()> {
+    let exe = dock_exe(&app, &id).ok_or("nie znam pliku aplikacji")?;
+    let lower = exe.to_lowercase();
+    match action.as_str() {
+        // Klasyczny Outlook obsługuje formularze MAPI. Przy nowym Outlooku
+        // `mailto:` jest bezpiecznym fallbackiem dla nowej wiadomości.
+        "outlook-mail" if lower.ends_with("outlook.exe") => open_target(&app, &exe, &["/c".into(), "ipm.note".into()]),
+        "outlook-meeting" if lower.ends_with("outlook.exe") => open_target(&app, &exe, &["/c".into(), "ipm.appointment".into()]),
+        "outlook-contact" if lower.ends_with("outlook.exe") => open_target(&app, &exe, &["/c".into(), "ipm.contact".into()]),
+        "outlook-task" if lower.ends_with("outlook.exe") => open_target(&app, &exe, &["/c".into(), "ipm.task".into()]),
+        "outlook-mail" => open_target(&app, "mailto:", &[]),
+        "browser-tab" => open_target(&app, &exe, &["--new-tab".into()]),
+        "browser-window" => open_target(&app, &exe, &["--new-window".into()]),
+        "browser-private" => open_target(&app, &exe, &["--incognito".into()]),
+        "teams-chat" => open_target(&app, "msteams:/l/chat/0/0", &[]),
+        "teams-meeting" => open_target(&app, "msteams:/l/meeting/new", &[]),
+        _ => Err("ta akcja nie jest dostępna dla tej aplikacji".into()),
+    }
+}
+
 #[tauri::command]
 pub fn launch_force(app: AppHandle) -> Res<()> {
     let id = state::update(&app, false, |rt| rt.friction_app.take());

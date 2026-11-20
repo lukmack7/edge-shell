@@ -33,9 +33,13 @@ pub struct ContextItem {
     pub action: String,
     pub label: String,
     #[serde(default)]
+    pub value: Option<String>,
+    #[serde(default)]
     pub danger: bool,
     #[serde(default)]
     pub separator: bool,
+    #[serde(default)]
+    pub section: bool,
 }
 
 /// Okna danej aplikacji z docka (po nazwie procesu albo pliku .exe).
@@ -182,8 +186,13 @@ pub fn previews_context(app: AppHandle, anchor: f64, items: Vec<ContextItem>) {
     crate::layout::DOCK_HOLD.store(true, std::sync::atomic::Ordering::Relaxed);
     let scale = dock.scale_factor().unwrap_or(1.0);
     let s = crate::layout::screen(&app);
-    let w = 244.0 * scale;
-    let h = ((items.len() as f64 * 34.0) + 18.0) * scale;
+    let w = 340.0 * scale;
+    let logical_h: f64 = items
+        .iter()
+        .map(|item| if item.section { 24.0 } else { 34.0 } + if item.separator { 6.0 } else { 0.0 })
+        .sum::<f64>()
+        + 12.0;
+    let h = logical_h * scale;
     let dpos = dock.outer_position().unwrap_or(PhysicalPosition::new(0, 0));
     let x = (dpos.x as f64 + anchor * scale - w / 2.0).clamp(0.0, (s.monitor.right as f64 - w).max(0.0));
     let y = (dpos.y as f64 - h + 8.0 * scale).max(s.monitor.top as f64 + 6.0 * scale);

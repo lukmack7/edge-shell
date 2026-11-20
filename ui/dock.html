@@ -128,10 +128,45 @@ function showAppContext(app, button) {
   clearTimeout(hoverTimer);
   invoke('previews_hide');
   const pinned = !app.unpinned && !app.id.startsWith('run:');
-  const items = [
+  const key = `${app.id} ${app.name} ${app.process || ''}`.toLowerCase();
+  const section = (label, separator = false) => ({ action: '', label, section: true, separator });
+  const items = [];
+  // Excel i inne aplikacje biurowe: ostatnie dokumenty z Windows Recent.
+  if (/excel|\.xls/.test(key)) {
+    const docs = (snap?.recent || []).filter((r) => /\.(xlsx?|xlsm|xlsb|csv)$/i.test(r.path)).slice(0, 8);
+    if (docs.length) {
+      items.push(section('OSTATNIE'));
+      items.push(...docs.map((r) => ({ action: 'recent', label: r.name, value: r.path })));
+    }
+  }
+  // Outlook: równoważnik sekcji „Zadania” z menu Windows.
+  if (/outlook|\bolk\b/.test(key)) {
+    items.push(section('ZADANIA', items.length > 0));
+    items.push(
+      { action: 'quick:outlook-mail', label: 'Nowa wiadomość e-mail' },
+      { action: 'quick:outlook-meeting', label: 'Nowe spotkanie' },
+      { action: 'quick:outlook-contact', label: 'Nowy kontakt' },
+      { action: 'quick:outlook-task', label: 'Nowe zadanie' },
+    );
+  }
+  // Vivaldi i inne przeglądarki: szybkie działania zamiast sztywnej listy stron.
+  if (/vivaldi|chrome|msedge|firefox|browser/.test(key)) {
+    items.push(section('SZYBKIE DZIAŁANIA', items.length > 0));
+    items.push(
+      { action: 'quick:browser-tab', label: 'Nowa karta' },
+      { action: 'quick:browser-window', label: 'Nowe okno' },
+      { action: 'quick:browser-private', label: 'Nowe okno prywatne' },
+    );
+  }
+  if (/teams|msteams/.test(key)) {
+    items.push(section('ZADANIA', items.length > 0));
+    items.push({ action: 'quick:teams-chat', label: 'Nowa rozmowa' }, { action: 'quick:teams-meeting', label: 'Nowe spotkanie' });
+  }
+  items.push(section('APLIKACJA', items.length > 0));
+  items.push(
     { action: 'open', label: app.windows ? `Przełącz na ${app.name}` : `Otwórz ${app.name}` },
     { action: 'new', label: 'Otwórz nowe okno' },
-  ];
+  );
   if (app.windows) items.push({ action: 'close', label: `Zamknij ${app.windows === 1 ? 'okno' : 'wszystkie okna'}`, danger: true, separator: true });
   items.push(pinned
     ? { action: 'unpin', label: 'Odepnij od docka', separator: !app.windows }
@@ -140,7 +175,7 @@ function showAppContext(app, button) {
   invoke('previews_context', { anchor: r.left + r.width / 2, items }).catch((err) => console.warn(err));
 }
 
-listen('dock-context-action', ({ action }) => {
+listen('dock-context-action', ({ action, value }) => {
   const app = contextApp;
   contextApp = null;
   if (!app) return;
@@ -149,6 +184,8 @@ listen('dock-context-action', ({ action }) => {
   if (action === 'close') invoke('dock_close_windows', { id: app.id }).catch((err) => console.warn(err));
   if (action === 'pin') invoke('dock_pin', { exe: app.id.slice(4) }).catch((err) => console.warn(err));
   if (action === 'unpin') invoke('dock_unpin', { id: app.id }).catch((err) => console.warn(err));
+  if (action === 'recent' && value) invoke('dock_open_with', { id: app.id, paths: [value] }).catch((err) => console.warn(err));
+  if (action.startsWith('quick:')) invoke('dock_quick_action', { id: app.id, action: action.slice(6) }).catch((err) => console.warn(err));
 });
 
 async function loadIcons() {
