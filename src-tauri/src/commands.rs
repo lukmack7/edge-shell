@@ -300,6 +300,29 @@ pub fn dock_pin(app: AppHandle, exe: String) -> Res<()> {
     crate::settings::save_config(app, cfg)
 }
 
+/// Odpina aplikację z docka, ale nie zamyka jej okien.
+#[tauri::command]
+pub fn dock_unpin(app: AppHandle, id: String) -> Res<()> {
+    let mut cfg = state::cfg(&app);
+    let before = cfg.dock.len();
+    cfg.dock.retain(|a| a.id != id);
+    if cfg.dock.len() == before {
+        return Err("aplikacja nie jest przypięta".into());
+    }
+    crate::settings::save_config(app, cfg)
+}
+
+/// Zamyka wszystkie okna należące do danej ikony docka.
+#[tauri::command]
+pub fn dock_close_windows(app: AppHandle, id: String) -> usize {
+    let wins = crate::previews::windows_of(&app, &id);
+    let n = wins.len();
+    for w in wins {
+        crate::sys::close_window(w.hwnd);
+    }
+    n
+}
+
 #[tauri::command]
 pub fn launch_force(app: AppHandle) -> Res<()> {
     let id = state::update(&app, false, |rt| rt.friction_app.take());

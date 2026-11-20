@@ -119,7 +119,37 @@ let trash = { items: 0 };
 let zoom = 1;
 let hoverTimer = null;
 let dockWidth = 0;
+let contextApp = null;
 const { emitTo } = window.__TAURI__.event;
+
+/** Menu jak w pasku zadań: jest nad dockiem, nie w jego niskim WebView. */
+function showAppContext(app, button) {
+  contextApp = app;
+  clearTimeout(hoverTimer);
+  invoke('previews_hide');
+  const pinned = !app.unpinned && !app.id.startsWith('run:');
+  const items = [
+    { action: 'open', label: app.windows ? `Przełącz na ${app.name}` : `Otwórz ${app.name}` },
+    { action: 'new', label: 'Otwórz nowe okno' },
+  ];
+  if (app.windows) items.push({ action: 'close', label: `Zamknij ${app.windows === 1 ? 'okno' : 'wszystkie okna'}`, danger: true, separator: true });
+  items.push(pinned
+    ? { action: 'unpin', label: 'Odepnij od docka', separator: !app.windows }
+    : { action: 'pin', label: 'Przypnij do docka', separator: !app.windows });
+  const r = button.getBoundingClientRect();
+  invoke('previews_context', { anchor: r.left + r.width / 2, items }).catch((err) => console.warn(err));
+}
+
+listen('dock-context-action', ({ action }) => {
+  const app = contextApp;
+  contextApp = null;
+  if (!app) return;
+  if (action === 'open') invoke('launch', { id: app.id }).catch((err) => console.warn(err));
+  if (action === 'new') invoke('launch_new', { id: app.id }).catch((err) => console.warn(err));
+  if (action === 'close') invoke('dock_close_windows', { id: app.id }).catch((err) => console.warn(err));
+  if (action === 'pin') invoke('dock_pin', { exe: app.id.slice(4) }).catch((err) => console.warn(err));
+  if (action === 'unpin') invoke('dock_unpin', { id: app.id }).catch((err) => console.warn(err));
+});
 
 async function loadIcons() {
   icons = await invoke('dock_icons').catch(() => ({}));
@@ -639,15 +669,12 @@ function render(s) {
         window.addEventListener('pointerup', up);
       };
     }
-    // Prawy klik na otwartej aplikacji spoza docka: przypnij ją na stałe.
-    if (id.startsWith('run:')) {
-      b.oncontextmenu = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        invoke('previews_hide');
-        invoke('dock_pin', { exe: id.slice(4) }).catch((err) => console.warn(err));
-      };
-    }
+    b.oncontextmenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const item = s.dock.find((x) => x.id === id);
+      if (item) showAppContext(item, b);
+    };
     // Najechanie: po chwili żywe podglądy okien tej aplikacji.
     b.onmouseenter = () => {
       closeCard();
@@ -662,7 +689,8 @@ function render(s) {
     };
     b.onmouseleave = () => { clearTimeout(hoverTimer); emitTo('preview', 'preview-leave', null); };
   }
-  dock.oncontextmenu = (e) => { e.preventDefault(); invoke('open_settings'); };
+  // Prawy klik w puste tło nie otwiera już ustawień Edge Shell.
+  dock.oncontextmenu = (e) => e.preventDefault();
   // Okno docka dopasowuje się do szerokości ikon (+ miejsce na podpowiedź).
   requestAnimationFrame(() => {
     dockWidth = Math.ceil(dock.getBoundingClientRect().width) + 8;

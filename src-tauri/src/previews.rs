@@ -26,6 +26,18 @@ pub struct Slot {
     pub h: f64,
 }
 
+/// Jedna pozycja menu kontekstowego docka.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ContextItem {
+    pub action: String,
+    pub label: String,
+    #[serde(default)]
+    pub danger: bool,
+    #[serde(default)]
+    pub separator: bool,
+}
+
 /// Okna danej aplikacji z docka (po nazwie procesu albo pliku .exe).
 pub fn windows_of(app: &AppHandle, id: &str) -> Vec<AppWindow> {
     if let Some(exe) = id.strip_prefix("run:") {
@@ -158,6 +170,26 @@ pub fn previews_metric_fit(app: AppHandle, height: f64) {
         let _ = pv.set_size(PhysicalSize::new(size.width, h as u32));
         let _ = pv.set_position(PhysicalPosition::new(pos.x, y));
     }
+    let _ = pv.show();
+}
+
+/// Menu kontekstowe aplikacji nad dockiem. Rysuje je `preview.html`, dzięki
+/// czemu menu nie jest ograniczone wysokością okna docka.
+#[tauri::command]
+pub fn previews_context(app: AppHandle, anchor: f64, items: Vec<ContextItem>) {
+    let (Some(pv), Some(dock)) = (app.get_webview_window("preview"), app.get_webview_window("dock")) else { return };
+    clear_thumbs();
+    crate::layout::DOCK_HOLD.store(true, std::sync::atomic::Ordering::Relaxed);
+    let scale = dock.scale_factor().unwrap_or(1.0);
+    let s = crate::layout::screen(&app);
+    let w = 244.0 * scale;
+    let h = ((items.len() as f64 * 34.0) + 18.0) * scale;
+    let dpos = dock.outer_position().unwrap_or(PhysicalPosition::new(0, 0));
+    let x = (dpos.x as f64 + anchor * scale - w / 2.0).clamp(0.0, (s.monitor.right as f64 - w).max(0.0));
+    let y = (dpos.y as f64 - h + 8.0 * scale).max(s.monitor.top as f64 + 6.0 * scale);
+    let _ = pv.set_size(PhysicalSize::new(w as u32, h as u32));
+    let _ = pv.set_position(PhysicalPosition::new(x as i32, y as i32));
+    let _ = app.emit_to("preview", "preview-context", &items);
     let _ = pv.show();
 }
 
