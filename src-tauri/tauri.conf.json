@@ -42,7 +42,8 @@
         "skipTaskbar": true,
         "resizable": false,
         "shadow": false,
-        "focus": false
+        "focus": false,
+        "dragDropEnabled": true
       },
       {
         "label": "drawer",
