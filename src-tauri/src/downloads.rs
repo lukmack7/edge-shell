@@ -57,18 +57,22 @@ fn history_files() -> Vec<PathBuf> {
         .collect()
 }
 
-/// Suma `total_bytes` trwających pobrań (stan 0) ze wszystkich przeglądarek.
+/// Suma `total_bytes` trwających pobrań (stan 0) w jednej bazie historii.
+fn total_in(db: &Path) -> Option<u64> {
+    let conn = Connection::open_with_flags(db, OpenFlags::SQLITE_OPEN_READ_ONLY).ok()?;
+    let total: i64 = conn
+        .query_row("SELECT IFNULL(SUM(CASE WHEN total_bytes > 0 THEN total_bytes ELSE 0 END), 0) FROM downloads WHERE state = 0", [], |r| r.get(0))
+        .ok()?;
+    Some(total.max(0) as u64)
+}
+
+/// Suma `total_bytes` trwających pobrań ze wszystkich przeglądarek (z kopii pliku historii).
 fn in_progress_total(files: &[PathBuf]) -> u64 {
     let tmp = std::env::temp_dir().join("edge-shell-history-copy.db");
     let mut total = 0u64;
     for f in files {
-        if std::fs::copy(f, &tmp).is_err() {
-            continue;
-        }
-        let Ok(conn) = Connection::open_with_flags(&tmp, OpenFlags::SQLITE_OPEN_READ_ONLY) else { continue };
-        let Ok(mut stmt) = conn.prepare("SELECT total_bytes FROM downloads WHERE state = 0") else { continue };
-        if let Ok(rows) = stmt.query_map([], |r| r.get::<_, i64>(0)) {
-            total += rows.flatten().filter(|t| *t > 0).map(|t| t as u64).sum::<u64>();
+        if std::fs::copy(f, &tmp).is_ok() {
+            total += total_in(&tmp).unwrap_or(0);
         }
     }
     let _ = std::fs::remove_file(&tmp);
