@@ -397,6 +397,7 @@ dock.addEventListener('mouseleave', () => {
 // Upuszczanie plików z Eksploratora: na ikonę = otwórz w tej aplikacji
 // (na stos = przenieś do folderu), na pusty fragment docka = przypnij.
 const traceDrop = (stage) => invoke('dock_drop_trace', { stage }).catch(console.warn);
+traceDrop('ui:loading');
 function dropHit(pos) {
   if (!pos) return {};
   const r = window.devicePixelRatio || 1;

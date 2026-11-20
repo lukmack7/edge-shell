@@ -23,8 +23,7 @@ fn log_line(stage: &str) {
 }
 
 pub fn attach(dock: &WebviewWindow) {
-    let _ = std::fs::write(crate::config::data_dir().join("dock-drop.log"), "");
-    log_line("native:ready");
+    log_line("native:ready (visible-at-creation)");
     let target = dock.clone();
     let over_logged = AtomicBool::new(false);
     dock.on_window_event(move |event| {
@@ -57,10 +56,14 @@ pub fn attach(dock: &WebviewWindow) {
     });
 }
 
+pub fn page_loaded() {
+    log_line("webview:page-loaded");
+}
+
 #[tauri::command]
 pub fn dock_drop_trace(webview: tauri::Webview, stage: &str) {
     if webview.label() == "dock" && matches!(stage,
-        "ui:ready" | "ui:listen-error" | "ui:drop" | "ui:outside" | "ui:no-paths" |
+        "ui:loading" | "ui:ready" | "ui:listen-error" | "ui:drop" | "ui:outside" | "ui:no-paths" |
         "action:pin" | "action:open" | "action:folder" | "action:trash" |
         "action:ok" | "action:error"
     ) {

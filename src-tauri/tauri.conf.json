@@ -35,7 +35,7 @@
         "title": "Edge Shell — dock",
         "width": 820,
         "height": 92,
-        "visible": false,
+        "visible": true,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,

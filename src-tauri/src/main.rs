@@ -60,8 +60,17 @@ fn main() {
         .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, None))
         .plugin(hotkeys::plugin())
         .manage(shared)
+        .on_page_load(|webview, payload| {
+            if webview.label() == "dock"
+                && matches!(payload.event(), tauri::webview::PageLoadEvent::Finished)
+            {
+                dock_drop::page_loaded();
+            }
+        })
         .setup(|app| {
             let handle = app.handle().clone();
+            // WebView2 musi zobaczyć widoczne okno przy rejestracji drop targetu.
+            // arrange poniżej nadal decyduje, czy dock ma pozostać widoczny.
             if let Some(dock) = app.get_webview_window("dock") {
                 dock_drop::attach(&dock);
             }
