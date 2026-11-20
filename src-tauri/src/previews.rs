@@ -17,7 +17,7 @@ pub struct PreviewWin {
     pub title: String,
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Deserialize)]
 pub struct Slot {
     pub hwnd: isize,
     pub x: f64,
@@ -27,7 +27,7 @@ pub struct Slot {
 }
 
 /// Jedna pozycja menu kontekstowego docka.
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ContextItem {
     pub action: String,
