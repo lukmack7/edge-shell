@@ -396,7 +396,10 @@ dock.addEventListener('mouseleave', () => {
 
 // Upuszczanie plików z Eksploratora: na ikonę = otwórz w tej aplikacji
 // (na stos = skopiuj do folderu), na pusty fragment docka = przypnij.
-const webview = window.__TAURI__.webview.getCurrentWebview();
+// Zdarzenia upuszczenia należą do *okna* WebView2, nie do obiektu osadzonego
+// webview. Przy pojedynczym WebviewWindow (jak dock) `webview` nie odbierał
+// ich niezawodnie na Windows. To jest API wskazane przez Tauri dla plików.
+const dropWindow = window.__TAURI__.webviewWindow.getCurrentWebviewWindow();
 function dropTarget(pos) {
   const r = window.devicePixelRatio || 1;
   const el = document.elementFromPoint(pos.x / r, pos.y / r);
@@ -414,7 +417,7 @@ function dropToast(text, anchor, error = false) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => invoke('previews_hide'), error ? 4200 : 2200);
 }
-webview.onDragDropEvent((ev) => {
+dropWindow.onDragDropEvent((ev) => {
   const p = ev.payload;
   if (p.type === 'over' || p.type === 'enter') {
     clearTimeout(toastTimer);
