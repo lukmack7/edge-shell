@@ -17,7 +17,7 @@ pub struct PreviewWin {
     pub title: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize)]
 pub struct Slot {
     pub hwnd: isize,
     pub x: f64,
