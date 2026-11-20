@@ -1,0 +1,62 @@
+error[E0597]: `conn` does not live long enough
+  --> src\downloads.rs:69:28
+   |
+68 |         let Ok(conn) = Connection::open_with_flags(&tmp, OpenFlags::SQLITE_OPEN_READ_ONLY) else { continue };
+   |                ---- binding `conn` declared here
+69 |         let Ok(mut stmt) = conn.prepare("SELECT total_bytes FROM downloads WHERE state = 0") else { continue };
+   |                            ^^^^ borrowed value does not live long enough
+70 |         if let Ok(rows) = stmt.query_map([], |r| r.get::<_, i64>(0)) {
+   |                           ------------------------------------------ a temporary with access to the borrow is created here ...
+...
+73 |     }
+   |     -
+   |     |
+   |     `conn` dropped here while still borrowed
+   |     ... and the borrow might be used here, when that temporary is dropped and runs the destructor for type `Result<MappedRows<'_, {closure@src\downloads.rs:70:46: 70:49}>, rusqlite::Error>`
+   |
+help: consider adding semicolon after the expression so its temporaries are dropped sooner, before the local variables declared by the block are dropped
+   |
+72 |         };
+   |          +
+
+error[E0597]: `stmt` does not live long enough
+  --> src\downloads.rs:70:27
+   |
+69 |         let Ok(mut stmt) = conn.prepare("SELECT total_bytes FROM downloads WHERE state = 0") else { continue };
+   |                -------- binding `stmt` declared here
+70 |         if let Ok(rows) = stmt.query_map([], |r| r.get::<_, i64>(0)) {
+   |                           ^^^^--------------------------------------
+   |                           |
+   |                           borrowed value does not live long enough
+
+error[E0597]: `stmt` does not live long enough
+  --> src\downloads.rs:70:27
+   |
+69 |         let Ok(mut stmt) = conn.prepare("SELECT total_bytes FROM downloads WHERE state = 0") else { continue };
+   |                -------- binding `stmt` declared here
+70 |         if let Ok(rows) = stmt.query_map([], |r| r.get::<_, i64>(0)) {
+   |                           ^^^^--------------------------------------
+   |                           |
+   |                           borrowed value does not live long enough
+   |                           a temporary with access to the borrow is created here ...
+...
+73 |     }
+   |     -
+   |     |
+   |     `stmt` dropped here while still borrowed
+   |     ... and the borrow might be used here, when that temporary is dropped and runs the destructor for type `Result<MappedRows<'_, {closure@src\downloads.rs:70:46: 70:49}>, rusqlite::Error>`
+   |
+help: consider adding semicolon after the expression so its temporaries are dropped sooner, before the local variables declared by the block are dropped
+   |
+72 |         };
+   |          +
+
+For more information about this error, try `rustc --explain E0597`.
+warning: `edge-shell` (bin "edge-shell") generated 1 warning
+error: could not compile `edge-shell` (bin "edge-shell") due to 2 previous errors; 1 warning emitted
+failed to build app: failed to build app
+       Error failed to build app: failed to build app
+
+error: could not compile `edge-shell` (bin "edge-shell") due to 2 previous errors; 1 warning emitted
+failed to build app: failed to build app
+       Error failed to build app: failed to build app
