@@ -204,6 +204,7 @@ fn main() {
             settings::get_config,
             settings::save_config,
             settings::open_settings,
+            settings::restart_app,
             settings::pick_path,
             settings::horolog_test,
             settings::get_stats,

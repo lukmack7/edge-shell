@@ -121,6 +121,7 @@
     <div class="content scroll" id="content"></div>
     <div class="footer">
       <span class="status" id="status">Wszystko zapisane</span>
+      <button class="btn" id="restart" title="Uruchom ponownie Edge Shell">Restartuj</button>
       <button class="btn" id="revert">Cofnij zmiany</button>
       <button class="btn primary" id="save">Zapisz i zastosuj</button>
     </div>
@@ -1521,6 +1522,20 @@ async function save() {
 $('nav').insertAdjacentHTML('beforeend', PAGES.map(([id, name, ic]) => `<button data-page="${id}">${icon(ic, 18)}${name}</button>`).join(''));
 for (const b of $('nav').querySelectorAll('button')) b.onclick = () => show(b.dataset.page);
 $('save').onclick = save;
+$('restart').onclick = async () => {
+  if (cfg && JSON.stringify(cfg) !== saved
+      && !confirm('Masz niezapisane zmiany. Uruchomić Edge Shell ponownie bez zapisywania?')) return;
+  const button = $('restart');
+  button.disabled = true;
+  button.textContent = 'Restartowanie…';
+  try {
+    await invoke('restart_app');
+  } catch (e) {
+    button.disabled = false;
+    button.textContent = 'Restartuj';
+    toast(`Nie udało się uruchomić ponownie: ${e}`, 4000);
+  }
+};
 $('revert').onclick = () => { cfg = JSON.parse(saved); markDirty(); show(page); };
 window.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key.toLowerCase() === 's') { e.preventDefault(); save(); } });
 
