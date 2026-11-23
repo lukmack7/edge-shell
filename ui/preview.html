@@ -15,7 +15,12 @@
   .card:hover .x { opacity: 1; }
   .card .x:hover { background: #7f1d1d; color: #fff; }
   .slot { height: 124px; border-radius: 8px; background: rgba(255,255,255,0.03); }
-  .tip { margin-bottom: 4px; padding: 5px 10px; border-radius: 8px; background: #27272a; border: 1px solid var(--line-strong); font-size: 12px; white-space: pre-line; }
+  .tip-position { min-width: 0; max-width: calc(100% - 8px); margin-bottom: 4px; }
+  .tip { display: block; padding: 5px 10px; border-radius: 8px; background: #27272a; border: 1px solid var(--line-strong); font-size: 12px; line-height: 16px; white-space: pre-line; overflow-wrap: anywhere; }
+  .drop-notice { display: flex; align-items: flex-start; gap: 10px; max-height: calc(100vh - 8px); padding: 9px 12px; overflow: auto; background: #202024; font-size: 14px; line-height: 19px; }
+  .drop-notice .symbol { flex: none; color: #86efac; font-weight: 700; }
+  .drop-notice.error .symbol { color: #fbbf24; }
+  .drop-notice .message { min-width: 0; }
   /* Karta metryki: CPU / pamięć / bateria nad dockiem. */
   .mwrap { margin-bottom: 4px; }
   .mcard { --c: #fbbf24; width: 252px; margin: 0 auto; padding: 14px 15px 13px; border-radius: 20px; background: rgba(22,23,28,.98); border: 1px solid rgba(255,255,255,.1); box-shadow: 0 24px 50px -18px #000; }
@@ -50,6 +55,7 @@ let inside = false;
 let hideTimer = null;
 
 function scheduleHide(ms) {
+  if (wrap.querySelector('.drop-notice')) return;
   clearTimeout(hideTimer);
   hideTimer = setTimeout(() => { if (!inside) invoke('previews_hide'); }, ms);
 }
@@ -59,13 +65,15 @@ document.body.addEventListener('mouseleave', () => { inside = false; scheduleHid
 let tipMode = false;
 let metricMode = false;
 listen('preview-leave', () => scheduleHide(metricMode ? 380 : tipMode ? 80 : 450));
-listen('preview-tip', (text) => {
+listen('preview-tip', ({ text, dropError }) => {
   tipMode = true;
   metricMode = false;
   clearTimeout(hideTimer);
-  wrap.className = '';
+  wrap.className = 'tip-position';
   delete wrap.dataset.k;
-  wrap.innerHTML = `<span class="tip">${esc(text)}</span>`;
+  wrap.innerHTML = typeof dropError === 'boolean'
+    ? `<div class="tip drop-notice${dropError ? ' error' : ''}" role="${dropError ? 'alert' : 'status'}"><span class="symbol" aria-hidden="true">${dropError ? '⚠' : '✓'}</span><span class="message">${esc(text)}</span></div>`
+    : `<div class="tip">${esc(text)}</div>`;
 });
 listen('preview-enter', () => clearTimeout(hideTimer));
 

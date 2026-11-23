@@ -89,14 +89,19 @@
   @keyframes wpulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(248,113,113,0); } 50% { box-shadow: 0 0 12px 1px rgba(248,113,113,0.35); } }
    /* Parametry systemu są częścią docka: sam pierścień z ikoną, szczegóły po najechaniu. */
    /* Parametry systemu: sam pierścień z ikoną; szczegóły w dymku po najechaniu. */
-   .metrics { display:flex; align-items:center; gap:3px; padding:3px; margin:0 0 6px 2px; border-radius:16px;
+  .metrics { display:flex; align-items:center; gap:3px; padding:3px; margin:0 0 6px 2px; border-radius:16px;
      background:rgba(255,255,255,0.035); border:1px solid rgba(255,255,255,0.055); }
    .metric { position:relative; width:44px; height:48px; border-radius:13px; color:var(--muted); display:grid; place-items:center; cursor:default; outline:0; }
    .metric:hover, .metric.open { background:rgba(255,255,255,0.09); }
    .metric-ring { --p:0; --c:#fbbf24; position:relative; width:30px; height:30px; border-radius:50%; display:grid; place-items:center;
      background:conic-gradient(var(--c) calc(var(--p) * 1%), rgba(255,255,255,0.12) 0); }
    .metric-ring::before { content:""; position:absolute; inset:3px; border-radius:50%; background:#17181d; }
-   .metric-ring svg { position:relative; width:12px; height:12px; fill:none; stroke:var(--c); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  .metric-ring svg { position:relative; width:12px; height:12px; fill:none; stroke:var(--c); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+  /* Zegar jest stałym zakończeniem docka, obok metryk — nie kolejną przypiętą aplikacją. */
+  .dock-clock { position: relative; flex: none; width: 78px; height: 48px; margin: 0 1px 6px 2px; padding: 0; border: 1px solid rgba(255,255,255,.11); border-radius: 13px; background: rgba(255,255,255,.045); color: var(--text); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1; }
+  .dock-clock:hover { background: rgba(255,255,255,.11); border-color: rgba(255,255,255,.2); }
+  .dock-clock time { font-size: 17px; font-weight: 680; font-variant-numeric: tabular-nums; letter-spacing: -.4px; }
+  .dock-clock small { max-width: 70px; overflow: hidden; text-overflow: ellipsis; color: var(--muted); font-size: 10px; white-space: nowrap; }
   /* Postęp pobierania na ikonie folderu Pobrane i przeglądarki. */
   .app:not(.card) .dl { position: absolute; left: 8px; right: 8px; bottom: 14px; height: 6px; border-radius: 3px; background: rgba(0,0,0,.62); box-shadow: 0 0 0 1px rgba(255,255,255,.2); overflow: hidden; display: none; pointer-events: none; }
   .app[data-dl="1"] .dl { display: block; }
@@ -276,6 +281,20 @@ function metricsHtml() {
       <span class="metric-ring" style="--c:${METRIC[k].color}">${metricIcon[k]}</span>
     </div>`).join('')}</span>`;
 }
+function clockHtml() {
+  return `<button class="dock-clock" type="button" aria-label="Otwórz kalendarz" title="Kalendarz">
+    <time data-dock-time></time><small data-dock-date></small>
+  </button>`;
+}
+function updateDockClock() {
+  const time = dock.querySelector('[data-dock-time]');
+  const date = dock.querySelector('[data-dock-date]');
+  if (!time || !date) return;
+  const now = new Date();
+  time.textContent = now.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+  date.textContent = now.toLocaleDateString('pl-PL', { weekday: 'short', day: 'numeric', month: 'short' }).replace('.', '');
+  time.dateTime = now.toISOString();
+}
 const sizeText = (mb) => (mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.round(mb)} MB`);
 function metricRows(k) {
   if (k === 'battery') return [['stan', stats.charging ? 'ładowanie' : 'na baterii'], ['poziom', `${pct(stats.battery)}%`]];
@@ -413,10 +432,15 @@ function clearDrop() {
 let toastTimer = null;
 /** Wynik upuszczenia widać w dymku nad dockiem — wcześniej błędy trafiały tylko do konsoli. */
 function dropToast(text, anchor, error = false) {
-  invoke('previews_tip', { text: `${error ? '⚠ ' : '✓ '}${text}`, anchor });
+  clearTimeout(hoverTimer);
+  invoke('previews_tip', { text, anchor, dropError: error });
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => invoke('previews_hide'), error ? 4200 : 2200);
+  toastTimer = setTimeout(() => {
+    toastTimer = null;
+    invoke('previews_hide');
+  }, error ? 5200 : 2600);
 }
+listen('preview-hidden', () => { clearTimeout(toastTimer); toastTimer = null; });
 let externalDrag = false;
 listen('dock-native-drop', (p) => {
   const { target: t, pin } = dropHit(p.position);
@@ -425,6 +449,7 @@ listen('dock-native-drop', (p) => {
       externalDrag = true;
       clearTimeout(hoverTimer);
       clearTimeout(toastTimer);
+      toastTimer = null;
       // Osobne okno podglądu nie może przejąć kursora podczas przeciągania.
       invoke('previews_hide');
     }
@@ -612,6 +637,7 @@ function tickCounts() {
   }
 }
 setInterval(tickCounts, 1000);
+setInterval(updateDockClock, 1000);
 
 /** Pasek pobierania na ikonach folderu Pobrane i przeglądarek — aktualizowany bez przerysowania docka. */
 function updateDownloads(s) {
@@ -652,8 +678,10 @@ function render(s) {
         : a.badge ? `<span class="badge" aria-label="${a.badge} ${a.unreadBadge ? 'nieprzeczytanych wiadomości' : 'nowych powiadomień'}">${a.badge > 99 ? '99+' : a.badge}</span>`
         : !card && (a.windows || a.running) ? `<span class="dots" aria-hidden="true">${'<i></i>'.repeat(Math.min(3, Math.max(1, a.windows || 1)))}</span>` : '')}
     </button>${a.separatorAfter ? '<span class="sep" aria-hidden="true"></span>' : ''}`;
-  }).join('') + (s.showTrash === false ? '' : trashHtml()) + metricsHtml();
+  }).join('') + (s.showTrash === false ? '' : trashHtml()) + metricsHtml() + clockHtml();
   updateDownloads(s);
+  updateDockClock();
+  dock.querySelector('.dock-clock').onclick = () => invoke('toggle_calendar').catch((err) => console.warn(err));
   for (const b of dock.querySelectorAll('.app')) {
     if (b.dataset.trash) {
       b.onclick = () => { invoke('previews_hide'); invoke('trash_open'); };
@@ -664,6 +692,7 @@ function render(s) {
         invoke('trash_empty').then(refreshTrash).catch((err) => console.warn(err));
       };
       b.onmouseenter = () => {
+        if (externalDrag || toastTimer) return;
         closeCard();
         clearTimeout(hoverTimer);
         emitTo('preview', 'preview-enter', null);
@@ -766,7 +795,7 @@ function render(s) {
     };
     // Najechanie: po chwili żywe podglądy okien tej aplikacji.
     b.onmouseenter = () => {
-      if (externalDrag) return;
+      if (externalDrag || toastTimer) return;
       closeCard();
       clearTimeout(hoverTimer);
       emitTo('preview', 'preview-enter', null);

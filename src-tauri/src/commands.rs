@@ -315,7 +315,7 @@ pub fn dock_add_paths(app: AppHandle, paths: Vec<String>) -> Res<String> {
     }
     if added.is_empty() {
         return Err(if skipped > 0 {
-            "Do docka przypinam programy (.exe), skróty (.lnk) i foldery. Upuść plik na ikonę aplikacji, żeby go otworzyć.".into()
+            "Tu możesz przypiąć aplikację, skrót lub folder.\nAby otworzyć plik, upuść go na ikonę aplikacji.".into()
         } else {
             "Ta pozycja jest już w docku".into()
         });
