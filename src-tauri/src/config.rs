@@ -58,7 +58,7 @@ pub struct Config {
     pub weather: WeatherCfg,
 }
 
-/// Poczta z Thunderbirda (przez dodatek Edge Shell Bridge).
+/// Poczta z Thunderbirda (przez dodatek Edge Shell Bridge) i licznik Outlooka.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct MailCfg {
@@ -75,6 +75,8 @@ pub struct MailCfg {
     pub block_words: Vec<String>,
     /// Licznik nieprzeczytanych na ikonie Thunderbirda w docku.
     pub badge: bool,
+    /// Licznik domyślnej skrzynki odbiorczej klasycznego Outlooka.
+    pub outlook_badge: bool,
     /// W fokusie licznik jest szary i bez liczby.
     pub badge_mute_focus: bool,
     /// Długość zadania z maila (minuty).
@@ -91,6 +93,7 @@ impl Default for MailCfg {
             vip: vec![],
             block_words: vec!["poczta".into(), "mail".into(), "maile".into(), "e-mail".into(), "skrzynka".into(), "inbox".into()],
             badge: true,
+            outlook_badge: false,
             badge_mute_focus: true,
             task_minutes: 30,
         }

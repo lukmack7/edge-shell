@@ -192,6 +192,15 @@ function markDirty() {
   $('status').classList.toggle('dirty', dirty);
 }
 
+function updateOutlookStatus() {
+  const el = $('outlookUnreadStatus');
+  if (!el) return;
+  const count = snap?.outlookUnread;
+  el.textContent = cfg?.mail?.outlookBadge
+    ? count == null ? 'Brak odczytu — uruchom klasyczny Outlook i odczekaj chwilę.' : `Nieprzeczytane w skrzynce odbiorczej: ${count}`
+    : 'Licznik wyłączony.';
+}
+
 /** Podpina pola z atrybutami data-bind / data-num / data-sw do konfiguracji. */
 function bind(root) {
   for (const el of root.querySelectorAll('[data-bind]')) {
@@ -557,6 +566,7 @@ const render = {
       </div>
       <div class="card">
         <h3>Dock</h3>
+        <div class="row"><div class="txt"><b>Licznik nieprzeczytanych na ikonie Outlooka</b><span>Domyślna skrzynka odbiorcza. Wymaga uruchomionego klasycznego Outlooka; nie obsługuje nowego Outlooka.</span><span id="outlookUnreadStatus"></span></div>${sw(mc.outlookBadge, 'mail.outlookBadge')}</div>
         <div class="row"><div class="txt"><b>Licznik nieprzeczytanych na ikonie Thunderbirda</b><span>Suma skrzynek odbiorczych wszystkich kont.</span></div>${sw(mc.badge, 'mail.badge')}</div>
         <div class="row"><div class="txt"><b>W fokusie wycisz licznik</b><span>Szara kropka zamiast liczby — wiesz, że coś jest, ale nie kusi. W bloku poczty licznik wraca.</span></div>${sw(mc.badgeMuteFocus, 'mail.badgeMuteFocus')}</div>
       </div>`;
@@ -1485,6 +1495,7 @@ function show(p) {
   const root = $('content').firstElementChild;
   bind(root);
   after[p]?.(root);
+  if (p === 'mail') updateOutlookStatus();
   $('content').scrollTop = scroll;
 }
 
@@ -1542,6 +1553,7 @@ window.addEventListener('keydown', (e) => { if (e.ctrlKey && e.key.toLowerCase()
 let statusKey = '';
 onSnapshot((s) => {
   snap = s;
+  updateOutlookStatus();
   // Przerysuj tylko, gdy zmienił się status widoczny na stronie.
   const key = JSON.stringify([s.radio?.notifications, s.music?.connected, s.music?.error]);
   if (key === statusKey) return;

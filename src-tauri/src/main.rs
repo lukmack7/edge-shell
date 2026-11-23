@@ -38,12 +38,14 @@ mod weather;
 mod trash;
 mod downloads;
 mod dock_drop;
+mod restart;
+mod outlook;
 
 use tauri::{Emitter, Manager, RunEvent, WindowEvent};
 
 fn main() {
     // Ten sam plik .exe działa też jako bezpiecznik (osobny proces).
-    if watchdog::run_if_requested() {
+    if restart::run_if_requested() || watchdog::run_if_requested() {
         return;
     }
     let cfg = config::Config::load();
@@ -105,6 +107,7 @@ fn main() {
             notifications::start(handle.clone());
             stats::start(handle.clone());
             downloads::start(handle.clone());
+            outlook::start(handle.clone());
             if cfg.shell.tray_in_rail {
                 let h = handle.clone();
                 tray::start(Box::new(move || {

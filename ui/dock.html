@@ -649,7 +649,7 @@ function render(s) {
       <span class="stripe" style="background:${a.stripe}"></span>
       ${a.dlTarget ? '<span class="dl"><i></i></span>' : ''}
       ${wd ? '' : (a.badgeMuted ? '<span class="badge muted" aria-label="nieprzeczytana poczta — wyciszone w fokusie" title="Poczta czeka — licznik wyciszony w fokusie"></span>'
-        : a.badge ? `<span class="badge" aria-label="${a.badge} nowych">${a.badge > 99 ? '99+' : a.badge}</span>`
+        : a.badge ? `<span class="badge" aria-label="${a.badge} ${a.unreadBadge ? 'nieprzeczytanych wiadomości' : 'nowych powiadomień'}">${a.badge > 99 ? '99+' : a.badge}</span>`
         : !card && (a.windows || a.running) ? `<span class="dots" aria-hidden="true">${'<i></i>'.repeat(Math.min(3, Math.max(1, a.windows || 1)))}</span>` : '')}
     </button>${a.separatorAfter ? '<span class="sep" aria-hidden="true"></span>' : ''}`;
   }).join('') + (s.showTrash === false ? '' : trashHtml()) + metricsHtml();
