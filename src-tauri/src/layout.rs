@@ -32,6 +32,11 @@ pub struct Screen {
 
 pub const BAR_H: f64 = 36.0;
 pub const DOCK_H: f64 = 92.0;
+
+/// Wysokość okna docka (px logiczne) po zastosowaniu skali z ustawień.
+pub fn dock_h(shell: &crate::config::ShellCfg) -> f64 {
+    DOCK_H * f64::from(shell.dock_scale.clamp(70, 140)) / 100.0
+}
 pub const RAIL_W: f64 = 56.0;
 /// Z notchem górny pasek znika, a pas pod notchem ma 40 px (okna zaczynają się niżej).
 pub const NOTCH_BAR_H: f64 = 40.0;
@@ -268,7 +273,7 @@ pub fn arrange(app: &AppHandle) {
     if let Some(dock) = win(app, "dock") {
         let fs = FULLSCREEN.lock().ok().and_then(|g| *g).is_some();
         if dock_on && cfg.shell.reserve_top_bar && !fs {
-            let h = px(DOCK_H + 6.0, &s);
+            let h = px(dock_h(&cfg.shell) + 6.0, &s);
             let rect = Rect { left: s.monitor.left, top: s.monitor.bottom - h, right: s.monitor.right, bottom: s.monitor.bottom };
             register_appbar(&dock, rect, ABE_BOTTOM);
             DOCK_RESERVED.store(true, Ordering::Relaxed);
@@ -286,7 +291,7 @@ pub fn arrange(app: &AppHandle) {
     set_dock_visible(app, dock_on);
 
     let top = s.work.top + px(MARGIN, &s);
-    let dock_space = if DOCK_RESERVED.load(Ordering::Relaxed) { 0.0 } else { DOCK_H };
+    let dock_space = if DOCK_RESERVED.load(Ordering::Relaxed) { 0.0 } else { dock_h(&cfg.shell) };
     let height = s.work.bottom - top - px(MARGIN + dock_space, &s);
     if let Some(w) = win(app, "drawer") {
         place(&w, s.work.left + px(MARGIN, &s), top, px(DRAWER_W, &s), height);
@@ -394,11 +399,14 @@ pub fn place_dock(app: &AppHandle, logical_width: Option<f64>) {
         Some(w) => px(w, &s),
         None => dock.outer_size().map(|z| z.width as i32).unwrap_or(px(820.0, &s)),
     };
-    let h = px(DOCK_H, &s);
+    let h = px(dock_h(&state::cfg(app).shell), &s);
     let x = (s.work.left + s.work.right - width) / 2;
     // Z rezerwacją dock stoi w zarezerwowanym pasie pod obszarem roboczym.
     let y = if DOCK_RESERVED.load(Ordering::Relaxed) { s.work.bottom } else { s.work.bottom - h - px(6.0, &s) };
-    place(&dock, x, y, width, h);
+    let done = hwnd_of(&dock).is_some_and(|raw| platform::set_rect(raw, x, y, width, h));
+    if !done {
+        place(&dock, x, y, width, h);
+    }
     if let Ok(mut r) = DOCK_RECT.lock() {
         *r = Rect { left: x, top: y, right: x + width, bottom: y + h };
     }
@@ -604,7 +612,7 @@ pub fn start_edges(app: AppHandle) {
                 right_since = None;
                 continue;
             }
-            let in_band = y > s.work.top + px(40.0, &s) && y < s.work.bottom - px(DOCK_H + 20.0, &s);
+            let in_band = y > s.work.top + px(40.0, &s) && y < s.work.bottom - px(dock_h(&shell) + 20.0, &s);
 
             let at_left = in_band && x <= s.monitor.left;
             let at_right = in_band && x >= s.monitor.right - 1;

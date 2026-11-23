@@ -345,6 +345,9 @@ pub struct Runtime {
     pub notif_status: String,
     /// Nieprzeczytane powiadomienia na ikonach docka (id aplikacji → liczba).
     pub badges: HashMap<String, u32>,
+    pub outlook_unread: Option<u32>,
+    /// Trwające pobieranie z przeglądarki (pasek postępu na ikonie docka).
+    pub download: Option<crate::downloads::DownloadInfo>,
     /// Uruchomione aplikacje z oknami, których nie ma w docku (w kolejności otwarcia).
     pub open_apps: Vec<OpenApp>,
     /// Tytuły okien per plik .exe (do kart w docku).
@@ -483,12 +486,17 @@ pub fn snapshot(app: &AppHandle) -> Value {
             } else {
                 (false, 0usize, 0u32, false, Vec::new())
             };
+            let dl_target = a.widget.is_empty()
+                && ((stack && crate::downloads::is_downloads_dir(&a.path))
+                    || exes.iter().any(|e| crate::downloads::BROWSERS.contains(&e.as_str())));
             json!({
+                "dlTarget": dl_target,
                 "id": a.id, "name": a.name, "icon": a.icon, "category": a.category,
                 "bg": bg, "fg": fg, "stripe": stripe,
                 "dim": mode.dim.iter().any(|d| d == &a.id),
                 "running": running, "windows": windows, "separatorAfter": separator,
                 "badge": badge, "stack": stack, "exe": exes.first().cloned().unwrap_or_default(),
+                "isClassicOutlook": exes.iter().any(|e| e == crate::outlook::EXE),
                 "widget": a.widget, "widgetTarget": a.widget_target,
             })
         })
@@ -504,7 +512,8 @@ pub fn snapshot(app: &AppHandle) -> Value {
                 "id": format!("run:{}", o.exe), "name": o.name, "icon": "auto", "category": "",
                 "bg": "#27272a", "fg": "#e4e4e7", "stripe": "rgba(255,255,255,0.35)",
                 "dim": false, "running": true, "windows": o.windows, "separatorAfter": false,
-                "badge": 0, "stack": false, "unpinned": true, "path": o.path, "exe": o.exe,
+                "badge": rt.badges.get(&format!("run:{}", o.exe)).copied().unwrap_or(0), "stack": false, "unpinned": true, "path": o.path, "exe": o.exe,
+                "isClassicOutlook": o.exe.eq_ignore_ascii_case(crate::outlook::EXE),
             }));
         }
     }
@@ -520,6 +529,14 @@ pub fn snapshot(app: &AppHandle) -> Value {
                 d["badge"] = json!(if muted { 0 } else { unread });
                 d["badgeMuted"] = json!(muted);
             }
+        }
+    }
+
+    if cfg.mail.outlook_badge {
+        for d in dock.iter_mut().filter(|d| d["isClassicOutlook"].as_bool() == Some(true)) {
+            // Nie myl liczby toastów Windows z liczbą nieprzeczytanych.
+            d["badge"] = json!(rt.outlook_unread.unwrap_or(0));
+            d["unreadBadge"] = json!(true);
         }
     }
 
@@ -597,11 +614,13 @@ pub fn snapshot(app: &AppHandle) -> Value {
             json!({ "name": p.name, "path": p.path, "stripe": stripe })
         }).collect::<Vec<_>>(),
         "recent": rt.recent,
+        "download": rt.download,
         "clipboard": rt.clipboard,
         "app": rt.foreground,
         "battery": rt.battery.map(|(p, c)| json!({ "percent": p, "charging": c })),
         "music": rt.music,
         "weather": rt.weather,
+        "wpreview": cfg.weather.preview,
         "spotifyEnabled": !cfg.spotify.client_id.is_empty(),
         "player": rt.store.player,
         "quietUntil": rt.store.quiet_until,
@@ -610,6 +629,7 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "notch": cfg.shell.notch,
         "dayRail": cfg.shell.notch && cfg.shell.day_rail,
         "mail": crate::mail::snapshot(&cfg, &rt.store.mail_planned),
+        "outlookUnread": if cfg.mail.outlook_badge { rt.outlook_unread } else { None },
         "mailTasks": rt.store.mail_tasks.iter().map(|t| t.intent_id.clone()).collect::<Vec<_>>(),
         "mailBlock": current_item(&rt.plan, now).is_some_and(|c| crate::mail::mail_block(&cfg, &c.title)),
         "windowTitles": rt.window_titles,
@@ -624,6 +644,8 @@ pub fn snapshot(app: &AppHandle) -> Value {
         "showBubbles": cfg.shell.show_bubbles,
         "barStats": cfg.bar.stats,
         "showRail": cfg.shell.show_rail,
+        "dockScale": cfg.shell.dock_scale,
+        "showTrash": cfg.shell.show_trash,
         "clock": format!("{:02}:{:02}", now.hour(), now.minute()),
     })
 }

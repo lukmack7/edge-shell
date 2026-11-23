@@ -35,14 +35,15 @@
         "title": "Edge Shell — dock",
         "width": 820,
         "height": 92,
-        "visible": false,
+        "visible": true,
         "decorations": false,
         "transparent": true,
         "alwaysOnTop": true,
         "skipTaskbar": true,
         "resizable": false,
         "shadow": false,
-        "focus": false
+        "focus": false,
+        "dragDropEnabled": true
       },
       {
         "label": "drawer",

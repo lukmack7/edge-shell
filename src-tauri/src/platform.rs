@@ -360,6 +360,12 @@ mod imp {
         }
     }
 
+    /// Pozycja i rozmiar okna jednym wywołaniem (bez migania przy zmianie wysokości).
+    pub fn set_rect(raw: isize, x: i32, y: i32, w: i32, h: i32) -> bool {
+        use windows::Win32::UI::WindowsAndMessaging::{SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
+        unsafe { SetWindowPos(hwnd(raw), HWND::default(), x, y, w.max(1), h.max(1), SWP_NOZORDER | SWP_NOACTIVATE).is_ok() }
+    }
+
     #[allow(dead_code)]
     pub fn unused(_: WPARAM) {}
 }
@@ -390,6 +396,7 @@ mod imp {
     pub fn send_paste() {}
     pub fn window_info(_: isize) -> (String, String) { (String::new(), String::new()) }
     pub fn place_below(_: isize, _: isize) {}
+    pub fn set_rect(_: isize, _: i32, _: i32, _: i32, _: i32) -> bool { false }
 }
 
 pub use imp::*;

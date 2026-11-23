@@ -244,6 +244,10 @@ fn foreground(app: &AppHandle) {
             state::update(app, false, |rt| rt.badges.remove(&id));
         }
     }
+    let run_key = format!("run:{file}");
+    if state::read(app, |rt| rt.badges.contains_key(&run_key)) {
+        state::update(app, false, |rt| rt.badges.remove(&run_key));
+    }
     let name = cfg
         .dock
         .iter()
